@@ -1,0 +1,399 @@
+.solar-page {
+  min-height: 100vh;
+  background: #f4f7fa;
+  color: #17324d;
+}
+
+
+/* =========================
+   HEADER
+========================= */
+
+.solar-header {
+  height: 75px;
+  background: white;
+  border-bottom: 1px solid #e2e9ee;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  box-sizing: border-box;
+}
+
+.back-btn {
+  border: none;
+  background: transparent;
+  color: #078b98;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.back-btn:hover {
+  color: #056d77;
+}
+
+.solar-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.solar-user-icon {
+  width: 42px;
+  height: 42px;
+  background: #0b98a3;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.solar-user strong,
+.solar-user span {
+  display: block;
+}
+
+.solar-user strong {
+  font-size: 14px;
+}
+
+.solar-user span {
+  margin-top: 3px;
+  color: #7c8995;
+  font-size: 11px;
+}
+
+
+/* =========================
+   TITLE
+========================= */
+
+.solar-title {
+  max-width: 1200px;
+  margin: 35px auto 25px;
+  padding: 0 25px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.solar-title-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 15px;
+  background: #fff3cd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+}
+
+.solar-title h1 {
+  margin: 0 0 5px;
+  font-size: 30px;
+  color: #103b5a;
+}
+
+.solar-title p {
+  margin: 0;
+  color: #718096;
+}
+
+
+/* =========================
+   CONTENT
+========================= */
+
+.solar-content {
+  max-width: 1200px;
+  margin: auto;
+  padding: 0 25px 50px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 25px;
+}
+
+.solar-card {
+  background: white;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 4px 18px rgba(20, 50, 70, 0.07);
+}
+
+.solar-card-header {
+  margin-bottom: 25px;
+}
+
+.solar-card-header h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.solar-card-header p {
+  margin: 0;
+  color: #7b8996;
+  font-size: 13px;
+}
+
+
+/* =========================
+   FORM
+========================= */
+
+.input-group {
+  margin-bottom: 20px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #304b61;
+}
+
+.input-group input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  border: 1px solid #d4e0e7;
+  border-radius: 9px;
+  background: #fbfdff;
+  color: #17324d;
+  font-size: 14px;
+  outline: none;
+}
+
+.input-group input:focus {
+  border-color: #0b9ba5;
+  box-shadow: 0 0 0 3px rgba(11, 155, 165, 0.1);
+}
+
+.input-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.analyze-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 9px;
+  background: #0b96a2;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 5px;
+}
+
+.analyze-btn:hover {
+  background: #087f89;
+}
+
+
+/* =========================
+   EMPTY RESULT
+========================= */
+
+.empty-result {
+  height: 100%;
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.empty-icon {
+  width: 80px;
+  height: 80px;
+  background: #fff4d2;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  margin-bottom: 18px;
+}
+
+.empty-result h2 {
+  margin: 0 0 8px;
+}
+
+.empty-result p {
+  max-width: 350px;
+  line-height: 1.6;
+  color: #7b8996;
+  font-size: 13px;
+}
+
+
+/* =========================
+   RESULT
+========================= */
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 30px;
+}
+
+.result-header h2 {
+  margin: 0 0 5px;
+}
+
+.result-header p {
+  margin: 0;
+  color: #7b8996;
+  font-size: 13px;
+}
+
+.rating {
+  background: #e3f7ea;
+  color: #16824b;
+  padding: 7px 13px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+
+/* =========================
+   SCORE
+========================= */
+
+.potential-score {
+  margin-bottom: 25px;
+}
+
+.potential-score span {
+  display: block;
+  color: #718096;
+  font-size: 13px;
+  margin-bottom: 7px;
+}
+
+.potential-score strong {
+  display: block;
+  font-size: 38px;
+  color: #0b929d;
+  margin-bottom: 12px;
+}
+
+.score-bar {
+  width: 100%;
+  height: 9px;
+  background: #e8eef2;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.score-bar div {
+  height: 100%;
+  background: #0b9ba5;
+  border-radius: 20px;
+}
+
+
+/* =========================
+   RESULT GRID
+========================= */
+
+.result-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 25px;
+}
+
+.result-box {
+  background: #f7fafc;
+  border: 1px solid #e8eef2;
+  padding: 17px;
+  border-radius: 10px;
+}
+
+.result-box span {
+  display: block;
+  color: #7b8996;
+  font-size: 11px;
+  margin-bottom: 7px;
+}
+
+.result-box strong {
+  font-size: 18px;
+  color: #17324d;
+}
+
+
+/* =========================
+   RECOMMENDATION
+========================= */
+
+.recommendation {
+  background: #edf9fa;
+  border-left: 4px solid #0b9ba5;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.recommendation h3 {
+  margin: 0 0 7px;
+  font-size: 14px;
+}
+
+.recommendation p {
+  margin: 0;
+  color: #536b7d;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 850px) {
+
+  .solar-content {
+    grid-template-columns: 1fr;
+  }
+
+  .solar-header {
+    padding: 0 20px;
+  }
+
+}
+
+@media (max-width: 550px) {
+
+  .input-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .solar-title {
+    margin-top: 25px;
+  }
+
+  .solar-title h1 {
+    font-size: 24px;
+  }
+
+  .solar-content {
+    padding: 0 15px 30px;
+  }
+
+  .solar-card {
+    padding: 20px;
+  }
+
+}

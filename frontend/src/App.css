@@ -1,0 +1,431 @@
+/* =========================================
+   RESET
+========================================= */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+
+/* =========================================
+   BODY
+========================================= */
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+
+/* =========================================
+   MAIN BACKGROUND
+========================================= */
+
+.app {
+  min-height: 100vh;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  padding: 30px 20px;
+
+  background: linear-gradient(
+    135deg,
+    #082f49 0%,
+    #075985 45%,
+    #0f766e 100%
+  );
+}
+
+
+/* =========================================
+   AUTH CARD
+========================================= */
+
+.auth-card {
+  width: 100%;
+  max-width: 470px;
+
+  background: #ffffff;
+
+  border-radius: 22px;
+
+  padding: 42px 48px;
+
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.30);
+
+  animation: cardAppear 0.5s ease;
+}
+
+
+/* =========================================
+   CARD ANIMATION
+========================================= */
+
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/* =========================================
+   BRAND
+========================================= */
+
+.brand {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+
+.brand-icons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  gap: 10px;
+
+  font-size: 38px;
+
+  margin-bottom: 8px;
+}
+
+
+.brand h1 {
+  color: #092c4c;
+
+  font-size: 38px;
+  font-weight: 700;
+
+  line-height: 1.1;
+
+  margin-bottom: 8px;
+}
+
+
+.brand p {
+  color: #64748b;
+
+  font-size: 16px;
+
+  line-height: 1.4;
+}
+
+
+/* =========================================
+   LOGIN / REGISTER TABS
+========================================= */
+
+.tabs {
+  display: flex;
+
+  width: 100%;
+
+  border-bottom: 1px solid #d7dee5;
+
+  margin-bottom: 28px;
+}
+
+
+.tab {
+  flex: 1;
+
+  background: transparent;
+
+  border: none;
+
+  border-bottom: 3px solid transparent;
+
+  padding: 12px 10px;
+
+  font-size: 17px;
+  font-weight: 500;
+
+  color: #64748b;
+
+  cursor: pointer;
+
+  transition: all 0.25s ease;
+}
+
+
+.tab:hover {
+  color: #078996;
+}
+
+
+.tab.active {
+  color: #078996;
+
+  font-weight: 700;
+
+  border-bottom-color: #078996;
+}
+
+
+/* =========================================
+   MESSAGE
+========================================= */
+
+.message {
+  width: 100%;
+
+  padding: 12px 14px;
+
+  border-radius: 9px;
+
+  margin-bottom: 20px;
+
+  text-align: center;
+
+  font-size: 14px;
+
+  font-weight: 500;
+}
+
+
+.message.success {
+  color: #166534;
+
+  background: #dcfce7;
+
+  border: 1px solid #86efac;
+}
+
+
+.message.error {
+  color: #991b1b;
+
+  background: #fee2e2;
+
+  border: 1px solid #fca5a5;
+}
+
+
+/* =========================================
+   FORM
+========================================= */
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+
+.form-group label {
+  display: block;
+
+  color: #17324d;
+
+  font-size: 16px;
+
+  font-weight: 600;
+
+  margin-bottom: 8px;
+}
+
+
+.form-group input {
+  width: 100%;
+
+  height: 50px;
+
+  padding: 0 15px;
+
+  border: 1px solid #cbd5e1;
+
+  border-radius: 9px;
+
+  outline: none;
+
+  background: #ffffff;
+
+  color: #17324d;
+
+  font-size: 16px;
+
+  transition: all 0.25s ease;
+}
+
+
+.form-group input::placeholder {
+  color: #94a3b8;
+}
+
+
+.form-group input:hover {
+  border-color: #94a3b8;
+}
+
+
+.form-group input:focus {
+  border-color: #078996;
+
+  box-shadow:
+    0 0 0 3px rgba(7, 137, 150, 0.12);
+}
+
+
+/* =========================================
+   SUBMIT BUTTON
+========================================= */
+
+.submit-btn {
+  width: 100%;
+
+  height: 52px;
+
+  margin-top: 5px;
+
+  border: none;
+
+  border-radius: 10px;
+
+  background: #078996;
+
+  color: #ffffff;
+
+  font-size: 17px;
+
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition: all 0.25s ease;
+}
+
+
+.submit-btn:hover {
+  background: #067783;
+
+  transform: translateY(-1px);
+
+  box-shadow:
+    0 7px 18px rgba(7, 137, 150, 0.25);
+}
+
+
+.submit-btn:active {
+  transform: translateY(0);
+}
+
+
+.submit-btn:disabled {
+  background: #94a3b8;
+
+  cursor: not-allowed;
+
+  transform: none;
+
+  box-shadow: none;
+}
+
+
+/* =========================================
+   BOTTOM SWITCH
+========================================= */
+
+.switch-text {
+  text-align: center;
+
+  margin-top: 25px;
+
+  color: #64748b;
+
+  font-size: 15px;
+}
+
+
+.switch-text button {
+  border: none;
+
+  background: transparent;
+
+  color: #078996;
+
+  font-size: 15px;
+
+  font-weight: 700;
+
+  cursor: pointer;
+
+  margin-left: 5px;
+}
+
+
+.switch-text button:hover {
+  text-decoration: underline;
+}
+
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (max-width: 600px) {
+
+  .app {
+    padding: 20px 15px;
+  }
+
+
+  .auth-card {
+    max-width: 100%;
+
+    padding: 32px 25px;
+
+    border-radius: 18px;
+  }
+
+
+  .brand-icons {
+    font-size: 32px;
+  }
+
+
+  .brand h1 {
+    font-size: 30px;
+  }
+
+
+  .brand p {
+    font-size: 14px;
+  }
+
+
+  .tab {
+    font-size: 16px;
+  }
+}
+.page-placeholder {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  background: #f4f8fb;
+  color: #073b5c;
+
+  text-align: center;
+}
+
+.page-placeholder h1 {
+  font-size: 42px;
+  margin-bottom: 12px;
+}
+
+.page-placeholder p {
+  color: #647b91;
+  font-size: 18px;
+}
