@@ -1,0 +1,169 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+}
+
+.card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+}
+
+.logo {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.icon {
+  font-size: 36px;
+}
+
+.logo h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin-top: 8px;
+}
+
+.logo p {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.tabs {
+  display: flex;
+  background: #0f172a;
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.tabs button {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.tabs button.active {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.field input,
+.field select {
+  padding: 10px 14px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #f1f5f9;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: #3b82f6;
+}
+
+.field select option {
+  background: #1e293b;
+  text-transform: capitalize;
+}
+
+.error {
+  font-size: 13px;
+  color: #f87171;
+  background: rgba(248,113,113,0.1);
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.submit {
+  padding: 11px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 4px;
+}
+
+.submit:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.oauth {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.oauth span {
+  font-size: 13px;
+  color: #475569;
+}
+
+.google {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #fff;
+  color: #1e293b;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  width: 100%;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.google:hover {
+  background: #f1f5f9;
+}
