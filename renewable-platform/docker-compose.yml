@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: renewable_platform
+      POSTGRES_USER: renewable_user
+      POSTGRES_PASSWORD: renewable_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://renewable_user:renewable_pass@db:5432/renewable_platform
+      JWT_SECRET_KEY: change-this-to-a-long-random-string
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
