@@ -1,0 +1,23 @@
+{
+  "name": "solar-wind-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "axios": "latest",
+    "chart.js": "latest",
+    "leaflet": "latest",
+    "react": "latest",
+    "react-chartjs-2": "latest",
+    "react-dom": "latest",
+    "react-leaflet": "latest"
+  },
+  "devDependencies": {
+    "vite": "latest"
+  }
+}
