@@ -1,18 +1,21 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from .database import engine, get_db, Base
-from .models import User
-from .schemas import UserCreate, UserLogin, UserResponse, Token
-from .auth import get_password_hash, authenticate_user, create_access_token, get_current_user
+from .core.database import engine, Base
+from .routers import auth, users, projects, sites, environmental, solar, wind, suitability
 
+# Create database tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Auth API", version="1.0.0")
+app = FastAPI(
+    title="Solar & Wind Deployment Intelligence Platform",
+    description="AI-powered renewable energy site selection platform",
+    version="1.0.0"
+)
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -20,53 +23,17 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"message": "Authentication API is running"}
+    return {"message": "Solar & Wind Deployment Intelligence Platform API", "version": "1.0.0"}
 
-@app.post("/api/auth/register", response_model=UserResponse)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-    
-    hashed_password = get_password_hash(user_data.password)
-    new_user = User(
-        name=user_data.name,
-        email=user_data.email,
-        password_hash=hashed_password
-    )
-    
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    return new_user
-
-@app.post("/api/auth/login", response_model=Token)
-def login(user_data: UserLogin, db: Session = Depends(get_db)):
-    user = authenticate_user(db, user_data.email, user_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
-        )
-    
-    access_token = create_access_token(data={"sub": user.email})
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": user
-    }
-
-@app.get("/api/auth/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
-    return current_user
-
-@app.post("/api/auth/logout")
-def logout():
-    return {"message": "Logged out successfully"}
+# Include routers
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(users.router, prefix="/api/users", tags=["Users"])
+app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
+app.include_router(sites.router, prefix="/api/sites", tags=["Sites"])
+app.include_router(environmental.router, prefix="/api/environmental", tags=["Environmental"])
+app.include_router(solar.router, prefix="/api/solar", tags=["Solar"])
+app.include_router(wind.router, prefix="/api/wind", tags=["Wind"])
+app.include_router(suitability.router, prefix="/api/suitability", tags=["Suitability"])
 
 if __name__ == "__main__":
     import uvicorn
