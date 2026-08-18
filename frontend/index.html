@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Solar & Wind Deployment Intelligence</title>
+
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Leaflet Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+    </script>
+
+</head>
+
+
+<body>
+
+    <div class="container">
+
+        <!-- =====================================
+         HEADER
+    ====================================== -->
+
+        <header class="header">
+
+            <div class="header-icon">
+                ☀️💨
+            </div>
+
+            <h1>
+                Solar & Wind Deployment Intelligence
+            </h1>
+
+            <p>
+                Renewable Energy Site Analysis & Prediction Platform
+            </p>
+
+        </header>
+
+
+        <!-- =====================================
+         SITE INPUT
+    ====================================== -->
+
+        <section class="control-panel">
+
+            <!-- SITE ID -->
+            <div class="input-box">
+                <label for="siteId">
+                    📍 Site ID
+                </label>
+
+                <input id="siteId" type="text" value="2c7a4bb4-1cb0-40b7-ba68-b49c468bb446" placeholder="Enter Site ID">
+            </div>
+
+            <!-- SITE NAME -->
+            <div class="input-box">
+                <label for="inputSiteName">
+                    🏢 Site Name
+                </label>
+
+                <input id="inputSiteName" type="text" value="Test Solar Site" placeholder="Enter Site Name">
+            </div>
+
+            <!-- LATITUDE -->
+            <div class="input-box">
+                <label for="inputLatitude">
+                    🌐 Latitude
+                </label>
+
+                <input id="inputLatitude" type="number" value="13.08270" step="0.00001" min="-90" max="90"
+                    placeholder="Example: 13.08270">
+            </div>
+
+            <!-- LONGITUDE -->
+            <div class="input-box">
+                <label for="inputLongitude">
+                    🌐 Longitude
+                </label>
+
+                <input id="inputLongitude" type="number" value="80.27070" step="0.00001" min="-180" max="180"
+                    placeholder="Example: 80.27070">
+            </div>
+
+            <!-- LAND AREA -->
+            <div class="input-box">
+                <label for="inputLandArea">
+                    🌱 Land Area (acres)
+                </label>
+
+                <input id="inputLandArea" type="number" value="10.5" min="0" step="0.1" placeholder="Example: 10.5">
+            </div>
+
+            <!-- LAND TYPE -->
+            <div class="input-box">
+                <label for="inputLandType">
+                    🌾 Land Type
+                </label>
+
+                <select id="inputLandType">
+                    <option value="Open Land">Open Land</option>
+                    <option value="Agricultural Land">Agricultural Land</option>
+                    <option value="Industrial Land">Industrial Land</option>
+                    <option value="Wasteland">Wasteland</option>
+                    <option value="Rooftop">Rooftop</option>
+                </select>
+            </div>
+
+            <!-- BUTTON -->
+            <button class="load-button" onclick="saveSiteAndAnalyze()">
+                🔍 Save & Analyze Site
+            </button>
+
+        </section>
+
+
+        <!-- =====================================
+         MESSAGE
+    ====================================== -->
+
+        <div id="message">
+            Enter a Site ID and load the dashboard.
+        </div>
+
+
+        <!-- =====================================
+         BASIC RESOURCE CARDS
+    ====================================== -->
+
+        <section class="dashboard">
+
+            <!-- WEATHER -->
+
+            <div class="card weather-card">
+
+                <div class="card-icon">
+                    🌡️
+                </div>
+
+                <h2>
+                    Weather
+                </h2>
+
+                <div class="data-row">
+
+                    <span>
+                        Temperature
+                    </span>
+
+                    <strong>
+                        <span id="temperature">--</span> °C
+                    </strong>
+
+                </div>
+
+                <div class="data-row">
+
+                    <span>
+                        Wind Speed
+                    </span>
+
+                    <strong>
+                        <span id="currentWind">--</span> m/s
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <!-- SOLAR -->
+
+            <div class="card solar-card">
+
+                <div class="card-icon">
+                    ☀️
+                </div>
+
+                <h2>
+                    Solar Resource
+                </h2>
+
+                <div class="data-row">
+
+                    <span>
+                        GHI
+                    </span>
+
+                    <strong id="ghi">
+                        --
+                    </strong>
+
+                </div>
+
+                <div class="data-row">
+
+                    <span>
+                        DNI
+                    </span>
+
+                    <strong id="dni">
+                        --
+                    </strong>
+
+                </div>
+
+                <div class="data-row">
+
+                    <span>
+                        DHI
+                    </span>
+
+                    <strong id="dhi">
+                        --
+                    </strong>
+
+                </div>
+
+                <div class="data-row highlight">
+
+                    <span>
+                        Predicted GHI
+                    </span>
+
+                    <strong id="predictedGhi">
+                        --
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <!-- WIND -->
+
+            <div class="card wind-card">
+
+                <div class="card-icon">
+                    💨
+                </div>
+
+                <h2>
+                    Wind Resource
+                </h2>
+
+                <div class="data-row">
+
+                    <span>
+                        Current Wind
+                    </span>
+
+                    <strong id="windSpeed">
+                        --
+                    </strong>
+
+                </div>
+
+                <div class="data-row highlight">
+
+                    <span>
+                        Predicted Wind
+                    </span>
+
+                    <strong id="predictedWind">
+                        --
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <!-- SOLAR POTENTIAL -->
+
+            <div class="card potential-card">
+
+                <div class="card-icon">
+                    🔆
+                </div>
+
+                <h2>
+                    Solar Potential
+                </h2>
+
+                <div id="solarStatus" class="status">
+                    --
+                </div>
+
+            </div>
+
+
+            <!-- WIND POTENTIAL -->
+
+            <div class="card potential-card">
+
+                <div class="card-icon">
+                    🌬️
+                </div>
+
+                <h2>
+                    Wind Potential
+                </h2>
+
+                <div id="windStatus" class="status">
+                    --
+                </div>
+
+            </div>
+
+
+            <!-- DATE -->
+
+            <div class="card date-card">
+
+                <div class="card-icon">
+                    📅
+                </div>
+
+                <h2>
+                    Analysis Date
+                </h2>
+
+                <p>
+                    Latest available resource data
+                </p>
+
+                <strong id="recordedDate">
+                    --
+                </strong>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================
+         OVERALL SUITABILITY
+    ====================================== -->
+
+        <section class="suitability-section">
+
+            <div class="section-title">
+
+                <h2>
+                    ⭐ Overall Site Suitability
+                </h2>
+
+                <p>
+                    Renewable energy deployment assessment
+                </p>
+
+            </div>
+
+
+            <div class="score-container">
+
+                <!-- OVERALL SCORE -->
+
+                <div class="overall-score">
+
+                    <div class="score-circle">
+
+                        <span id="overallScore">
+                            --
+                        </span>
+
+                        <small>
+                            / 100
+                        </small>
+
+                    </div>
+
+                    <h3>
+                        Overall Score
+                    </h3>
+
+                    <p id="scoreMessage">
+                        Waiting for site analysis...
+                    </p>
+
+                </div>
+
+
+                <!-- SCORE BREAKDOWN -->
+
+                <div class="score-breakdown">
+
+
+                    <!-- SOLAR SCORE -->
+
+                    <div class="score-item">
+
+                        <div class="score-label">
+
+                            <span>
+                                ☀️ Solar Suitability
+                            </span>
+
+                            <strong>
+                                <span id="solarScore">
+                                    --
+                                </span>/100
+                            </strong>
+
+                        </div>
+
+                        <div class="progress-bar">
+
+                            <div id="solarProgress" class="progress solar-progress">
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- WIND SCORE -->
+
+                    <div class="score-item">
+
+                        <div class="score-label">
+
+                            <span>
+                                💨 Wind Suitability
+                            </span>
+
+                            <strong>
+                                <span id="windScore">
+                                    --
+                                </span>/100
+                            </strong>
+
+                        </div>
+
+                        <div class="progress-bar">
+
+                            <div id="windProgress" class="progress wind-progress">
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- LAND SCORE -->
+
+                    <div class="score-item">
+
+                        <div class="score-label">
+
+                            <span>
+                                🌱 Land Suitability
+                            </span>
+
+                            <strong>
+                                <span id="landScore">
+                                    --
+                                </span>/100
+                            </strong>
+
+                        </div>
+
+                        <div class="progress-bar">
+
+                            <div id="landProgress" class="progress land-progress">
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================
+         RECOMMENDATION
+    ====================================== -->
+
+        <section class="recommendation-card">
+
+            <div class="recommendation-icon">
+                📍
+            </div>
+
+            <div>
+
+                <h2>
+                    Deployment Recommendation
+                </h2>
+
+                <p id="recommendation">
+                    --
+                </p>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================
+         SITE LOCATION
+    ====================================== -->
+
+        <section class="location-card">
+
+            <div class="location-header">
+
+                <div>
+
+                    <h2>
+                        🗺️ Site Location
+                    </h2>
+
+                    <p>
+                        Geographic location of the selected site
+                    </p>
+
+                </div>
+
+
+                <div class="coordinates">
+
+                    <span>
+                        Latitude:
+                        <strong id="latitude">
+                            --
+                        </strong>
+                    </span>
+
+                    <span>
+                        Longitude:
+                        <strong id="longitude">
+                            --
+                        </strong>
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <div id="map">
+                Map will appear here.
+            </div>
+
+
+            <!-- =====================================
+             SITE INFORMATION
+        ====================================== -->
+
+            <div class="site-details">
+
+                <h2>
+                    🏢 Site Information
+                </h2>
+
+                <div class="site-details-grid">
+
+
+                    <div>
+
+                        <span>
+                            Site Name
+                        </span>
+
+                        <strong id="siteName">
+                            --
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Region
+                        </span>
+
+                        <strong id="region">
+                            --
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Land Area
+                        </span>
+
+                        <strong>
+
+                            <span id="landArea">
+                                --
+                            </span>
+
+                            acres
+
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Elevation
+                        </span>
+
+                        <strong>
+
+                            <span id="elevation">
+                                --
+                            </span>
+
+                            m
+
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Land Type
+                        </span>
+
+                        <strong id="landType">
+                            --
+                        </strong>
+
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Ownership
+                        </span>
+
+                        <strong id="ownership">
+                            --
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================
+         CHARTS
+    ====================================== -->
+
+        <section class="charts">
+
+
+            <!-- SOLAR CHART -->
+
+            <div class="chart-card">
+
+                <h2>
+                    ☀️ Solar Radiation Analysis
+                </h2>
+
+                <p>
+                    Current and predicted solar resource
+                </p>
+
+                <div class="chart-container">
+
+                    <canvas id="solarChart"></canvas>
+
+                </div>
+
+            </div>
+
+
+            <!-- WIND CHART -->
+
+            <div class="chart-card">
+
+                <h2>
+                    💨 Wind Speed Analysis
+                </h2>
+
+                <p>
+                    Current and predicted wind speed
+                </p>
+
+                <div class="chart-container">
+
+                    <canvas id="windChart"></canvas>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================================
+         FOOTER
+    ====================================== -->
+
+        <footer>
+
+            <p>
+                Solar & Wind Deployment Intelligence Platform
+            </p>
+
+            <span>
+                Powered by FastAPI • Machine Learning • Renewable Energy Analytics
+            </span>
+
+        </footer>
+
+    </div>
+
+
+    <!-- JavaScript -->
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
