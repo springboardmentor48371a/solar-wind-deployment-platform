@@ -1,0 +1,152 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: swdip_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: swdip_user
+      POSTGRES_PASSWORD: swdip_pass
+      POSTGRES_DB: swdip_db
+    # Exposed to the host for local dev convenience (so you can connect
+    # with a GUI client). In a real deployment, remove this `ports` block
+    # entirely — the backend reaches `db` over the internal Docker
+    # network regardless, and there's no reason Postgres itself should be
+    # reachable from outside the docker-compose network.
+    ports:
+      - "5432:5432"
+    volumes:
+      - swdip_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swdip_user -d swdip_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo:
+    image: mongo:7
+    container_name: swdip_mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-swdip_mongo}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-swdip_mongo_pass}
+    # Same note as db's ports above — drop this in a real deployment.
+    ports:
+      - "27017:27017"
+    volumes:
+      - swdip_mongo_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet -u "${MONGO_USER:-swdip_mongo}" -p "${MONGO_PASSWORD:-swdip_mongo_pass}" --authenticationDatabase admin
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: swdip_redis
+    restart: unless-stopped
+    # Cache only — nothing here is a system of record, so persistence is
+    # deliberately off (no volume). Losing this container's data just
+    # means the next few external-API lookups are cache misses.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backup:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: swdip_backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: swdip_user
+      PGPASSWORD: swdip_pass
+      PGDATABASE: swdip_db
+      MONGODB_URL: mongodb://${MONGO_USER:-swdip_mongo}:${MONGO_PASSWORD:-swdip_mongo_pass}@mongo:27017/?authSource=admin
+      BACKUP_RETENTION_DAYS: "14"
+      BACKUP_INTERVAL_SECONDS: "86400"
+    volumes:
+      - swdip_backups:/backups
+    # Overrides the backend image's normal `uvicorn` CMD — this container
+    # runs the same image but as a scheduler loop instead of the API
+    # server. See backend/scripts/backup.sh.
+    entrypoint: ["/bin/sh", "/app/scripts/backup_loop.sh"]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: swdip_backend
+    restart: unless-stopped
+    # No bind-mounted source volume here on purpose: the Dockerfile's
+    # CMD doesn't run uvicorn with --reload, so mounting ./backend over
+    # the image's /app wouldn't give you live-reload anyway — it would
+    # only risk permission errors, since the container runs as a
+    # non-root user that may not own files bind-mounted from the host.
+    # If you want live-reload for local development, add --reload to
+    # the Dockerfile's CMD and re-add `volumes: ["./backend:/app"]` here.
+    depends_on:
+      db:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://swdip_user:swdip_pass@db:5432/swdip_db
+      MONGODB_URL: mongodb://${MONGO_USER:-swdip_mongo}:${MONGO_PASSWORD:-swdip_mongo_pass}@mongo:27017/?authSource=admin
+      MONGODB_DB_NAME: swdip_raw
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+      STAFF_PIN: ${STAFF_PIN:-1248}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "1440"
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      NASA_POWER_BASE_URL: https://power.larc.nasa.gov/api/temporal/daily/point
+      ELEVATION_API_BASE_URL: https://api.open-elevation.com/api/v1/lookup
+      OVERPASS_API_BASE_URL: https://overpass-api.de/api/interpreter
+      RATE_LIMIT_DEFAULT: 100/minute
+      RATE_LIMIT_AUTH: 10/minute
+      ALLOWED_ORIGINS: http://localhost:3000
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      # All optional — blank by default, connector reports "not_configured"
+      # until you add real values to the root .env file. See .env.example
+      # for how to get each one.
+      SENTINEL_HUB_CLIENT_ID: ${SENTINEL_HUB_CLIENT_ID:-}
+      SENTINEL_HUB_CLIENT_SECRET: ${SENTINEL_HUB_CLIENT_SECRET:-}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+      DATA_LAKE_BUCKET: ${DATA_LAKE_BUCKET:-}
+      DATA_LAKE_ACCESS_KEY_ID: ${DATA_LAKE_ACCESS_KEY_ID:-}
+      DATA_LAKE_SECRET_ACCESS_KEY: ${DATA_LAKE_SECRET_ACCESS_KEY:-}
+      DATA_LAKE_S3_ENDPOINT_URL: ${DATA_LAKE_S3_ENDPOINT_URL:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    container_name: swdip_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  swdip_postgres_data:
+  swdip_mongo_data:
+  swdip_backups:

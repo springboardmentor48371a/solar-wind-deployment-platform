@@ -1,0 +1,71 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+sqlalchemy==2.0.35
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-multipart==0.0.9
+pydantic==2.9.2
+pydantic-settings==2.5.2
+requests==2.32.3
+python-dotenv==1.0.1
+slowapi==0.1.9
+openpyxl==3.1.5
+reportlab==4.2.5
+email-validator==2.2.0
+
+# --- Database: PostgreSQL + PostGIS (primary) ---
+psycopg2-binary==2.9.9
+geoalchemy2==0.15.2
+
+# --- Database: MongoDB (secondary) ---
+# Stores raw/unstructured payloads from external APIs (full NASA POWER
+# responses, full Overpass responses, satellite metadata) for audit and
+# reprocessing, separate from the structured PostGIS tables.
+pymongo==4.9.1
+
+# --- GIS & Remote Sensing ---
+# GDAL itself is a system library, not a pure Python wheel. Install the
+# matching GDAL binary for your OS *before* `pip install`:
+#   Ubuntu/Debian: sudo apt-get install gdal-bin libgdal-dev
+#   macOS:          brew install gdal
+#   Windows:         use OSGeo4W or conda-forge
+# Then: pip install GDAL==$(gdal-config --version)
+# (The Docker image installs GDAL's Python bindings separately, pinned to
+# the exact system version, for this reason — see backend/Dockerfile.)
+rasterio==1.3.11
+geopandas==1.0.1
+shapely==2.0.6
+fiona==1.10.1
+pyproj==3.6.1
+
+# --- Data analytics (used by the scoring & terrain pipelines) ---
+pandas==2.2.3
+numpy==2.1.1
+
+# --- Visualization (server-rendered chart images for PDF reports) ---
+plotly==5.24.1
+kaleido==0.2.1
+
+# --- Cache: Redis ---
+# Used by app/cache.py to cache external API responses (NASA POWER,
+# Overpass, elevation) and reduce repeat hits against rate-limited public
+# APIs. The app runs fine without Redis actually reachable — cache.py
+# falls back to an in-process cache — but the client library itself must
+# be installed for that fallback logic to even attempt a connection.
+redis==5.0.8
+
+# --- Monitoring & Observability ---
+# /metrics (Prometheus scrape target) + optional Sentry error tracking.
+# Both no-op cleanly if unconfigured (METRICS_ENABLED=false / no SENTRY_DSN).
+prometheus-fastapi-instrumentator==7.0.0
+sentry-sdk[fastapi]==2.14.0
+
+# --- Data Lake (S3-compatible archival) ---
+# Optional: only used if DATA_LAKE_BUCKET is set (see app/data_lake.py).
+# Installed by default so the feature works out of the box once a bucket
+# is configured, without a separate deploy step.
+boto3==1.35.36
+
+# --- Data Warehouse (Parquet export) ---
+pyarrow==17.0.0

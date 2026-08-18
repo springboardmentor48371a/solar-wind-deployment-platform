@@ -1,0 +1,14 @@
+# Caddy automatically gets and renews Let's Encrypt certificates for any
+# domain listed here, as long as DNS already points at this server and
+# ports 80/443 are reachable from the internet. No manual certbot needed.
+#
+# Replace app.yourdomain.com / api.yourdomain.com with your real domains
+# before deploying — see the root .env's DOMAIN_APP / DOMAIN_API.
+
+{$DOMAIN_APP} {
+    reverse_proxy frontend:3000
+}
+
+{$DOMAIN_API} {
+    reverse_proxy backend:8000
+}

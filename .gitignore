@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.db
+
+# Environment secrets — never commit real .env
+.env
+backend/.env
+frontend/.env
+
+# Node
+node_modules/
+dist/
+.vite/
+.next/
+
+# OS
+.DS_Store
