@@ -323,7 +323,7 @@ export default function App() {
               <div>
                 <div className="flex items-center space-x-2 text-emerald-400 mb-1.5">
                   <Sparkles className="w-4 h-4" />
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Module 2: Site Intelligence & Selection</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider"> Site Intelligence & Selection</span>
                 </div>
                 <h2 className="text-xl font-bold text-white tracking-tight">Deployment Target Zone</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Select a pre-assessed corridor or register a boundary for AI simulation.</p>
