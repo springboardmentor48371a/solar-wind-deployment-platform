@@ -1,55 +1,184 @@
+# Solar and Wind Prediction
 
-# Solar and Wind Prediction — Deployment Intelligence Platform
+A renewable energy deployment intelligence platform that helps users analyse potential solar and wind sites, calculate suitability scores, estimate energy generation, and make deployment recommendations.
 
-A working full-stack prototype based on the supplied project brief.
+## Features
 
-## Included workflow
-1. Register account / login
-2. Role-based account selection
-3. Create renewable energy project
-4. Register candidate site
-5. Capture environmental, geographic and infrastructure factors
-6. Calculate suitability using the brief's weighted model:
-   - Resource availability 35%
-   - Geographic suitability 25%
-   - Infrastructure accessibility 15%
-   - Environmental impact 15%
-   - Economic feasibility 10%
-7. Rank sites and show deployment recommendations
-8. View analytics and energy estimates
-9. Export a site assessment CSV
-10. View profile and sign out
+* User registration and login
+* JWT authentication
+* Role-based access
+* Project and site management
+* Solar and wind resource analysis
+* Environmental and geographic analysis
+* Site suitability scoring
+* Energy generation estimation
+* Site recommendations
+* Dashboard and analytics
+* Site assessment report export
 
-## Why SQLite for this prototype?
-The project brief specifies PostgreSQL + PostGIS as the primary production database. This prototype intentionally uses SQLite for authentication and core persistence so registration/login works immediately without PostgreSQL setup or driver/schema issues. The API/database layer is isolated, so PostgreSQL/PostGIS can be introduced later.
+## Technology Stack
 
-## Run backend
+**Frontend**
+
+* React.js
+* JavaScript
+* Vite
+* Recharts
+* CSS
+
+**Backend**
+
+* Python
+* FastAPI
+* JWT Authentication
+
+**Database**
+
+* SQLite
+
+## Project Structure
+
+```text
+solar-wind-deployment-platform/
+│
+├── backend/
+│   ├── main.py
+│   ├── auth.py
+│   ├── database.py
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── src/
+│   │   ├── main.jsx
+│   │   └── styles.css
+│   ├── index.html
+│   ├── package.json
+│   └── package-lock.json
+│
+├── docs/
+├── .gitignore
+├── README.md
+└── RUN_FIRST.txt
+```
+
+## Suitability Scoring
+
+The platform uses the weighted scoring model from the project specification:
+
+| Factor                          | Weight |
+| ------------------------------- | -----: |
+| Renewable Resource Availability |    35% |
+| Geographic Suitability          |    25% |
+| Infrastructure Accessibility    |    15% |
+| Environmental Impact            |    15% |
+| Economic Feasibility            |    10% |
+
+## Workflow
+
+```text
+Register / Login
+      ↓
+Dashboard
+      ↓
+Create Project
+      ↓
+Add Site
+      ↓
+Enter Site Data
+      ↓
+Solar & Wind Analysis
+      ↓
+Suitability Score
+      ↓
+Recommendations
+      ↓
+Analytics & Reports
+```
+
+## How to Run
+
+### Backend
+
+Open a terminal:
+
 ```bash
 cd backend
 python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-source .venv/bin/activate
-
-pip install -r requirements.txt
-uvicorn main:app --reload
 ```
 
-Backend: http://localhost:8000
-Swagger: http://localhost:8000/docs
+Activate the virtual environment on Windows:
 
-## Run frontend
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Start the backend:
+
+```bash
+python -m uvicorn main:app --reload
+```
+
+Backend:
+
+```text
+http://127.0.0.1:8000
+```
+
+API documentation:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### Frontend
+
+Open a second terminal:
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Frontend: http://localhost:5173
+Open:
 
-## Login test
-Create a new account on `/register`. The same email + password are saved and can immediately be used on `/login`. Duplicate email registration returns a clear message instead of creating a broken user.
+```text
+http://localhost:5173
+```
 
-## Notes
-The environmental/energy calculations are transparent prototype heuristics, not a validated engineering model. The brief's production stack includes NASA POWER, Global Wind Atlas, SRTM, OSM and Copernicus Sentinel datasets, plus ML/GIS services; those external integrations can be connected after the core workflow is validated.
+## Testing
+
+1. Register a new account.
+2. Login using the same email and password.
+3. Create a project.
+4. Add a candidate site.
+5. Enter environmental and geographic information.
+6. Analyse the site.
+7. View the suitability score and energy estimation.
+8. Check recommendations and analytics.
+9. Export the site assessment report.
+
+## Future Enhancements
+
+* PostgreSQL + PostGIS
+* NASA POWER integration
+* Global Wind Atlas integration
+* OpenStreetMap integration
+* Sentinel satellite data
+* GIS mapping
+* Machine-learning prediction models
+* Advanced forecasting
+* Deployment optimization
+* Docker and cloud deployment
+
+## Developer
+
+**Vaishnavi Gokarna**
+
+**Project:** Solar and Wind Prediction
