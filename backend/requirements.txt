@@ -1,0 +1,49 @@
+# Backend framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# Auth (JWT + OAuth2)
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-multipart==0.0.9
+authlib==1.3.2
+
+# Database - Primary (PostgreSQL + PostGIS)
+sqlalchemy==2.0.35
+geoalchemy2==0.15.2
+psycopg2-binary==2.9.9
+alembic==1.13.2
+
+# Database - Secondary (MongoDB)
+pymongo==4.8.0
+motor==3.5.1
+
+# Settings / validation
+pydantic==2.9.2
+pydantic-settings==2.5.2
+email-validator==2.2.0
+
+# AI & Machine Learning
+xgboost==2.1.1
+lightgbm==4.5.0
+scikit-learn==1.5.2
+tensorflow==2.17.0
+torch==2.4.1
+
+# Data analytics
+pandas==2.2.3
+numpy==1.26.4
+
+# GIS & remote sensing
+geopandas==1.0.1
+shapely==2.0.6
+rasterio==1.3.11
+GDAL==3.9.2
+
+# Satellite & environmental API clients
+requests==2.32.3
+httpx==0.27.2
+
+# Visualization (server-side chart generation)
+plotly==5.24.1
