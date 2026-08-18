@@ -1,16 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Sun, 
   Wind, 
-  ShieldCheck, 
   Mail, 
   Lock, 
   UserCheck, 
   User, 
   Eye, 
   EyeOff, 
-  CheckCircle2, 
-  AlertCircle 
+  MapPin, 
+  Compass, 
+  Layers, 
+  Zap, 
+  ArrowRight, 
+  LogOut, 
+  AlertCircle, 
+  PlusCircle, 
+  Activity, 
+  AlertTriangle,
+  ChevronDown,
+  Copy,
+  Check,
+  TrendingUp,
+  Sparkles
 } from 'lucide-react';
 
 export default function App() {
@@ -27,6 +39,69 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [loggedInUser, setLoggedInUser] = useState(null);
+
+  // Profile Dropdown & Sign Out confirmation states
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Pre-configured assessment sites
+  const [selectedSite, setSelectedSite] = useState('site-1');
+  const sites = [
+    {
+      id: 'site-1',
+      name: 'Bhadla Solar Park Extension',
+      region: 'Rajasthan, India',
+      lat: '27.5381° N',
+      long: '71.9161° E',
+      type: 'Solar PV',
+      area: '45.2 km²',
+      solarPotential: '5.8 kWh/m²/day',
+      windSpeed: '4.2 m/s',
+      gridProximity: '1.8 km',
+      suitabilityScore: 94
+    },
+    {
+      id: 'site-2',
+      name: 'Muppandal Wind Corridor',
+      region: 'Tamil Nadu, India',
+      lat: '8.2588° N',
+      long: '77.5484° E',
+      type: 'Wind Farm',
+      area: '62.0 km²',
+      solarPotential: '4.9 kWh/m²/day',
+      windSpeed: '8.7 m/s',
+      gridProximity: '3.4 km',
+      suitabilityScore: 91
+    },
+    {
+      id: 'site-3',
+      name: 'Kutch Hybrid Energy Zone',
+      region: 'Gujarat, India',
+      lat: '23.7337° N',
+      long: '69.8597° E',
+      type: 'Hybrid (Solar + Wind)',
+      area: '88.5 km²',
+      solarPotential: '5.6 kWh/m²/day',
+      windSpeed: '7.4 m/s',
+      gridProximity: '0.9 km',
+      suitabilityScore: 96
+    }
+  ];
+
+  const currentSiteData = sites.find(s => s.id === selectedSite);
 
   const roles = [
     'Renewable Energy Planner',
@@ -71,10 +146,6 @@ export default function App() {
       if (response.ok) {
         localStorage.setItem('token', data.access_token);
         setLoggedInUser({ name: data.name, role: data.role, email: data.email });
-        setMessage({ 
-          type: 'success', 
-          text: isRegister ? 'Registration successful! Logged in.' : `Welcome back, ${data.name}!` 
-        });
       } else {
         setMessage({ type: 'error', text: data.detail || 'Authentication failed' });
       }
@@ -85,74 +156,328 @@ export default function App() {
     }
   };
 
+  const handleCopyEmail = () => {
+    if (loggedInUser?.email) {
+      navigator.clipboard.writeText(loggedInUser.email);
+      setEmailCopied(true);
+      setTimeout(() => setEmailCopied(false), 2000);
+    }
+  };
+
+  const handleConfirmSignOut = () => {
+    localStorage.removeItem('token');
+    setLoggedInUser(null);
+    setMessage(null);
+    setIsUserMenuOpen(false);
+    setShowSignOutConfirm(false);
+  };
+
+  // ----------------------------------------------------
+  // AUTHENTICATED DASHBOARD WITH ANIMATED BACKGROUND
+  // ----------------------------------------------------
   if (loggedInUser) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1 bg-emerald-50 text-emerald-600 p-2 rounded-xl border border-emerald-100">
-              <Sun className="w-5 h-5 text-amber-500" />
-              <Wind className="w-5 h-5 text-sky-500" />
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans relative overflow-hidden selection:bg-emerald-500 selection:text-white">
+        
+        {/* Animated Background Fluid Orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/20 rounded-full mix-blend-screen filter blur-[90px] animate-pulse duration-7000"></div>
+          <div className="absolute top-1/3 -right-40 w-[30rem] h-[30rem] bg-sky-500/20 rounded-full mix-blend-screen filter blur-[100px] animate-pulse duration-10000 delay-1000"></div>
+          <div className="absolute -bottom-40 left-1/3 w-[28rem] h-[28rem] bg-amber-500/15 rounded-full mix-blend-screen filter blur-[90px] animate-pulse duration-8000 delay-2000"></div>
+          
+          {/* Subtle Grid Overlay */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-30"></div>
+        </div>
+
+        {/* Sign Out Confirmation Modal Dialog */}
+        {showSignOutConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center backdrop-blur-xl animate-in zoom-in-95 duration-150">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto mb-4 text-rose-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-white">Sign Out Confirmation</h3>
+              <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                Are you sure you want to sign out of the <span className="font-medium text-emerald-400">Solar & Wind Intelligence Platform</span>?
+              </p>
+              
+              <div className="mt-6 flex items-center space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSignOutConfirm(false)}
+                  className="flex-1 px-4 py-2.5 text-xs font-semibold text-slate-300 bg-slate-800/80 hover:bg-slate-800 rounded-xl transition border border-slate-700/60"
+                >
+                  No, Stay
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSignOut}
+                  className="flex-1 px-4 py-2.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 rounded-xl transition shadow-lg shadow-rose-600/20"
+                >
+                  Yes, Sign Out
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Header */}
+        <header className="bg-slate-900/60 border-b border-slate-800/80 backdrop-blur-xl px-8 py-3.5 flex items-center justify-between sticky top-0 z-20 shadow-lg shadow-slate-950/20">
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1.5 bg-emerald-500/10 text-emerald-400 p-2 rounded-2xl border border-emerald-500/20 shadow-inner">
+              <Sun className="w-5 h-5 text-amber-400 animate-spin" style={{ animationDuration: '24s' }} />
+              <Wind className="w-5 h-5 text-sky-400" />
             </div>
             <div>
-              <h1 className="text-base font-semibold text-slate-900 leading-none">Solar & Wind Intelligence</h1>
-              <p className="text-xs text-slate-500 mt-0.5">Deployment Platform</p>
+              <div className="flex items-center space-x-2">
+                <h1 className="text-base font-bold text-white leading-tight tracking-wide">Solar & Wind Intelligence</h1>
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">Deployment & Feasibility Platform</p>
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
-            <div className="text-right">
-              <p className="text-sm font-semibold text-slate-800">{loggedInUser.name}</p>
-              <span className="inline-block text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                {loggedInUser.role}
-              </span>
-            </div>
-            <button 
-              onClick={() => { setLoggedInUser(null); setMessage(null); }}
-              className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-lg border border-slate-200 transition"
+          {/* Header User Profile Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="flex items-center space-x-3 p-1.5 pr-3.5 rounded-2xl bg-slate-800/50 hover:bg-slate-800/90 border border-slate-700/60 hover:border-slate-600 transition duration-200 backdrop-blur-md"
             >
-              Sign Out
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 font-bold text-xs flex items-center justify-center shadow-sm">
+                {loggedInUser.name.charAt(0).toUpperCase()}
+              </div>
+              
+              <div className="text-left hidden sm:block">
+                <p className="text-xs font-semibold text-slate-200 leading-tight">
+                  {loggedInUser.name}
+                </p>
+                <span className="text-[10px] text-emerald-400 font-medium">{loggedInUser.role}</span>
+              </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
             </button>
+
+            {/* Profile Dropdown Card */}
+            {isUserMenuOpen && (
+              <div className="absolute right-0 mt-2 w-72 bg-slate-900/95 rounded-2xl shadow-2xl border border-slate-800 py-3.5 px-4 z-30 backdrop-blur-2xl animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="pb-3 border-b border-slate-800">
+                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Signed in account</p>
+                  <p className="text-sm font-bold text-white mt-0.5">{loggedInUser.name}</p>
+                  
+                  <div className="mt-2.5 flex items-center justify-between bg-slate-950/80 border border-slate-800 rounded-xl p-2 text-xs">
+                    <div className="flex items-center space-x-2 truncate mr-2 text-slate-300">
+                      <Mail className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                      <span className="truncate">{loggedInUser.email}</span>
+                    </div>
+                    <button
+                      onClick={handleCopyEmail}
+                      title="Copy Email"
+                      className="p-1 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded-lg transition"
+                    >
+                      {emailCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="py-2.5 border-b border-slate-800 space-y-2 text-xs text-slate-400">
+                  <div className="flex items-center justify-between">
+                    <span>Role:</span>
+                    <span className="font-medium text-emerald-300 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 text-[10px]">
+                      {loggedInUser.role}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Node Status:</span>
+                    <span className="text-slate-300 flex items-center space-x-1.5 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>Connected</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2.5">
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      setShowSignOutConfirm(true);
+                    }}
+                    className="w-full flex items-center justify-center space-x-2 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20 transition duration-150"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </header>
 
-        <main className="max-w-6xl mx-auto p-8">
-          <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm text-center">
-            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-100">
-              <CheckCircle2 className="w-6 h-6" />
+        {/* Dashboard Content */}
+        <main className="max-w-6xl mx-auto px-6 py-8 space-y-6 relative z-10">
+          
+          {/* Site Selection Hero Card */}
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-2xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800/60">
+              <div>
+                <div className="flex items-center space-x-2 text-emerald-400 mb-1.5">
+                  <Sparkles className="w-4 h-4" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider">Module 2: Site Intelligence & Selection</span>
+                </div>
+                <h2 className="text-xl font-bold text-white tracking-tight">Deployment Target Zone</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Select a pre-assessed corridor or register a boundary for AI simulation.</p>
+              </div>
+
+              {/* Site Selector Dropdown */}
+              <div className="flex items-center space-x-3">
+                <select
+                  value={selectedSite}
+                  onChange={(e) => setSelectedSite(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 text-slate-200 rounded-2xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition cursor-pointer"
+                >
+                  {sites.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.name} ({site.region})
+                    </option>
+                  ))}
+                </select>
+                <button className="flex items-center space-x-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition shadow-lg shadow-emerald-500/20 active:scale-95">
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Register Site</span>
+                </button>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">Welcome, {loggedInUser.name}!</h2>
-            <p className="text-sm text-slate-600 mt-2 max-w-md mx-auto">
-              Signed in as <span className="font-semibold text-slate-800">{loggedInUser.role}</span>.
-            </p>
+
+            {/* Selected Site Details */}
+            {currentSiteData && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                <div className="bg-slate-950/60 hover:bg-slate-950 p-4 rounded-2xl border border-slate-800/80 transition-all duration-300 hover:-translate-y-1 hover:border-slate-700">
+                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Coordinates</p>
+                  <p className="text-sm font-bold text-slate-200 mt-1 flex items-center space-x-1.5">
+                    <Compass className="w-4 h-4 text-emerald-400" />
+                    <span>{currentSiteData.lat}, {currentSiteData.long}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">Area: {currentSiteData.area}</p>
+                </div>
+
+                <div className="bg-slate-950/60 hover:bg-slate-950 p-4 rounded-2xl border border-slate-800/80 transition-all duration-300 hover:-translate-y-1 hover:border-amber-500/30">
+                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Solar GHI Potential</p>
+                  <p className="text-sm font-bold text-amber-400 mt-1 flex items-center space-x-1.5">
+                    <Sun className="w-4 h-4 text-amber-400" />
+                    <span>{currentSiteData.solarPotential}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">NASA POWER Satellite feed</p>
+                </div>
+
+                <div className="bg-slate-950/60 hover:bg-slate-950 p-4 rounded-2xl border border-slate-800/80 transition-all duration-300 hover:-translate-y-1 hover:border-sky-500/30">
+                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Mean Wind (100m)</p>
+                  <p className="text-sm font-bold text-sky-400 mt-1 flex items-center space-x-1.5">
+                    <Wind className="w-4 h-4 text-sky-400" />
+                    <span>{currentSiteData.windSpeed}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">Global Wind Atlas</p>
+                </div>
+
+                <div className="bg-emerald-950/30 hover:bg-emerald-950/50 p-4 rounded-2xl border border-emerald-500/30 transition-all duration-300 hover:-translate-y-1">
+                  <p className="text-[10px] font-medium text-emerald-400 uppercase tracking-wider">Suitability Index</p>
+                  <p className="text-base font-extrabold text-emerald-300 mt-0.5 flex items-center space-x-1.5">
+                    <Activity className="w-4 h-4 text-emerald-400" />
+                    <span>{currentSiteData.suitabilityScore} / 100</span>
+                  </p>
+                  <p className="text-[11px] text-emerald-400/80 mt-1">Grid Distance: {currentSiteData.gridProximity}</p>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Quick Action Navigation Cards with Hover Lift */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div className="group bg-slate-900/60 hover:bg-slate-900/90 p-6 rounded-3xl border border-slate-800/80 hover:border-emerald-500/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-emerald-500/10">
+              <div className="w-11 h-11 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mb-4 border border-emerald-500/20 group-hover:scale-110 transition-transform duration-300">
+                <Layers className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-white group-hover:text-emerald-300 transition-colors">GIS Terrain & Slope Analysis</h3>
+              <p className="text-xs text-slate-400 mt-1.5 mb-5 leading-relaxed">
+                Inspect digital elevation models (DEM), slope gradients, and infrastructure proximity buffers.
+              </p>
+              <button className="flex items-center space-x-1.5 text-xs font-bold text-emerald-400 group-hover:text-emerald-300 group-hover:translate-x-1 transition-all">
+                <span>Open GIS Map Viewer</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="group bg-slate-900/60 hover:bg-slate-900/90 p-6 rounded-3xl border border-slate-800/80 hover:border-amber-500/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-amber-500/10">
+              <div className="w-11 h-11 bg-amber-500/10 text-amber-400 rounded-2xl flex items-center justify-center mb-4 border border-amber-500/20 group-hover:scale-110 transition-transform duration-300">
+                <Zap className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors">Yield & Feasibility Prediction</h3>
+              <p className="text-xs text-slate-400 mt-1.5 mb-5 leading-relaxed">
+                Run XGBoost & Random Forest models to predict annual generation (MWh) and capacity factor.
+              </p>
+              <button className="flex items-center space-x-1.5 text-xs font-bold text-amber-400 group-hover:text-amber-300 group-hover:translate-x-1 transition-all">
+                <span>Run Feasibility Engine</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="group bg-slate-900/60 hover:bg-slate-900/90 p-6 rounded-3xl border border-slate-800/80 hover:border-sky-500/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-sky-500/10">
+              <div className="w-11 h-11 bg-sky-500/10 text-sky-400 rounded-2xl flex items-center justify-center mb-4 border border-sky-500/20 group-hover:scale-110 transition-transform duration-300">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-white group-hover:text-sky-300 transition-colors">Multi-Site Comparison</h3>
+              <p className="text-xs text-slate-400 mt-1.5 mb-5 leading-relaxed">
+                Compare environmental metrics, ROI projections, and grid connection costs side-by-side.
+              </p>
+              <button className="flex items-center space-x-1.5 text-xs font-bold text-sky-400 group-hover:text-sky-300 group-hover:translate-x-1 transition-all">
+                <span>Compare Sites</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+          </div>
+
         </main>
       </div>
     );
   }
 
+  // ----------------------------------------------------
+  // LOGIN / REGISTER AUTHENTICATION VIEW
+  // ----------------------------------------------------
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-800 font-sans">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-slate-200 font-sans relative overflow-hidden">
+      
+      {/* Background Animated Blobs for Login */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-20 -left-20 w-80 h-80 bg-emerald-500/20 rounded-full blur-[80px] animate-pulse"></div>
+        <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-sky-500/20 rounded-full blur-[80px] animate-pulse delay-1000"></div>
+      </div>
+
+      <div className="max-w-md w-full bg-slate-900/80 rounded-3xl shadow-2xl border border-slate-800 p-8 backdrop-blur-2xl relative z-10">
+        
+        {/* Header Branding */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="flex items-center justify-center space-x-2 bg-emerald-50 text-emerald-600 p-3 rounded-2xl border border-emerald-100 mb-3">
-            <Sun className="w-6 h-6 text-amber-500" />
-            <Wind className="w-6 h-6 text-sky-500" />
+          <div className="flex items-center justify-center space-x-2 bg-emerald-500/10 text-emerald-400 p-3.5 rounded-2xl border border-emerald-500/20 mb-3 shadow-inner">
+            <Sun className="w-6 h-6 text-amber-400" />
+            <Wind className="w-6 h-6 text-sky-400" />
           </div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">
+          <h1 className="text-xl font-bold text-white tracking-tight">
             Solar & Wind Intelligence Platform
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Renewable Energy Deployment & Feasibility Analysis
           </p>
         </div>
 
-        <div className="flex bg-slate-100 p-1 rounded-xl mb-6 border border-slate-200">
+        {/* Tab Switcher */}
+        <div className="flex bg-slate-950/80 p-1 rounded-2xl mb-6 border border-slate-800">
           <button
             type="button"
             onClick={() => { setIsRegister(false); setMessage(null); }}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${
-              !isRegister ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition duration-200 ${
+              !isRegister ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Sign In
@@ -160,98 +485,100 @@ export default function App() {
           <button
             type="button"
             onClick={() => { setIsRegister(true); setMessage(null); }}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${
-              isRegister ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition duration-200 ${
+              isRegister ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             Register Account
           </button>
         </div>
 
+        {/* Error / Status Alert */}
         {message && (
-          <div className={`p-3 rounded-lg text-xs font-medium mb-5 flex items-start space-x-2 border ${
+          <div className={`p-3 rounded-xl text-xs font-medium mb-5 flex items-start space-x-2 border ${
             message.type === 'success' 
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-              : 'bg-rose-50 border-rose-200 text-rose-700'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+              : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
           }`}>
             <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <span>{message.text}</span>
           </div>
         )}
 
+        {/* Form Fields */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {isRegister && (
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block text-xs font-medium text-slate-300 mb-1">
                 Display Name
               </label>
               <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <User className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
                 <input
                   type="text"
                   required
                   placeholder="Sakshi Sharma"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
+                  className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Platform Role
             </label>
             <div className="relative">
-              <UserCheck className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <UserCheck className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
+                className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition"
               >
                 {roles.map((r) => (
-                  <option key={r} value={r}>{r}</option>
+                  <option key={r} value={r} className="bg-slate-900 text-slate-200">{r}</option>
                 ))}
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
+            <label className="block text-xs font-medium text-slate-300 mb-1">
               Email Address
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
               <input
                 type="email"
                 required
                 placeholder="planner@energy.org"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
+                className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              {isRegister ? 'Create Password' : 'Password'}
+            <label className="block text-xs font-medium text-slate-300 mb-1">
+              {isRegister ? 'Create Password (at least 6 characters)' : 'Password'}
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-10 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
+                className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 focus:outline-none"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -260,23 +587,23 @@ export default function App() {
 
           {isRegister && (
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
+              <label className="block text-xs font-medium text-slate-300 mb-1">
                 Confirm Password
               </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   required
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-10 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
+                  className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 focus:outline-none"
                 >
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -287,19 +614,14 @@ export default function App() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 rounded-lg text-sm shadow-sm transition duration-150 ease-in-out mt-2 disabled:opacity-50"
+            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold py-3 rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition duration-200 ease-in-out mt-2 disabled:opacity-50 active:scale-[0.98]"
           >
             {loading 
               ? (isRegister ? 'Creating Account...' : 'Authenticating...') 
-              : (isRegister ? 'Register & Sign In' : 'Sign In to Portal')
+              : (isRegister ? 'Register & Sign In' : 'Sign In')
             }
           </button>
         </form>
-
-        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center space-x-1.5 text-xs text-slate-400">
-          <ShieldCheck className="w-4 h-4 text-slate-400" />
-          <span>Role-Based Access Control (RBAC)</span>
-        </div>
       </div>
     </div>
   );
