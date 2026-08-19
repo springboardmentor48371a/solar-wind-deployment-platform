@@ -2,7 +2,7 @@
 
 An AI-powered platform that recommends optimal locations for renewable energy projects by analyzing environmental, geographic, climatic, and infrastructure-related factors.
 
-For the full project specification see [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md).
+
 
 ---
 
