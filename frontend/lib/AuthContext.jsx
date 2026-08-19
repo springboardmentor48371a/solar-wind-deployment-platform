@@ -40,11 +40,10 @@ export function AuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const login = async (email, password, pin, remember = true) => {
+  const login = async (email, password, remember = true) => {
     const form = new URLSearchParams()
     form.append('username', email)
     form.append('password', password)
-    if (pin) form.append('pin', pin)
     const res = await api.post('/auth/login', form, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     })
@@ -53,10 +52,9 @@ export function AuthProvider({ children }) {
   }
 
   // Registration -> straight into the app, no "now go log in again" detour.
-  // Reuses login() so PIN handling / STAFF_PIN_REQUIRED behaves identically.
-  const registerAndLogin = async (registerPayload, password, pin, remember = true) => {
+  const registerAndLogin = async (registerPayload, password, remember = true) => {
     await api.post('/auth/register', registerPayload)
-    await login(registerPayload.email, password, pin, remember)
+    await login(registerPayload.email, password, remember)
   }
 
   const logout = () => {

@@ -9,7 +9,7 @@ const roles = [
   { name: 'Project Manager', desc: 'Creates and tracks projects portfolio-wide: progress, feasibility reports, cost-benefit context, and deployment timelines.' },
   { name: 'Investor / Developer', desc: 'Read-only portfolio visibility across every project, for investment decisions.' },
   { name: 'Government / Regulator', desc: 'Read-only compliance visibility across every project.' },
-  { name: 'Administrator', desc: 'Full portfolio access, user management, staff PIN-gated roles, audit trail, and the ability to view the app as any other user.' },
+  { name: 'Administrator', desc: 'Full portfolio access, user management, audit trail, and the ability to view the app as any other user.' },
 ]
 
 const engines = [

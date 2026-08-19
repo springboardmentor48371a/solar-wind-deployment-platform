@@ -1,9 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
-import secrets
 
 from app import models, schemas, auth
 from app.database import get_db
@@ -28,24 +26,22 @@ class TokenPair(schemas.Token):
     refresh_token: str
 
 
-# Only "normal" users self-register with nothing but an email + password.
-# Every other role is "staff" and additionally needs the shared staff PIN
-# (set via STAFF_PIN in .env) — both to register as staff, and again every
-# time a staff account logs in. This is a second, org-controlled factor on
-# top of each person's individual password: a stolen/guessed password
-# alone is not enough to act as GIS Analyst / Project Manager / Admin.
+# All 6 roles are self-service — no staff PIN gate. This was removed as a
+# deliberate, temporary simplification (see git history / conversation for
+# context): registering as GIS Analyst, Project Manager, or Administrator
+# no longer requires anything beyond picking the role. This is a real
+# security tradeoff, not a cosmetic one — anyone can now self-register as
+# Administrator with full platform access. Revisit before any real/public
+# deployment.
 NORMAL_ROLE = models.RoleEnum.planner
-SELF_SERVICE_ROLES = {
+ALL_ROLES = {
     models.RoleEnum.planner,
     models.RoleEnum.investor_developer,
     models.RoleEnum.government_regulator,
+    models.RoleEnum.gis_analyst,
+    models.RoleEnum.project_manager,
+    models.RoleEnum.admin,
 }
-STAFF_ROLES = {models.RoleEnum.gis_analyst, models.RoleEnum.project_manager, models.RoleEnum.admin}
-
-
-def _check_staff_pin(pin: Optional[str]) -> bool:
-    """Constant-time comparison so response timing can't leak the PIN."""
-    return bool(pin) and secrets.compare_digest(pin, settings.staff_pin)
 
 
 @router.post("/register", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED)
@@ -58,19 +54,9 @@ def register(request: Request, user_in: schemas.UserCreate, db: Session = Depend
     auth.validate_password_strength(user_in.password)
 
     requested_role = user_in.role
-
-    if requested_role in STAFF_ROLES:
-        if not _check_staff_pin(user_in.pin):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Incorrect or missing staff PIN. Registering as GIS Analyst, "
-                "Project Manager, or Administrator requires the staff PIN — ask "
-                "whoever runs this platform for it.",
-            )
-    elif requested_role not in SELF_SERVICE_ROLES:
-        # Anything that isn't an explicit, PIN-verified staff role or a
-        # known self-service role falls back to the safest default —
-        # never trust a client-supplied role on its own.
+    if requested_role not in ALL_ROLES:
+        # Anything that isn't one of the 6 known roles falls back to the
+        # safest default — never trust an unrecognized client-supplied value.
         requested_role = NORMAL_ROLE
 
     user = models.User(
@@ -92,7 +78,6 @@ def register(request: Request, user_in: schemas.UserCreate, db: Session = Depend
 def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    pin: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     # OAuth2PasswordRequestForm uses "username" field for the email
@@ -116,12 +101,6 @@ def login(
         )
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
-
-    if user.role in STAFF_ROLES and not _check_staff_pin(pin):
-        # A distinct, machine-checkable error code — the frontend uses this
-        # to reveal a PIN field and let the person retry, rather than
-        # showing a dead-end "wrong password" message.
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="STAFF_PIN_REQUIRED")
 
     access_token = auth.create_access_token({"sub": str(user.id), "role": user.role.value})
     refresh_token = auth.create_refresh_token({"sub": str(user.id)})

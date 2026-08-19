@@ -5,19 +5,24 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../../lib/AuthContext'
 
-// Self-service roles the backend actually honors without a PIN.
-const SELF_SERVICE_ROLES = ['Renewable Energy Planner', 'Investor / Developer', 'Government / Regulator']
-// "Staff" roles need the shared staff PIN — both to register and to log in.
-const STAFF_ROLES = ['GIS Analyst', 'Project Manager', 'Administrator']
+// All 6 roles from the spec, self-service — no staff PIN gate.
+// (Deliberately simplified; see backend/app/routers/auth.py's ALL_ROLES
+// comment for the tradeoff this removed.)
+const ROLES = [
+  'Renewable Energy Planner',
+  'GIS Analyst',
+  'Project Manager',
+  'Investor / Developer',
+  'Government / Regulator',
+  'Administrator',
+]
 
 export default function Register() {
-  const [isStaff, setIsStaff] = useState(false)
   const [form, setForm] = useState({
     full_name: '',
     email: '',
     password: '',
-    role: SELF_SERVICE_ROLES[0],
-    pin: '',
+    role: ROLES[0],
   })
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
@@ -27,25 +32,14 @@ export default function Register() {
 
   const update = (field) => (e) => setForm({ ...form, [field]: e.target.value })
 
-  const toggleStaff = () => {
-    const next = !isStaff
-    setIsStaff(next)
-    setForm({ ...form, role: next ? STAFF_ROLES[0] : SELF_SERVICE_ROLES[0], pin: '' })
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      const payload = isStaff
-        ? { full_name: form.full_name, email: form.email, password: form.password, role: form.role, pin: form.pin }
-        : { full_name: form.full_name, email: form.email, password: form.password, role: form.role }
-
-      // Straight into the app — no "now go log back in" detour. Reuses
-      // the same PIN for the immediate login, since staff accounts need
-      // it there too.
-      await registerAndLogin(payload, form.password, isStaff ? form.pin : undefined, remember)
+      const payload = { full_name: form.full_name, email: form.email, password: form.password, role: form.role }
+      // Straight into the app — no "now go log back in" detour.
+      await registerAndLogin(payload, form.password, remember)
       router.push('/dashboard')
     } catch (err) {
       setError(err.response?.data?.detail || 'Registration failed')
@@ -73,51 +67,10 @@ export default function Register() {
           <input className="input" type="password" value={form.password} onChange={update('password')} placeholder="••••••••" required />
           <p className="text-xs text-ink-faint mt-1">At least 8 characters, with an uppercase letter, a lowercase letter, and a number.</p>
 
-          {!isStaff && (
-            <>
-              <label className="label">I am a</label>
-              <select className="input" value={form.role} onChange={update('role')}>
-                {SELF_SERVICE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </>
-          )}
-
-          <button
-            type="button"
-            onClick={toggleStaff}
-            className="flex items-center justify-between mt-4 p-3 rounded-sm border border-border bg-surface-2 hover:bg-[#eef1ef] transition text-left"
-          >
-            <span className="text-[13px] font-medium">Registering as GIS Analyst / Project Manager / Admin?</span>
-            <span className={`w-9 h-5 rounded-full relative transition ${isStaff ? 'bg-brand' : 'bg-[#d7ddda]'}`}>
-              <span
-                className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${isStaff ? 'translate-x-[18px]' : 'translate-x-0.5'}`}
-              />
-            </span>
-          </button>
-
-          {isStaff && (
-            <div className="mt-3.5 p-3.5 rounded-sm border border-border bg-surface-2 animate-fadeIn">
-              <label className="label mt-0">Staff Role</label>
-              <select className="input" value={form.role} onChange={update('role')}>
-                {STAFF_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-              <label className="label">Staff PIN</label>
-              <input
-                className="input tracking-[0.3em] font-mono text-center"
-                type="password"
-                inputMode="numeric"
-                value={form.pin}
-                onChange={update('pin')}
-                placeholder="••••••"
-                required={isStaff}
-                maxLength={32}
-              />
-              <p className="text-xs text-ink-faint mt-1">
-                Ask whoever runs this platform for the current staff PIN. You&apos;ll
-                also need it every time you log in.
-              </p>
-            </div>
-          )}
+          <label className="label">I am a</label>
+          <select className="input" value={form.role} onChange={update('role')}>
+            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
 
           <label className="flex items-center gap-2 mt-3.5 text-[13px] text-ink-muted cursor-pointer select-none">
             <input

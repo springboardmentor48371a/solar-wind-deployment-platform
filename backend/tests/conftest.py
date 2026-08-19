@@ -205,7 +205,7 @@ def _unique_email(prefix: str) -> str:
     return f"{prefix}.{uuid.uuid4().hex[:10]}@example.com"
 
 
-def register_and_login(client: TestClient, role: str, pin: str | None = None, password: str = "Str0ngPass!"):
+def register_and_login(client: TestClient, role: str, password: str = "Str0ngPass!"):
     email = _unique_email(role.lower().replace(" ", "").replace("/", ""))
     payload = {
         "full_name": f"Test {role}",
@@ -213,15 +213,10 @@ def register_and_login(client: TestClient, role: str, pin: str | None = None, pa
         "password": password,
         "role": role,
     }
-    if pin:
-        payload["pin"] = pin
     resp = client.post("/auth/register", json=payload)
     assert resp.status_code == 201, resp.text
 
-    login_data = {"username": email, "password": password}
-    if pin:
-        login_data["pin"] = pin
-    login_resp = client.post("/auth/login", data=login_data)
+    login_resp = client.post("/auth/login", data={"username": email, "password": password})
     assert login_resp.status_code == 200, login_resp.text
     tokens = login_resp.json()
     return {"email": email, "access_token": tokens["access_token"], "id": resp.json()["id"]}
@@ -239,17 +234,17 @@ def second_planner(client):
 
 @pytest.fixture()
 def gis_analyst(client):
-    return register_and_login(client, "GIS Analyst", pin="1248")
+    return register_and_login(client, "GIS Analyst")
 
 
 @pytest.fixture()
 def project_manager(client):
-    return register_and_login(client, "Project Manager", pin="1248")
+    return register_and_login(client, "Project Manager")
 
 
 @pytest.fixture()
 def admin(client):
-    return register_and_login(client, "Administrator", pin="1248")
+    return register_and_login(client, "Administrator")
 
 
 def auth_headers(user: dict) -> dict:

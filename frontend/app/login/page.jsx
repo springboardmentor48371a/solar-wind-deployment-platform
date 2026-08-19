@@ -8,9 +8,7 @@ import { useAuth } from '../../lib/AuthContext'
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [pin, setPin] = useState('')
   const [remember, setRemember] = useState(true)
-  const [needsPin, setNeedsPin] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
@@ -21,20 +19,10 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      await login(email, password, pin || undefined, remember)
+      await login(email, password, remember)
       router.push('/dashboard')
     } catch (err) {
-      const detail = err.response?.data?.detail
-      if (detail === 'STAFF_PIN_REQUIRED') {
-        setNeedsPin(true)
-        setError(
-          pin
-            ? 'Incorrect staff PIN. Ask an administrator for the current PIN.'
-            : 'This is a staff account. Enter your staff PIN to continue.'
-        )
-      } else {
-        setError(detail || 'Login failed. Check your credentials and try again.')
-      }
+      setError(err.response?.data?.detail || 'Login failed. Check your credentials and try again.')
     } finally {
       setLoading(false)
     }
@@ -59,7 +47,6 @@ export default function Login() {
             onChange={(e) => setEmail(e.target.value)}
             required
             autoFocus
-            disabled={needsPin}
           />
           <label className="label">Password</label>
           <input
@@ -69,29 +56,7 @@ export default function Login() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            disabled={needsPin}
           />
-
-          {needsPin && (
-            <div className="mt-1 animate-fadeIn">
-              <label className="label">Staff PIN</label>
-              <input
-                className="input tracking-[0.3em] font-mono text-center"
-                type="password"
-                inputMode="numeric"
-                placeholder="••••••"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                required
-                autoFocus
-                maxLength={32}
-              />
-              <p className="text-xs text-ink-faint mt-1">
-                GIS Analyst / Project Manager / Administrator accounts require this
-                on every sign-in, in addition to your password.
-              </p>
-            </div>
-          )}
 
           <label className="flex items-center gap-2 mt-3.5 text-[13px] text-ink-muted cursor-pointer select-none">
             <input
@@ -106,22 +71,9 @@ export default function Login() {
           <div className="mt-4.5">
             <button type="submit" disabled={loading} className="btn w-full">
               {loading && <span className="spinner" />}
-              {loading ? 'Signing in…' : needsPin ? 'Verify PIN & sign in' : 'Sign in'}
+              {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </div>
-          {needsPin && (
-            <button
-              type="button"
-              className="btn-ghost btn-sm mt-2 self-center"
-              onClick={() => {
-                setNeedsPin(false)
-                setPin('')
-                setError('')
-              }}
-            >
-              ← Use a different account
-            </button>
-          )}
         </form>
         <p className="mt-4 text-[13px] text-ink-muted text-center">
           No account? <Link href="/register" className="text-brand font-medium hover:underline">Create one</Link>

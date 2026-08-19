@@ -1,7 +1,12 @@
 from tests.conftest import auth_headers, register_and_login
 
 
-def test_register_self_service_role_needs_no_pin(client):
+def test_register_any_role_needs_no_pin(client):
+    """
+    The staff-PIN gate was removed (temporary, deliberate simplification —
+    see auth.py's ALL_ROLES comment). Every role, including Administrator,
+    is now self-service with just email + password.
+    """
     resp = client.post(
         "/auth/register",
         json={
@@ -15,20 +20,7 @@ def test_register_self_service_role_needs_no_pin(client):
     assert resp.json()["role"] == "Renewable Energy Planner"
 
 
-def test_register_staff_role_without_pin_is_rejected(client):
-    resp = client.post(
-        "/auth/register",
-        json={
-            "full_name": "Fake Admin",
-            "email": "fake.admin@example.com",
-            "password": "Str0ngPass!",
-            "role": "Administrator",
-        },
-    )
-    assert resp.status_code == 403
-
-
-def test_register_staff_role_with_correct_pin_succeeds(client):
+def test_register_admin_role_needs_no_pin(client):
     resp = client.post(
         "/auth/register",
         json={
@@ -36,10 +28,10 @@ def test_register_staff_role_with_correct_pin_succeeds(client):
             "email": "real.admin@example.com",
             "password": "Str0ngPass!",
             "role": "Administrator",
-            "pin": "1248",
         },
     )
     assert resp.status_code == 201
+    assert resp.json()["role"] == "Administrator"
 
 
 def test_client_cannot_self_assign_unknown_role(client):
@@ -111,7 +103,8 @@ def test_login_unknown_email_same_generic_error(client):
     assert resp.json()["detail"] == "Incorrect email or password"
 
 
-def test_staff_login_without_pin_prompts_for_pin(client):
+def test_staff_role_login_succeeds_without_pin(client):
+    """PIN-free login now applies to every role, including staff roles."""
     client.post(
         "/auth/register",
         json={
@@ -119,14 +112,13 @@ def test_staff_login_without_pin_prompts_for_pin(client):
             "email": "staff.nopin@example.com",
             "password": "Str0ngPass!",
             "role": "GIS Analyst",
-            "pin": "1248",
         },
     )
     resp = client.post(
         "/auth/login", data={"username": "staff.nopin@example.com", "password": "Str0ngPass!"}
     )
-    assert resp.status_code == 401
-    assert resp.json()["detail"] == "STAFF_PIN_REQUIRED"
+    assert resp.status_code == 200
+    assert "access_token" in resp.json()
 
 
 def test_me_returns_authenticated_user(client, planner):

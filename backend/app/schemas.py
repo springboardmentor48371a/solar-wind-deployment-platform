@@ -13,9 +13,10 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
     role: RoleEnum = RoleEnum.planner
-    # Required only when `role` is an elevated role (GIS Analyst, Project
-    # Manager, Administrator) — see auth.py's register(). Left as a plain
-    # optional string so ordinary Planner sign-ups don't need to send it.
+    # No longer required by the backend (the staff-PIN gate was removed —
+    # see auth.py's register()). Left in the schema as an accepted-but-
+    # ignored optional field so nothing breaks if older frontend code
+    # still sends it.
     pin: Optional[str] = Field(None, max_length=32)
 
 
