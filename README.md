@@ -17,6 +17,38 @@ An AI-powered platform that recommends optimal locations for renewable energy pr
 | **Maps** | Leaflet.js, OpenStreetMap |
 | **DevOps** | Docker, Docker Compose |
 
+---## Project Structure
+
+```text
+solar-wind-deployment-platform/
+├── backend/
+│   ├── app/
+│   │   ├── core/         # config, security, dependencies
+│   │   ├── models/       # SQLAlchemy database models
+│   │   ├── routers/      # API endpoint handlers
+│   │   ├── schemas/      # Pydantic schemas
+│   │   ├── services/     # External API callers & calculations
+│   │   └── main.py       # FastAPI application entry point
+│   ├── tests/            # pytest suite
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── components/   # UI & Map components
+│   │   ├── pages/        # Dashboard & view pages
+│   │   ├── services/     # API client functions
+│   │   ├── App.jsx       # Routing & main app wrapper
+│   │   └── main.jsx
+│   ├── Dockerfile
+│   └── package.json
+├── docs/
+│   ├── DATABASE_SCHEMA.md
+│   ├── PROJECT_SPEC.md
+│   └── WORKFLOWS.md
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
 ---
 
 ## Comprehensive Module Breakdown (All 14 Modules)
@@ -127,6 +159,7 @@ An AI-powered platform that recommends optimal locations for renewable energy pr
 
 
 ---
+
 ## External Datasets & Connectors
 
 | Dataset / API | Purpose / Data Provided | Source |
@@ -166,12 +199,82 @@ No Node.js, no Python, no pip — Docker handles all of that.
 
 ## Getting Started
 
-### 1. Clone the repository
+### Step 1. Clone the repository
 
 ```bash
 git clone [https://github.com/springboardmentor48371a/solar-wind-deployment-platform.git](https://github.com/springboardmentor48371a/solar-wind-deployment-platform.git)
 cd solar-wind-deployment-platform
 git checkout shruti-mishra
+```
+### Step 2: Start the FastAPI Backend ServerOpen your first terminal in the project root:PowerShell# Navigate to backend directory
+```bash
+cd backend
+
+# Create virtual environment
+
+python -m venv venv
+
+# Activate virtual environment
+# Windows (PowerShell):
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+.\venv\Scripts\Activate.ps1
+# macOS / Linux:
+# source venv/bin/activate
+
+# Install required Python dependencies
+
+pip install fastapi uvicorn sqlalchemy "python-jose[cryptography]" "passlib[bcrypt]" "bcrypt==4.0.1" pydantic "pydantic[email]" email-validator requests
+
+# Run the backend with live reload
+uvicorn main:app --reload --port 8000
+```
+Backend API Gateway: http://127.0.0.1:8000Interactive Swagger Documentation: http://127.0.0.1:8000/docs
+### Step 3: Start the Vite + React Frontend ServerOpen a second terminal in the project root:PowerShell# Navigate to frontend directory
+```bash
+cd frontend
+```
+# Install Node dependencies
+```bash
+npm install
+```
+# Start Vite development server
+```bash
+npm run dev
+```
+Frontend Web Application: http://localhost:5173/
+
+## Testing & Verification Guide
+
+Follow these steps to test and verify the end-to-end functionality of the platform in your browser:
+
+### 1. Launch Application
+* Open **`http://localhost:5173/`** in your web browser.
+
+---
+
+### 2. User Registration & Login
+* Click on **Register Account**.
+* Select your platform role (e.g., *Renewable Energy Planner*, *GIS Analyst*, *Project Manager*, or *Administrator*).
+* Enter your display name, email address, and a secure password ($\ge$ 6 characters).
+* Click **Register & Sign In** to authenticate and receive your JWT session token.
+
+---
+
+### 3. Register Candidate Sites with Interactive GIS
+* On the authenticated dashboard, click **Select Your Site on Map** or **Register Site on Map**.
+* Enter a custom **Site / Project Name**.
+* Search for any location by name in the search bar or click and drag the blue pin anywhere on the map.
+* Verify that the **Coordinates (Lat/Long)**, **Region / State (in English)**, **DEM Elevation**, and **Grid Distance** update automatically in real time.
+* Click **Confirm & Send for Feasibility Analysis** to persist the site record to the database.
+
+---
+
+### 4. Multi-Site Analysis & Dashboard Navigation
+* **View Stored Sites:** Use the sidebar navigation menu to browse all saved geographical corridors and switch active target zones.
+* **Compare Sites:** Benchmark candidate locations side-by-side on Solar GHI, Wind Speed (100m), Area, and Suitability Scores.
+* **View Feasibility Report:** Review the estimated Annual Energy Production (AEP in MWh/yr), Capacity Utilization Factor (CUF), and export the dossier.
+
+---
 
 
 
