@@ -17,7 +17,8 @@ An AI-powered platform that recommends optimal locations for renewable energy pr
 | **Maps** | Leaflet.js, OpenStreetMap |
 | **DevOps** | Docker, Docker Compose |
 
----## Project Structure
+---
+## Project Structure
 
 ```text
 solar-wind-deployment-platform/
