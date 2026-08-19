@@ -1,11 +1,5 @@
 # solar-wind-deployment-platform# ☀️ Solar & Wind Deployment Intelligence Platform
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-18.x-61DAFB.svg?logo=react&logoColor=black)](https://react.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC.svg?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Leaflet](https://img.shields.io/badge/Leaflet-GIS_Mapping-199900.svg?logo=leaflet&logoColor=white)](https://leafletjs.com/)
-[![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-red.svg?logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org/)
 
 An AI-powered renewable energy deployment and feasibility intelligence platform designed to identify, assess, and recommend optimal geographical sites for Solar PV, Wind Farms, and Hybrid clean energy infrastructure.
 
