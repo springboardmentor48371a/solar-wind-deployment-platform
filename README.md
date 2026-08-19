@@ -100,7 +100,7 @@ Created by `seed.py`. Use these to log in and test each role.
 
 Google OAuth **will not work out of the box** when you clone this repo.
 
-Google OAuth credentials (`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`) are personal — they are registered under a specific Google account and tied to specific authorized redirect URIs. The `.env.example` contains placeholders that won't work for anyone other than the original developer who set them up.
+Google OAuth credentials (`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`) are registered under a specific Google account and tied to specific localhost for now. The `.env.example` contains placeholders that won't work for anyone other than the original developer who set them up.
 
 Email and password login works perfectly without any additional setup.
 
