@@ -28,6 +28,27 @@ Only two things needed:
 * **[Git](https://git-scm.com/)** — to clone the repo
 
 No Node.js, no Python, no pip — Docker handles all of that.
+---
+
+## Module Progress
+
+| Module | Status |
+|---|---|
+| **1. User Authentication & RBAC** | 🟩 Complete |
+| **2. Project & Site Management** | 🟩 Complete |
+| **3. Environmental Data Collection** | 🟩 Complete |
+| **4. Geographic Intelligence Engine** | 🟦 Planned |
+| **5. Solar Potential Prediction** | 🟦 Planned |
+| **6. Wind Potential Prediction** | 🟦 Planned |
+| **7. Site Suitability Engine** | 🟦 Planned |
+| **8. Energy Forecasting Engine** | 🟦 Planned |
+| **9. Deployment Optimization Engine** | 🟦 Planned |
+| **10. Site Scoring Engine** | 🟦 Planned |
+| **11. Dashboard & Analytics** | 🟨 In Progress |
+| **12. Notification & Alert System** | 🟦 Planned |
+| **13. Reports & Export System** | 🟦 Planned |
+| **14. Final Integration & Deployment** | 🟦 Planned |
+
 
 ---
 
