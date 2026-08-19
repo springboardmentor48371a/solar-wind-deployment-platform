@@ -21,7 +21,6 @@ class RegionResponse(BaseModel):
 class ProjectCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    region_id: int
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
@@ -33,7 +32,7 @@ class ProjectResponse(BaseModel):
     name: str
     description: Optional[str]
     status: ProjectStatus
-    region_id: int
+    region_id: Optional[int]
     created_by: int
     created_at: datetime
     updated_at: datetime

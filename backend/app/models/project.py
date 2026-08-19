@@ -29,7 +29,7 @@ class Project(Base):
     name = Column(String(150), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(Enum(ProjectStatus), default=ProjectStatus.planning)
-    region_id = Column(Integer, ForeignKey("regions.id"), nullable=False)
+    region_id = Column(Integer, ForeignKey("regions.id"), nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

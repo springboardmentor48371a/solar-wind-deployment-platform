@@ -21,11 +21,12 @@ For the full project specification see [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.
 
 ## Prerequisites
 
-Make sure you have these installed before starting:
+Only two things needed:
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) — runs the backend and database
-- [Node.js 18+](https://nodejs.org/) — runs the frontend
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) — runs everything
 - [Git](https://git-scm.com/) — to clone the repo
+
+No Node.js, no Python, no pip — Docker handles all of that.
 
 ---
 
@@ -44,42 +45,38 @@ cd solar-wind-deployment-platform
 cp .env.example .env
 ```
 
-Open `.env` and replace the `SECRET_KEY` with a freshly generated one:
+Open `.env` and replace `SECRET_KEY` with a freshly generated one:
 
 ```bash
-python -c "import secrets; print(secrets.token_hex(32))"
+docker run --rm python:3.11-slim python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-Paste the output as your `SECRET_KEY` in `.env`. Leave the Google OAuth fields as they are for now — see the [Google OAuth](#google-oauth) section below.
+Paste the output as your `SECRET_KEY` in `.env`. Leave everything else as is.
 
-### 3. Start the backend and database
+### 3. Start everything
 
 ```bash
 docker compose up --build
 ```
 
-Wait until you see:
+This starts PostgreSQL, the FastAPI backend, and the React frontend all at once. Wait until you see:
+
 ```
-backend-1  | INFO:     Application startup complete.
+backend-1   | INFO:     Application startup complete.
+frontend-1  | VITE ready in ... ms
 ```
 
-### 4. Seed the database
+### 4. Seed the database (first time only)
 
 Open a new terminal and run:
 
 ```bash
-docker exec -i solar-wind-deployment-platform-backend-1 python app/seed.py
+docker exec solar-wind-deployment-platform-backend-1 python app/seed.py
 ```
 
-This creates the default region, all 4 role accounts, 2 sample projects and 6 sites.
+This creates 4 default accounts, 2 sample projects, and 6 sites with environmental data.
 
-### 5. Start the frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
+### 5. Open the app
 
 Open **http://localhost:5173** in your browser.
 

@@ -5,3 +5,13 @@ body {
   background: #fff;
   color: #111;
 }
+
+/* Remove browser native password toggle */
+input::-ms-reveal,
+input::-ms-clear,
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
+}

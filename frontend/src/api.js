@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: 'http://localhost:8000' })
+const api = axios.create({ baseURL: '/api' })
 
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('access_token')
@@ -36,6 +36,7 @@ export const deleteProject = (id) => api.delete(`/projects/${id}`)
 
 // Sites
 export const listSites = (projectId) => api.get(`/sites/?project_id=${projectId}`)
+export const previewLocation = (lat, lon) => api.get(`/sites/preview?lat=${lat}&lon=${lon}`)
 export const createSite = (data) => api.post('/sites/', data)
 export const updateSiteStatus = (id, status, notes) => api.patch(`/sites/${id}/status`, { status, notes })
 export const deleteSite = (id) => api.delete(`/sites/${id}`)

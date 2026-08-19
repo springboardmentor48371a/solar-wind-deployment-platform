@@ -16,7 +16,7 @@ Complete database schema for the Solar & Wind Deployment Intelligence Platform.
 | Table | Module | Purpose |
 |---|---|---|
 | `users` | Module 1 | User accounts and authentication |
-| `regions` | Module 2 | Geographic grouping for projects |
+| `regions` | Module 2 | Geographic grouping for projects — auto-created from coordinates |
 | `projects` | Module 2 | Renewable energy projects |
 | `sites` | Module 2 | Individual deployment sites within projects |
 | `deployment_history` | Module 2 | Audit log of site status changes |
@@ -49,7 +49,7 @@ Stores all platform user accounts including OAuth users.
 
 ### `regions`
 
-Geographic regions used to group projects. Only administrators can create or delete regions.
+Geographic regions auto-created from Nominatim reverse geocoding when a site is added. Not user-facing.
 
 | Column | Type | Nullable | Description |
 |---|---|---|---|
@@ -64,7 +64,7 @@ Geographic regions used to group projects. Only administrators can create or del
 
 ### `projects`
 
-Renewable energy deployment projects. Each project belongs to a region and is created by a user.
+Renewable energy deployment projects. Region is auto-assigned from the first site added to the project.
 
 | Column | Type | Nullable | Description |
 |---|---|---|---|
@@ -72,7 +72,7 @@ Renewable energy deployment projects. Each project belongs to a region and is cr
 | `name` | String(150) | No | Project name |
 | `description` | Text | Yes | Project description |
 | `status` | Enum(ProjectStatus) | No | Current status, default `planning` |
-| `region_id` | Integer (FK → regions) | No | Region this project belongs to |
+| `region_id` | Integer (FK → regions) | Yes | Auto-assigned from first site's coordinates |
 | `created_by` | Integer (FK → users) | No | User who created the project |
 | `created_at` | DateTime | No | Creation timestamp |
 | `updated_at` | DateTime | No | Last update timestamp |
@@ -81,7 +81,7 @@ Renewable energy deployment projects. Each project belongs to a region and is cr
 
 ### `sites`
 
-Individual deployment sites within a project. Stores geographic coordinates and land information.
+Individual deployment sites within a project. Region and elevation are auto-detected from coordinates on creation.
 
 | Column | Type | Nullable | Description |
 |---|---|---|---|
@@ -90,10 +90,10 @@ Individual deployment sites within a project. Stores geographic coordinates and 
 | `project_id` | Integer (FK → projects) | No | Project this site belongs to |
 | `latitude` | Float | No | Geographic latitude |
 | `longitude` | Float | No | Geographic longitude |
-| `elevation` | Float | Yes | Elevation in meters |
+| `elevation` | Float | Yes | Elevation in meters — auto-fetched from OpenTopoData |
 | `land_area` | Float | Yes | Land area in hectares |
 | `energy_type` | Enum(EnergyType) | No | `solar`, `wind`, or `hybrid` |
-| `status` | Enum(SiteStatus) | No | Deployment status, default `planned` |
+| `status` | Enum(SiteStatus) | No | Review status, default `under_review` |
 | `land_ownership` | Enum(LandOwnership) | No | Ownership type, default `unknown` |
 | `existing_infrastructure` | Text | Yes | Notes on existing infrastructure |
 | `notes` | Text | Yes | General notes |
@@ -121,7 +121,7 @@ Audit log that records every status change made to a site. Automatically written
 
 ### `environmental_data`
 
-Daily environmental readings per site fetched from external APIs. One row per site per day.
+Daily environmental readings per site fetched from external APIs. One row per site per day. Auto-fetched for last 30 days when a site is created.
 
 | Column | Type | Nullable | Description |
 |---|---|---|---|
@@ -198,11 +198,9 @@ sites ──< environmental_data
 ### SiteStatus
 | Value | Description |
 |---|---|
-| `planned` | Site registered, not yet reviewed (default) |
-| `under_review` | Site is being evaluated |
+| `under_review` | Site is being evaluated (default) |
 | `approved` | Site has been approved for deployment |
-| `deployed` | Site has been deployed |
-| `rejected` | Site was rejected |
+| `rejected` | Site was rejected after review |
 
 ### EnergyType
 | Value | Description |
@@ -228,3 +226,4 @@ sites ──< environmental_data
 | NASA POWER | `power.larc.nasa.gov/api` | Solar irradiance, wind speed (10m & 50m), wind direction, temperature, rainfall, cloud cover | Free, no key |
 | Open-Meteo | `archive-api.open-meteo.com` | Relative humidity | Free, no key |
 | OpenTopoData | `api.opentopodata.org/v1/srtm30m` | Elevation from SRTM30m dataset | Free, no key |
+| Nominatim | `nominatim.openstreetmap.org` | Reverse geocoding — country, state, city from coordinates | Free, no key |

@@ -37,8 +37,6 @@ def delete_region(region_id: int, db: Session = Depends(get_db), _: User = Depen
 
 @router.post("/", response_model=ProjectResponse, status_code=201)
 def create_project(payload: ProjectCreate, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.administrator, UserRole.energy_planner, UserRole.project_manager))):
-    if not db.query(Region).filter(Region.id == payload.region_id).first():
-        raise HTTPException(status_code=404, detail="Region not found")
     project = Project(**payload.model_dump(), created_by=current_user.id)
     db.add(project)
     db.commit()

@@ -10,10 +10,8 @@ class EnergyType(str, enum.Enum):
     hybrid = "hybrid"
 
 class SiteStatus(str, enum.Enum):
-    planned = "planned"
     under_review = "under_review"
     approved = "approved"
-    deployed = "deployed"
     rejected = "rejected"
 
 class LandOwnership(str, enum.Enum):
@@ -33,7 +31,7 @@ class Site(Base):
     elevation = Column(Float, nullable=True)          # meters
     land_area = Column(Float, nullable=True)          # hectares
     energy_type = Column(Enum(EnergyType), nullable=False)
-    status = Column(Enum(SiteStatus), default=SiteStatus.planned)
+    status = Column(Enum(SiteStatus), default=SiteStatus.under_review)
     land_ownership = Column(Enum(LandOwnership), default=LandOwnership.unknown)
     existing_infrastructure = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)

@@ -8,17 +8,12 @@ class SiteCreate(BaseModel):
     project_id: int
     latitude: float
     longitude: float
-    elevation: Optional[float] = None
-    land_area: Optional[float] = None
     energy_type: EnergyType
     land_ownership: LandOwnership = LandOwnership.unknown
-    existing_infrastructure: Optional[str] = None
     notes: Optional[str] = None
 
 class SiteUpdate(BaseModel):
     name: Optional[str] = None
-    elevation: Optional[float] = None
-    land_area: Optional[float] = None
     land_ownership: Optional[LandOwnership] = None
     existing_infrastructure: Optional[str] = None
     notes: Optional[str] = None
@@ -26,6 +21,15 @@ class SiteUpdate(BaseModel):
 class SiteStatusUpdate(BaseModel):
     status: SiteStatus
     notes: Optional[str] = None
+
+class LocationPreview(BaseModel):
+    latitude: float
+    longitude: float
+    country: str
+    state: Optional[str]
+    city: Optional[str]
+    display_name: str
+    elevation: Optional[float]
 
 class DeploymentHistoryResponse(BaseModel):
     id: int

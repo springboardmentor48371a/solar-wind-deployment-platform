@@ -3,12 +3,13 @@ import { login, register } from '../api'
 
 const ROLES = ['energy_planner', 'gis_analyst', 'project_manager', 'administrator']
 
-const input = { width: '100%', padding: '8px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, marginTop: 4 }
+const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, marginTop: 4 }
 const label = { fontSize: 13, color: '#444', display: 'block', marginTop: 12 }
 
 export default function Login({ onSuccess }) {
   const [isRegister, setIsRegister] = useState(false)
   const [form, setForm] = useState({ full_name: '', email: '', password: '', role: 'energy_planner' })
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -45,19 +46,48 @@ export default function Login({ onSuccess }) {
           {isRegister && (
             <>
               <label style={label}>Full Name</label>
-              <input style={input} name="full_name" value={form.full_name} onChange={handle} placeholder="John Doe" required />
+              <input style={inputStyle} name="full_name" value={form.full_name} onChange={handle} placeholder="John Doe" required />
             </>
           )}
           <label style={label}>Email</label>
-          <input style={input} name="email" type="email" value={form.email} onChange={handle} placeholder="you@example.com" required />
+          <input style={inputStyle} name="email" type="email" value={form.email} onChange={handle} placeholder="you@example.com" required />
 
           <label style={label}>Password</label>
-          <input style={input} name="password" type="password" value={form.password} onChange={handle} placeholder="••••••••" required />
+          <div style={{ position: 'relative', marginTop: 4 }}>
+            <input
+              style={{ ...inputStyle, marginTop: 0, paddingRight: 36 }}
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              value={form.password}
+              onChange={handle}
+              placeholder="••••••••"
+              required
+            />
+            {form.password && (
+              <button
+                type="button"
+                onClick={() => setShowPassword(p => !p)}
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#aaa', display: 'flex', alignItems: 'center' }}>
+                {showPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>
 
           {isRegister && (
             <>
               <label style={label}>Role</label>
-              <select style={input} name="role" value={form.role} onChange={handle}>
+              <select style={inputStyle} name="role" value={form.role} onChange={handle}>
                 {ROLES.map(r => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
               </select>
             </>

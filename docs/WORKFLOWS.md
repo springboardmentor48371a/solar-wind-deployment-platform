@@ -92,20 +92,53 @@ After 7 days the refresh token expires and the user must log in again.
 
 ## 4. Project & Site Creation
 
+### Project Creation
 ```
-Admin creates a Region (required first)
-        ↓
 Energy Planner / Project Manager / Admin creates a Project
-  → must select an existing Region
-  → project saved with created_by = current user id
-  → default status = "planning"
+  → only name + description required
+  → region is NOT set at this point
+  → project saved with status = "planning", region_id = null
+```
+
+### Site Creation (2-step)
+
+**Step 1 — Location Preview**
+```
+User enters site name, coordinates, energy type, land ownership
         ↓
-Any user creates a Site under the Project
-  → must provide name, latitude, longitude, energy_type
-  → site saved with status = "planned"
+Frontend calls GET /sites/preview?lat=&lon=
         ↓
-Site appears as a pin on the map
-Site appears in the project's site list
+Backend calls Nominatim reverse geocoding API
+        ↓
+Backend calls OpenTopoData for elevation
+        ↓
+Returns detected country, state, city, display_name, elevation
+        ↓
+Frontend shows preview card — "Is this the correct location?"
+User can go back to edit coordinates or confirm
+```
+
+**Step 2 — Site Creation**
+```
+User confirms location
+        ↓
+POST /sites/ called
+        ↓
+Backend reverse geocodes coordinates → gets region info
+        ↓
+Region looked up in DB by country + state
+  → if not found: new region auto-created
+        ↓
+If project has no region_id → auto-assigned from this site's region
+        ↓
+Elevation fetched from OpenTopoData
+        ↓
+Site saved with status = "under_review" (default)
+        ↓
+30 days of environmental data auto-fetched in background
+  (NASA POWER + Open-Meteo + OpenTopoData)
+        ↓
+Site appears on map and in project's site list
 ```
 
 ---
@@ -113,7 +146,7 @@ Site appears in the project's site list
 ## 5. Site Status Update & Audit Trail
 
 ```
-Authorized user changes site status via dropdown or API
+Authorized user changes site status via dropdown
         ↓
 PATCH /sites/{id}/status called with new status
         ↓
@@ -133,18 +166,20 @@ Full history retrievable via GET /sites/{id}/history
 
 **Site status progression:**
 ```
-planned → under_review → approved → deployed
-                       ↘ rejected
+under_review → approved
+             ↘ rejected
 ```
+
+Sites enter as `under_review` by default. Our platform's role is to evaluate and approve or reject sites — deployment tracking is out of scope.
 
 ---
 
 ## 6. Environmental Data Collection
 
 ```
-User clicks "Collect Data" on a site
+Site is created → auto-triggers data collection for last 30 days
         ↓
-POST /environmental/{site_id}/collect?days=30 called
+POST /environmental/{site_id}/collect?days=30 called internally
         ↓
 Backend checks if data was already fetched within 24 hours
   → if yes: returns "Data already up to date" (no API calls made)
@@ -159,7 +194,7 @@ Backend checks if data was already fetched within 24 hours
 Data parsed into daily records (one record per day)
         ↓
 Old records for this site deleted from `environmental_data`
-New records inserted
+New records inserted (30 rows per site)
         ↓
 GET /environmental/{site_id}/summary returns:
   - avg solar irradiance
@@ -172,6 +207,11 @@ GET /environmental/{site_id}/summary returns:
   - elevation
   - total days of data
 ```
+
+**Refresh behaviour:**
+- Clicking Refresh in the UI calls `POST /environmental/{site_id}/collect`
+- If data was fetched within the last 24 hours, the cache check skips re-fetching and re-reads from DB
+- After 24 hours, old rows are deleted and fresh 30-day data is inserted
 
 ---
 
@@ -201,15 +241,17 @@ GET /environmental/{site_id}/summary returns:
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/regions/` | Admin | Create a new region |
+| POST | `/regions/` | Admin | Create a new region manually |
 | GET | `/regions/` | Any | List all regions |
 | DELETE | `/regions/{id}` | Admin | Delete a region |
+
+> Regions are normally auto-created from site coordinates. Manual creation is admin-only.
 
 ### Projects — `/projects`
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/projects/` | Planner, Manager, Admin | Create a new project |
+| POST | `/projects/` | Planner, Manager, Admin | Create a new project (name + description only) |
 | GET | `/projects/` | Any | List all projects |
 | GET | `/projects/{id}` | Any | Get a specific project |
 | PATCH | `/projects/{id}` | Creator or Admin | Update project details or status |
@@ -219,7 +261,8 @@ GET /environmental/{site_id}/summary returns:
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/sites/` | Any | Register a new site |
+| GET | `/sites/preview?lat=&lon=` | Any | Preview detected location + elevation before creating site |
+| POST | `/sites/` | Any | Register a new site — auto-detects region, elevation, fetches env data |
 | GET | `/sites/` | Any | List sites, filter by `?project_id=` |
 | GET | `/sites/compare?ids=1,2,3` | Any | Compare multiple sites side by side |
 | GET | `/sites/{id}` | Any | Get a specific site |
@@ -251,7 +294,7 @@ GET /environmental/{site_id}/summary returns:
 | List all users | ❌ | ❌ | ❌ | ✅ |
 | Change user role | ❌ | ❌ | ❌ | ✅ |
 | Deactivate user | ❌ | ❌ | ❌ | ✅ |
-| Create region | ❌ | ❌ | ❌ | ✅ |
+| Create region (manual) | ❌ | ❌ | ❌ | ✅ |
 | Delete region | ❌ | ❌ | ❌ | ✅ |
 | View regions | ✅ | ✅ | ✅ | ✅ |
 | Create project | ✅ | ❌ | ✅ | ✅ |
@@ -275,7 +318,6 @@ GET /environmental/{site_id}/summary returns:
 |---|---|---|---|---|
 | Create Project button | ✅ | ❌ | ✅ | ✅ |
 | Delete Project button | ❌ | ❌ | ❌ | ✅ |
-| Create Region button | ❌ | ❌ | ❌ | ✅ |
 | Site status dropdown | ✅ | ❌ | ✅ | ✅ |
 | User Management tab | ❌ | ❌ | ❌ | ✅ |
 | Default landing page | Projects | Map | Projects | Projects |
