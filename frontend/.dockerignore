@@ -1,0 +1,10 @@
+# Ignore files for frontend container builds
+node_modules/
+dist/
+.env
+.env.development
+.env.production
+.vscode/
+.git/
+.gitignore
+README.md

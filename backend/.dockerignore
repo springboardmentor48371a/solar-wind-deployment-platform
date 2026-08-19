@@ -1,0 +1,16 @@
+# Ignore files for backend container builds
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.development
+.env.production
+*.db
+*.db-journal
+.pytest_cache/
+.vscode/
+.git/
+.gitignore
