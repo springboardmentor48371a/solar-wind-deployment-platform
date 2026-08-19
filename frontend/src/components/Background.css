@@ -1,0 +1,389 @@
+/* ============================================
+   RENEWABLE ENERGY BACKGROUND
+============================================ */
+.renewable-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #0a0e1a 0%, #0d1b2a 40%, #1b2f44 100%);
+  overflow: hidden;
+  z-index: 0;
+}
+
+/* ============================================
+   SUN
+============================================ */
+.sun-core {
+  position: absolute;
+  top: 8%;
+  right: 10%;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7a0 0%, #ffdd44 50%, #ff9900 100%);
+  box-shadow: 0 0 80px rgba(255, 200, 50, 0.4);
+  animation: sunPulse 4s ease-in-out infinite;
+}
+
+.sun-glow {
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 200, 50, 0.15) 0%, transparent 70%);
+  animation: sunGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes sunPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 80px rgba(255, 200, 50, 0.4); }
+  50% { transform: scale(1.05); box-shadow: 0 0 120px rgba(255, 200, 50, 0.6); }
+}
+
+@keyframes sunGlow {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(1.3); opacity: 0.8; }
+}
+
+/* ============================================
+   CLOUDS
+============================================ */
+.cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 60px;
+  filter: blur(2px);
+  animation: cloudDrift linear infinite;
+}
+
+.cloud-1 {
+  width: 180px;
+  height: 40px;
+  top: 12%;
+  left: -200px;
+  animation-duration: 45s;
+}
+
+.cloud-2 {
+  width: 250px;
+  height: 50px;
+  top: 25%;
+  left: -300px;
+  animation-duration: 60s;
+  animation-delay: 10s;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cloud-3 {
+  width: 150px;
+  height: 35px;
+  top: 8%;
+  left: -150px;
+  animation-duration: 35s;
+  animation-delay: 20s;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cloud::before {
+  content: '';
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  background: inherit;
+  border-radius: 50%;
+  top: -25px;
+  left: 30px;
+}
+
+.cloud::after {
+  content: '';
+  position: absolute;
+  width: 80px;
+  height: 70px;
+  background: inherit;
+  border-radius: 50%;
+  top: -30px;
+  left: 80px;
+}
+
+@keyframes cloudDrift {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(100vw + 400px)); }
+}
+
+/* ============================================
+   WIND LINES
+============================================ */
+.wind-line {
+  position: absolute;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(180, 230, 255, 0.15), transparent);
+  border-radius: 2px;
+  animation: windFlow linear infinite;
+  opacity: 0.6;
+}
+
+.w1 { top: 18%; width: 120px; left: -150px; animation-duration: 8s; }
+.w2 { top: 35%; width: 180px; left: -200px; animation-duration: 12s; animation-delay: 2s; }
+.w3 { top: 50%; width: 100px; left: -120px; animation-duration: 6s; animation-delay: 4s; }
+.w4 { top: 65%; width: 200px; left: -250px; animation-duration: 14s; animation-delay: 1s; }
+.w5 { top: 78%; width: 140px; left: -180px; animation-duration: 10s; animation-delay: 3s; }
+
+@keyframes windFlow {
+  0% { transform: translateX(0); opacity: 0; }
+  10% { opacity: 0.8; }
+  90% { opacity: 0.8; }
+  100% { transform: translateX(calc(100vw + 300px)); opacity: 0; }
+}
+
+/* ============================================
+   WIND TURBINES
+============================================ */
+.turbine {
+  position: absolute;
+  bottom: 12%;
+}
+
+.turbine-1 { left: 8%; }
+.turbine-2 { left: 25%; bottom: 18%; transform: scale(0.8); }
+.turbine-3 { right: 12%; bottom: 15%; transform: scale(0.9); }
+
+.tower {
+  width: 4px;
+  height: 80px;
+  background: linear-gradient(180deg, #8899aa, #556677);
+  margin: 0 auto;
+  border-radius: 2px;
+  position: relative;
+}
+
+.tower::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: -6px;
+  width: 16px;
+  height: 8px;
+  background: #445566;
+  border-radius: 2px;
+}
+
+.nacelle {
+  width: 20px;
+  height: 10px;
+  background: #778899;
+  border-radius: 4px;
+  margin: 0 auto;
+  position: relative;
+  top: -2px;
+}
+
+.blades {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto;
+  position: relative;
+  top: -55px;
+  animation: bladeSpin 6s linear infinite;
+}
+
+.turbine-2 .blades { animation-duration: 8s; }
+.turbine-3 .blades { animation-duration: 5s; }
+
+.blade {
+  position: absolute;
+  width: 3px;
+  height: 32px;
+  background: linear-gradient(180deg, #ccddee, #99aabb);
+  border-radius: 2px;
+  transform-origin: bottom center;
+  top: 50%;
+  left: 50%;
+}
+
+.b1 { transform: translate(-50%, -100%) rotate(0deg); }
+.b2 { transform: translate(-50%, -100%) rotate(120deg); }
+.b3 { transform: translate(-50%, -100%) rotate(240deg); }
+
+@keyframes bladeSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ============================================
+   SOLAR PANELS
+============================================ */
+.solar-panel {
+  position: absolute;
+  width: 50px;
+  height: 40px;
+  transform: perspective(200px) rotateX(30deg);
+}
+
+.sp1 { bottom: 8%; right: 30%; }
+.sp2 { bottom: 12%; right: 22%; transform: perspective(200px) rotateX(30deg) scale(0.8); }
+
+.panel-surface {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #1a3a6a, #2a5a8a, #1a3a6a);
+  border: 1px solid rgba(100, 200, 255, 0.15);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.panel-surface::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 4px,
+    rgba(100, 200, 255, 0.05) 4px,
+    rgba(100, 200, 255, 0.05) 5px
+  );
+}
+
+.panel-surface::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 4px,
+    rgba(100, 200, 255, 0.05) 4px,
+    rgba(100, 200, 255, 0.05) 5px
+  );
+}
+
+.glint {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    135deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.15) 45%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0.15) 55%,
+    transparent 60%
+  );
+  animation: glintSweep 4s ease-in-out infinite;
+}
+
+@keyframes glintSweep {
+  0% { transform: translateX(-100%) rotate(25deg); }
+  50% { transform: translateX(100%) rotate(25deg); }
+  100% { transform: translateX(-100%) rotate(25deg); }
+}
+
+/* ============================================
+   AI GRID NODES
+============================================ */
+.grid-node {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(100, 200, 255, 0.25);
+  box-shadow: 0 0 12px rgba(100, 200, 255, 0.15);
+  animation: nodePulse 3s ease-in-out infinite;
+}
+
+.node-1 { top: 20%; left: 10%; animation-delay: 0s; }
+.node-2 { top: 45%; left: 5%; animation-delay: 0.5s; }
+.node-3 { top: 30%; right: 20%; animation-delay: 1s; }
+.node-4 { top: 55%; right: 8%; animation-delay: 1.5s; }
+.node-5 { top: 70%; left: 15%; animation-delay: 2s; }
+.node-6 { top: 85%; right: 25%; animation-delay: 2.5s; }
+
+@keyframes nodePulse {
+  0%, 100% { transform: scale(1); opacity: 0.25; }
+  50% { transform: scale(1.8); opacity: 0.6; }
+}
+
+/* ============================================
+   GRID LINES (SVG)
+============================================ */
+.grid-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ============================================
+   REDUCED MOTION SUPPORT
+============================================ */
+@media (prefers-reduced-motion: reduce) {
+  .cloud,
+  .wind-line,
+  .blades,
+  .glint,
+  .sun-core,
+  .sun-glow,
+  .grid-node {
+    animation: none !important;
+  }
+  .sun-core {
+    box-shadow: 0 0 60px rgba(255, 200, 50, 0.3);
+  }
+  .grid-node {
+    opacity: 0.3;
+  }
+}
+
+/* ============================================
+   RESPONSIVE
+============================================ */
+@media (max-width: 768px) {
+  .turbine-1 { left: 2%; transform: scale(0.6); }
+  .turbine-2 { display: none; }
+  .turbine-3 { right: 2%; transform: scale(0.6); }
+  .cloud-1, .cloud-2, .cloud-3 { display: none; }
+  .wind-line { display: none; }
+  .solar-panel { display: none; }
+  .grid-node { display: none; }
+  .grid-lines { display: none; }
+  .sun-core {
+    width: 50px;
+    height: 50px;
+    top: 5%;
+    right: 5%;
+  }
+  .sun-core .sun-glow {
+    width: 80px;
+    height: 80px;
+    top: -15px;
+    left: -15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .turbine-1, .turbine-3 { transform: scale(0.4); }
+  .sun-core {
+    width: 35px;
+    height: 35px;
+  }
+  .sun-core .sun-glow {
+    width: 60px;
+    height: 60px;
+  }
+}
