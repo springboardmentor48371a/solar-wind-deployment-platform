@@ -43,6 +43,7 @@ git checkout shruti-mishra
 
 
 ---
+
 ## Module Progress
 
 | Module | Status |
@@ -61,5 +62,5 @@ git checkout shruti-mishra
 | **12. Notification & Alert System** | 🟦 Planned |
 | **13. Reports & Export System** | 🟦 Planned |
 | **14. Final Integration & Deployment** | 🟦 Planned |
----
 
+---
