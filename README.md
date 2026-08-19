@@ -1,71 +1,65 @@
-# solar-wind-deployment-platform# ☀️ Solar & Wind Deployment Intelligence Platform
+# Solar & Wind Deployment Intelligence Platform
 
+An AI-powered platform that recommends optimal locations for renewable energy projects by analyzing environmental, geographic, climatic, and infrastructure-related factors.
 
-An AI-powered renewable energy deployment and feasibility intelligence platform designed to identify, assess, and recommend optimal geographical sites for Solar PV, Wind Farms, and Hybrid clean energy infrastructure.
-
----
-
-## 📌 Key Highlights & Implemented Features
-
-- **🔐 Module 1: Role-Based Authentication (RBAC):**
-  - Secure user registration and login with Bcrypt password hashing and JWT bearer tokens.
-  - Multi-role permission architecture (`Renewable Energy Planner`, `GIS Analyst`, `Project Manager`, `Administrator`).
-  - Active session handling, profile dropdown with one-click email copying, and confirmation sign-out modals.
-
-- **🗺️ Module 2: Interactive GIS Site Management & Mapping:**
-  - Dynamic GIS Map Picker powered by **Leaflet & OpenStreetMap**.
-  - Interactive pin dropping and real-time draggable coordinates extraction.
-  - Live reverse-geocoding via **OpenStreetMap Nominatim API** (strictly English place names).
-  - Topological Digital Elevation Modeling (DEM) integration via **Open-Meteo Elevation API**.
-  - Automated infrastructure proximity buffering and suitability indexing.
-
-- **💾 Persistent Relational Storage:**
-  - SQLite database management via **SQLAlchemy ORM** to persist registered user accounts and evaluated site boundaries across page refreshes and server restarts.
-
-- **📊 Multi-View Executive Dashboard:**
-  - **Active Deployment Zone:** Instant resource breakdown (Solar GHI, Wind Speed @ 100m, Terrain DEM, Substation proximity).
-  - **Stored Candidate Sites:** Relational repository of all registered geographical corridors.
-  - **Multi-Site Comparison Matrix:** Side-by-side benchmarking of site metrics and suitability scores.
-  - **Executive Feasibility Dossier:** Generation yield and capacity utilization factor (CUF) summaries.
+For the full project specification see [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md).
 
 ---
 
-## 🛠️ System Architecture & Tech Stack
+## Tech Stack
 
-| Layer | Technology | Purpose |
-| :--- | :--- | :--- |
-| **Frontend** | React 18, Vite, Tailwind CSS | High-performance SPA with responsive executive dark UI |
-| **GIS Visualization** | Leaflet.js, React-Leaflet, CartoDB Positron | Interactive geospatial search and pin-drop mapping |
-| **Icons & UI** | Lucide React | Modern icon library |
-| **Backend API** | FastAPI, Python, Uvicorn | Asynchronous RESTful API Gateway |
-| **Data Validation** | Pydantic v2, Email Validator | Request/response schema validation |
-| **Security & Auth** | JWT (HS256), Passlib, Bcrypt | Role-Based Access Control and password encryption |
-| **Database & ORM** | SQLite, SQLAlchemy 2.0 | Persistent relational storage for users and sites |
-
----
-
-## 🌐 External Meteorological & Geospatial Connectors
-
-- **Reverse Geocoding:** OpenStreetMap Nominatim API (`accept-language=en`)
-- **Digital Elevation Modeling (DEM):** Open-Meteo Elevation API
-- **Solar Potential Feeds:** NASA POWER API specifications (Global Horizontal Irradiance - GHI)
-- **Wind Resource Feeds:** Global Wind Atlas / Open-Meteo (100m hub height velocities)
+| Layer | Technology |
+|---|---|
+| **Backend** | Python 3.11, FastAPI |
+| **Frontend** | React.js, Vite |
+| **Database** | PostgreSQL 16 |
+| **Auth** | JWT, bcrypt, Google OAuth2 |
+| **Maps** | Leaflet.js, OpenStreetMap |
+| **DevOps** | Docker, Docker Compose |
 
 ---
 
-## 🚀 Quickstart: Run the Project Locally
 
-Follow these step-by-step commands to clone and start both the backend API and frontend client.
+## Prerequisites
 
-### Prerequisites
-- **Python 3.10+** installed
-- **Node.js 18+ & npm** installed
-- **Git** installed
+Only two things needed:
+
+* **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** — runs everything
+* **[Git](https://git-scm.com/)** — to clone the repo
+
+No Node.js, no Python, no pip — Docker handles all of that.
 
 ---
 
-### 1. Clone the Repository & Checkout Branch
+## Getting Started
+
+### 1. Clone the repository
+
 ```bash
 git clone [https://github.com/springboardmentor48371a/solar-wind-deployment-platform.git](https://github.com/springboardmentor48371a/solar-wind-deployment-platform.git)
 cd solar-wind-deployment-platform
 git checkout shruti-mishra
+
+
+
+---
+## Module Progress
+
+| Module | Status |
+|---|---|
+| **1. User Authentication & RBAC** | 🟩 Complete |
+| **2. Project & Site Management** | 🟩 Complete |
+| **3. Environmental Data Collection** | 🟩 Complete |
+| **4. Geographic Intelligence Engine** | 🟦 Planned |
+| **5. Solar Potential Prediction** | 🟦 Planned |
+| **6. Wind Potential Prediction** | 🟦 Planned |
+| **7. Site Suitability Engine** | 🟦 Planned |
+| **8. Energy Forecasting Engine** | 🟦 Planned |
+| **9. Deployment Optimization Engine** | 🟦 Planned |
+| **10. Site Scoring Engine** | 🟦 Planned |
+| **11. Dashboard & Analytics** | 🟨 In Progress |
+| **12. Notification & Alert System** | 🟦 Planned |
+| **13. Reports & Export System** | 🟦 Planned |
+| **14. Final Integration & Deployment** | 🟦 Planned |
+---
+
