@@ -562,7 +562,7 @@ export default function App() {
                         className="flex items-center space-x-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
                       >
                         <Globe2 className="w-4 h-4" />
-                        <span>Register Site on Map</span>
+                        <span>Register New Site</span>
                       </button>
                     </div>
                   </div>
