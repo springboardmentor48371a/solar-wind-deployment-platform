@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import Background from '../components/Background';
 
 const API_URL = 'http://localhost:8000/api';
 
@@ -16,12 +17,7 @@ function Projects() {
     budget: 0
   });
   const [error, setError] = useState('');
-  const [stats, setStats] = useState({
-    total: 0,
-    solar: 0,
-    wind: 0,
-    hybrid: 0
-  });
+  const [stats, setStats] = useState({ total: 0, solar: 0, wind: 0, hybrid: 0 });
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -39,7 +35,6 @@ function Projects() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProjects(response.data);
-      
       const stats = {
         total: response.data.length,
         solar: response.data.filter(p => p.technology === 'SOLAR').length,
@@ -48,10 +43,8 @@ function Projects() {
       };
       setStats(stats);
     } catch (err) {
-      console.error('Error fetching projects:', err);
-      if (err.response?.status === 401) {
-        navigate('/login');
-      }
+      console.error(err);
+      if (err.response?.status === 401) navigate('/login');
     } finally {
       setLoading(false);
     }
@@ -74,7 +67,7 @@ function Projects() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this project?')) {
+    if (window.confirm('Delete this project?')) {
       try {
         const token = localStorage.getItem('token');
         await axios.delete(`${API_URL}/projects/${id}`, {
@@ -82,7 +75,7 @@ function Projects() {
         });
         fetchProjects();
       } catch (err) {
-        console.error('Error deleting project:', err);
+        console.error(err);
       }
     }
   };
@@ -93,420 +86,124 @@ function Projects() {
     navigate('/login');
   };
 
-  if (loading) {
-    return <div style={styles.loading}>Loading projects...</div>;
-  }
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  if (loading) return <div style={styles.loading}>Loading...</div>;
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <div>
-          <h1 style={styles.title}>🌞 Solar & Wind Deployment Intelligence</h1>
-          <p style={styles.subtitle}>AI-powered renewable energy site selection platform</p>
+    <>
+      <Background />
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <div>
+            <h1 style={styles.title}>🌞 Solar & Wind Intelligence</h1>
+            <p style={styles.subtitle}>AI-powered renewable energy deployment</p>
+          </div>
+          <div style={styles.headerActions}>
+            <span style={styles.userName}>👋 {user.name || 'User'}</span>
+            <button onClick={() => navigate('/dashboard')} style={styles.dashboardBtn}>📊 Dashboard</button>
+            <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
+          </div>
         </div>
-        <div style={styles.headerActions}>
-          <span style={styles.userName}>👋 {JSON.parse(localStorage.getItem('user') || '{}').name || 'User'}</span>
-          <button onClick={handleLogout} style={styles.logoutButton}>Logout</button>
-        </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div style={styles.statsGrid}>
-        <div style={styles.statCard}>
-          <h3 style={styles.statNumber}>{stats.total}</h3>
-          <p style={styles.statLabel}>Total Projects</p>
+        <div style={styles.statsGrid}>
+          <div style={styles.statCard}><h3>{stats.total}</h3><p>Total Projects</p></div>
+          <div style={styles.statCard}><h3>{stats.solar}</h3><p>☀️ Solar</p></div>
+          <div style={styles.statCard}><h3>{stats.wind}</h3><p>💨 Wind</p></div>
+          <div style={styles.statCard}><h3>{stats.hybrid}</h3><p>⚡ Hybrid</p></div>
         </div>
-        <div style={styles.statCard}>
-          <h3 style={styles.statNumber}>{stats.solar}</h3>
-          <p style={styles.statLabel}>Solar Projects</p>
-        </div>
-        <div style={styles.statCard}>
-          <h3 style={styles.statNumber}>{stats.wind}</h3>
-          <p style={styles.statLabel}>Wind Projects</p>
-        </div>
-        <div style={styles.statCard}>
-          <h3 style={styles.statNumber}>{stats.hybrid}</h3>
-          <p style={styles.statLabel}>Hybrid Projects</p>
-        </div>
-      </div>
 
-      {/* Projects Section */}
-      <div style={styles.sectionHeader}>
-        <h2 style={styles.sectionTitle}>📋 Projects</h2>
-        <button onClick={() => setShowModal(true)} style={styles.addButton}>
-          + New Project
-        </button>
-      </div>
-
-      {projects.length === 0 ? (
-        <div style={styles.emptyState}>
-          <p>No projects yet. Create your first project to get started!</p>
+        <div style={styles.sectionHeader}>
+          <h2 style={styles.sectionTitle}>📋 Projects</h2>
+          <button onClick={() => setShowModal(true)} style={styles.addButton}>+ New Project</button>
         </div>
-      ) : (
-        <div style={styles.grid}>
-          {projects.map((project) => (
-            <div key={project.id} style={styles.card}>
-              <div style={styles.cardHeader}>
-                <h3 style={styles.cardTitle}>{project.project_name}</h3>
-                <span style={styles.technologyBadge}>{project.technology}</span>
-              </div>
-              <p style={styles.cardDescription}>{project.description || 'No description'}</p>
-              <div style={styles.cardFooter}>
-                <span style={styles.statusBadge}>{project.status}</span>
-                <span style={styles.budget}>💰 ${project.budget?.toLocaleString()}</span>
-              </div>
-              <div style={styles.cardActions}>
-                <button 
-                  onClick={() => navigate(`/projects/${project.id}/sites`)} 
-                  style={styles.viewButton}
-                >
-                  📍 View Sites
-                </button>
-                <button 
-                  onClick={() => handleDelete(project.id)} 
-                  style={styles.deleteButton}
-                >
-                  🗑️ Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
-      {/* Create Project Modal */}
-      {showModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <h2 style={styles.modalTitle}>Create New Project</h2>
-            {error && <div style={styles.error}>{error}</div>}
-            <form onSubmit={handleSubmit}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Project Name *</label>
-                <input
-                  type="text"
-                  value={formData.project_name}
-                  onChange={(e) => setFormData({...formData, project_name: e.target.value})}
-                  required
-                  style={styles.input}
-                  placeholder="Enter project name"
-                />
+        {projects.length === 0 ? (
+          <div style={styles.emptyState}>No projects yet. Create one!</div>
+        ) : (
+          <div style={styles.grid}>
+            {projects.map(proj => (
+              <div key={proj.id} style={styles.card}>
+                <div style={styles.cardHeader}>
+                  <h3>{proj.project_name}</h3>
+                  <span style={styles.techBadge}>{proj.technology}</span>
+                </div>
+                <p style={styles.cardDesc}>{proj.description || 'No description'}</p>
+                <div style={styles.cardFooter}>
+                  <span style={styles.statusBadge}>{proj.status}</span>
+                  <span>💰 ${proj.budget?.toLocaleString()}</span>
+                </div>
+                <div style={styles.cardActions}>
+                  <button onClick={() => navigate(`/projects/${proj.id}/sites`)} style={styles.viewBtn}>📍 Sites</button>
+                  <button onClick={() => handleDelete(proj.id)} style={styles.deleteBtn}>🗑️</button>
+                </div>
               </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  style={styles.textarea}
-                  rows="3"
-                  placeholder="Describe your project"
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Technology</label>
-                <select
-                  value={formData.technology}
-                  onChange={(e) => setFormData({...formData, technology: e.target.value})}
-                  style={styles.select}
-                >
+            ))}
+          </div>
+        )}
+
+        {/* Modal */}
+        {showModal && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modal}>
+              <h2>Create Project</h2>
+              {error && <div style={styles.error}>{error}</div>}
+              <form onSubmit={handleSubmit}>
+                <input placeholder="Project Name" value={formData.project_name} onChange={e => setFormData({...formData, project_name: e.target.value})} required style={styles.input} />
+                <textarea placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} rows="2" style={styles.textarea} />
+                <select value={formData.technology} onChange={e => setFormData({...formData, technology: e.target.value})} style={styles.input}>
                   <option value="SOLAR">☀️ Solar</option>
                   <option value="WIND">💨 Wind</option>
                   <option value="HYBRID">⚡ Hybrid</option>
                 </select>
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Budget ($)</label>
-                <input
-                  type="number"
-                  value={formData.budget}
-                  onChange={(e) => setFormData({...formData, budget: parseFloat(e.target.value)})}
-                  style={styles.input}
-                  placeholder="Enter budget"
-                />
-              </div>
-              <div style={styles.modalActions}>
-                <button type="button" onClick={() => setShowModal(false)} style={styles.cancelButton}>
-                  Cancel
-                </button>
-                <button type="submit" style={styles.submitButton}>
-                  Create Project
-                </button>
-              </div>
-            </form>
+                <input type="number" placeholder="Budget ($)" value={formData.budget} onChange={e => setFormData({...formData, budget: parseFloat(e.target.value)})} style={styles.input} />
+                <div style={styles.modalActions}>
+                  <button type="button" onClick={() => setShowModal(false)} style={styles.cancelBtn}>Cancel</button>
+                  <button type="submit" style={styles.submitBtn}>Create</button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }
 
 const styles = {
-  container: {
-    padding: '20px',
-    maxWidth: '1400px',
-    margin: '0 auto',
-    fontFamily: 'Arial, sans-serif',
-    minHeight: '100vh',
-    backgroundColor: '#f5f7fa'
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '30px',
-    padding: '20px',
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
-  },
-  title: {
-    fontSize: '28px',
-    color: '#1a237e',
-    margin: 0
-  },
-  subtitle: {
-    color: '#666',
-    margin: '5px 0 0 0',
-    fontSize: '14px'
-  },
-  headerActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '15px'
-  },
-  userName: {
-    fontSize: '16px',
-    color: '#333'
-  },
-  logoutButton: {
-    padding: '8px 16px',
-    backgroundColor: '#dc3545',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px'
-  },
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '20px',
-    marginBottom: '30px'
-  },
-  statCard: {
-    backgroundColor: 'white',
-    padding: '20px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-    textAlign: 'center'
-  },
-  statNumber: {
-    fontSize: '32px',
-    margin: 0,
-    color: '#1a237e'
-  },
-  statLabel: {
-    color: '#666',
-    margin: '5px 0 0 0',
-    fontSize: '14px'
-  },
-  sectionHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px'
-  },
-  sectionTitle: {
-    fontSize: '22px',
-    color: '#333',
-    margin: 0
-  },
-  addButton: {
-    padding: '10px 24px',
-    backgroundColor: '#4CAF50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '16px'
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-    gap: '20px'
-  },
-  card: {
-    backgroundColor: 'white',
-    padding: '20px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-    border: '1px solid #e9ecef'
-  },
-  cardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '10px'
-  },
-  cardTitle: {
-    fontSize: '18px',
-    margin: 0,
-    color: '#333'
-  },
-  technologyBadge: {
-    padding: '4px 12px',
-    backgroundColor: '#e3f2fd',
-    borderRadius: '20px',
-    fontSize: '12px',
-    color: '#1565c0'
-  },
-  cardDescription: {
-    color: '#666',
-    marginBottom: '15px',
-    fontSize: '14px'
-  },
-  cardFooter: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: '14px',
-    color: '#666'
-  },
-  statusBadge: {
-    padding: '4px 12px',
-    backgroundColor: '#fff3cd',
-    borderRadius: '20px',
-    fontSize: '12px',
-    color: '#856404'
-  },
-  budget: {
-    fontSize: '14px'
-  },
-  cardActions: {
-    display: 'flex',
-    gap: '10px',
-    marginTop: '15px',
-    paddingTop: '15px',
-    borderTop: '1px solid #e9ecef'
-  },
-  viewButton: {
-    padding: '8px 16px',
-    backgroundColor: '#1976d2',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    flex: 1
-  },
-  deleteButton: {
-    padding: '8px 16px',
-    backgroundColor: '#dc3545',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    flex: 1
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000
-  },
-  modal: {
-    backgroundColor: 'white',
-    padding: '30px',
-    borderRadius: '12px',
-    width: '500px',
-    maxWidth: '90%',
-    maxHeight: '90%',
-    overflowY: 'auto'
-  },
-  modalTitle: {
-    fontSize: '24px',
-    marginBottom: '20px',
-    color: '#333'
-  },
-  formGroup: {
-    marginBottom: '15px'
-  },
-  label: {
-    display: 'block',
-    marginBottom: '5px',
-    fontWeight: '500',
-    color: '#333'
-  },
-  input: {
-    width: '100%',
-    padding: '10px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px'
-  },
-  textarea: {
-    width: '100%',
-    padding: '10px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontFamily: 'Arial, sans-serif',
-    resize: 'vertical'
-  },
-  select: {
-    width: '100%',
-    padding: '10px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px'
-  },
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '10px',
-    marginTop: '20px'
-  },
-  cancelButton: {
-    padding: '10px 20px',
-    backgroundColor: '#6c757d',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer'
-  },
-  submitButton: {
-    padding: '10px 20px',
-    backgroundColor: '#4CAF50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer'
-  },
-  loading: {
-    textAlign: 'center',
-    padding: '50px',
-    fontSize: '18px',
-    color: '#666'
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '50px',
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    color: '#666'
-  },
-  error: {
-    backgroundColor: '#ffebee',
-    color: '#c62828',
-    padding: '10px',
-    borderRadius: '6px',
-    marginBottom: '15px'
-  }
+  container: { position: 'relative', zIndex: 1, maxWidth: '1400px', margin: '0 auto', padding: '20px', minHeight: '100vh', color: '#fff' },
+  loading: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#fff', fontSize: '20px' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '24px' },
+  title: { fontSize: '28px', fontWeight: '600', margin: 0 },
+  subtitle: { color: 'rgba(255,255,255,0.6)', margin: 0 },
+  headerActions: { display: 'flex', gap: '12px', alignItems: 'center' },
+  userName: { color: 'rgba(255,255,255,0.8)' },
+  dashboardBtn: { padding: '8px 16px', background: 'rgba(25,118,210,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', cursor: 'pointer' },
+  logoutBtn: { padding: '8px 16px', background: 'rgba(220,53,69,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', cursor: 'pointer' },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px', marginBottom: '24px' },
+  statCard: { background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '20px', textAlign: 'center' },
+  sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
+  sectionTitle: { fontSize: '22px' },
+  addButton: { padding: '10px 20px', background: 'rgba(76,175,80,0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', cursor: 'pointer' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' },
+  card: { background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px' },
+  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
+  techBadge: { background: 'rgba(100,200,255,0.2)', padding: '4px 12px', borderRadius: '20px', fontSize: '12px' },
+  cardDesc: { color: 'rgba(255,255,255,0.7)', marginBottom: '12px' },
+  cardFooter: { display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'rgba(255,255,255,0.6)' },
+  statusBadge: { background: 'rgba(255,193,7,0.2)', padding: '4px 12px', borderRadius: '20px', fontSize: '12px' },
+  cardActions: { display: 'flex', gap: '10px', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' },
+  viewBtn: { flex: 1, padding: '8px', background: 'rgba(25,118,210,0.5)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' },
+  deleteBtn: { padding: '8px 12px', background: 'rgba(220,53,69,0.5)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' },
+  emptyState: { padding: '50px', textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', color: 'rgba(255,255,255,0.5)' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
+  modal: { background: 'rgba(20,30,50,0.9)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '30px', width: '500px', maxWidth: '90%', maxHeight: '90%', overflowY: 'auto', color: '#fff' },
+  input: { width: '100%', padding: '12px', marginBottom: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', boxSizing: 'border-box' },
+  textarea: { width: '100%', padding: '12px', marginBottom: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontFamily: 'inherit', boxSizing: 'border-box' },
+  modalActions: { display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' },
+  cancelBtn: { padding: '10px 20px', background: 'rgba(108,117,125,0.5)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' },
+  submitBtn: { padding: '10px 20px', background: 'rgba(76,175,80,0.6)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' },
+  error: { background: 'rgba(220,53,69,0.2)', padding: '10px', borderRadius: '8px', marginBottom: '12px', color: '#ff6b6b' },
 };
 
 export default Projects;

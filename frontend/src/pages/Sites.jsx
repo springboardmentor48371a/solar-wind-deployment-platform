@@ -11,8 +11,11 @@ function Sites() {
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     site_name: '',
+    location: '',
     latitude: '',
     longitude: '',
     region: '',
@@ -21,7 +24,6 @@ function Sites() {
     land_ownership: '',
     existing_infrastructure: ''
   });
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (projectId) {
@@ -33,63 +35,105 @@ function Sites() {
   const fetchProject = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/projects/${projectId}`, {
+      const res = await axios.get(`${API_URL}/projects/${projectId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setProject(response.data);
+      setProject(res.data);
     } catch (err) {
-      console.error('Error fetching project:', err);
+      console.error(err);
     }
   };
 
   const fetchSites = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/sites?project_id=${projectId}`, {
+      const res = await axios.get(`${API_URL}/sites?project_id=${projectId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSites(response.data);
+      setSites(res.data);
     } catch (err) {
-      console.error('Error fetching sites:', err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // 🔥 Fetch coordinates from location name
+  const fetchCoordinates = async () => {
+    if (!formData.location.trim()) {
+      setError('Please enter a location name first.');
+      return;
+    }
+
+    setGeocoding(true);
     setError('');
+
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_URL}/sites`, {
-        ...formData,
-        project_id: parseInt(projectId)
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setShowModal(false);
-      setFormData({
-        site_name: '',
-        latitude: '',
-        longitude: '',
-        region: '',
-        land_area: '',
-        elevation: '',
-        land_ownership: '',
-        existing_infrastructure: ''
-      });
-      fetchSites();
+      const res = await axios.post(
+        `${API_URL}/geocode`,
+        { location: formData.location },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.data.latitude && res.data.longitude) {
+        setFormData(prev => ({
+          ...prev,
+          latitude: res.data.latitude,
+          longitude: res.data.longitude,
+          region: res.data.display_name || prev.region
+        }));
+        setError('✅ Coordinates found!');
+      } else {
+        setError('❌ Location not found. Please try again.');
+      }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create site');
+      setError(err.response?.data?.error || 'Failed to fetch coordinates');
+    } finally {
+      setGeocoding(false);
     }
   };
 
-  if (loading) {
-    return <div style={styles.loading}>Loading sites...</div>;
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError('');
+
+  // Validate coordinates
+  if (!formData.latitude || !formData.longitude) {
+    setError('Please fetch coordinates from location name first.');
+    return;
   }
+
+  const payload = {
+    project_id: parseInt(projectId),
+    site_name: formData.site_name.trim(),
+    latitude: parseFloat(formData.latitude),
+    longitude: parseFloat(formData.longitude),
+    region: formData.region || null,
+    land_area: parseFloat(formData.land_area) || 0,
+    elevation: parseFloat(formData.elevation) || 0,
+    land_ownership: formData.land_ownership || null,
+    existing_infrastructure: formData.existing_infrastructure || null
+  };
+
+  try {
+    const token = localStorage.getItem('token');
+    await axios.post(`${API_URL}/sites`, payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setShowModal(false);
+    setFormData(initialState);
+    fetchSites();
+    setError(''); // clear any previous error
+  } catch (err) {
+    setError(err.response?.data?.detail || 'Failed to create site');
+  }
+};
+  if (loading) return <div style={styles.loading}>Loading sites...</div>;
 
   return (
     <div style={styles.container}>
+      {/* Header */}
       <div style={styles.header}>
         <div>
           <button onClick={() => navigate('/projects')} style={styles.backButton}>
@@ -102,13 +146,14 @@ function Sites() {
         </button>
       </div>
 
+      {/* Site Cards */}
       {sites.length === 0 ? (
         <div style={styles.emptyState}>
           <p>No sites registered yet. Add your first site!</p>
         </div>
       ) : (
         <div style={styles.grid}>
-          {sites.map((site) => (
+          {sites.map(site => (
             <div key={site.id} style={styles.card}>
               <h3 style={styles.cardTitle}>{site.site_name}</h3>
               <div style={styles.coordinates}>
@@ -120,16 +165,10 @@ function Sites() {
                 {site.elevation && <span>⛰️ {site.elevation}m</span>}
               </div>
               <div style={styles.cardActions}>
-                <button 
-                  onClick={() => navigate(`/sites/${site.id}/analyze`)} 
-                  style={styles.analyzeButton}
-                >
+                <button onClick={() => navigate(`/sites/${site.id}/analyze`)} style={styles.analyzeButton}>
                   Analyze Site
                 </button>
-                <button 
-                  onClick={() => navigate(`/sites/${site.id}`)} 
-                  style={styles.viewButton}
-                >
+                <button onClick={() => navigate(`/sites/${site.id}`)} style={styles.viewButton}>
                   View Details
                 </button>
               </div>
@@ -138,55 +177,95 @@ function Sites() {
         </div>
       )}
 
+      {/* ========================================================= */}
+      {/* REGISTER SITE MODAL – with Location Auto-Fill */}
+      {/* ========================================================= */}
       {showModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
-            <h2 style={styles.modalTitle}>Register New Site</h2>
+            <h2 style={styles.modalTitle}>📌 Register New Site</h2>
             {error && <div style={styles.error}>{error}</div>}
+
             <form onSubmit={handleSubmit}>
+              {/* Site Name */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>Site Name *</label>
                 <input
                   type="text"
                   value={formData.site_name}
-                  onChange={(e) => setFormData({...formData, site_name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, site_name: e.target.value })}
                   required
                   style={styles.input}
+                  placeholder="Enter site name"
                 />
               </div>
+
+              {/* Location + Get Coordinates */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>📍 Location Name *</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    type="text"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    required
+                    style={{ ...styles.input, flex: 1 }}
+                    placeholder="e.g., Hyderabad, India"
+                  />
+                  <button
+                    type="button"
+                    onClick={fetchCoordinates}
+                    disabled={geocoding || !formData.location.trim()}
+                    style={styles.geocodeButton}
+                  >
+                    {geocoding ? '⏳ Fetching...' : '🔍 Get Coordinates'}
+                  </button>
+                </div>
+                <small style={{ color: '#666', display: 'block', marginTop: '5px' }}>
+                  Type a location and click "Get Coordinates" to auto-fill lat/lon.
+                </small>
+              </div>
+
+              {/* Latitude & Longitude (auto-filled, read-only) */}
               <div style={styles.formRow}>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Latitude *</label>
                   <input
-                    type="number"
-                    step="0.000001"
+                    type="text"
                     value={formData.latitude}
-                    onChange={(e) => setFormData({...formData, latitude: parseFloat(e.target.value)})}
+                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
                     required
-                    style={styles.input}
+                    style={{ ...styles.input, background: '#f0f0f0' }}
+                    placeholder="Auto-filled"
+                    readOnly
                   />
                 </div>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Longitude *</label>
                   <input
-                    type="number"
-                    step="0.000001"
+                    type="text"
                     value={formData.longitude}
-                    onChange={(e) => setFormData({...formData, longitude: parseFloat(e.target.value)})}
+                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
                     required
-                    style={styles.input}
+                    style={{ ...styles.input, background: '#f0f0f0' }}
+                    placeholder="Auto-filled"
+                    readOnly
                   />
                 </div>
               </div>
+
+              {/* Other Fields */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>Region</label>
                 <input
                   type="text"
                   value={formData.region}
-                  onChange={(e) => setFormData({...formData, region: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, region: e.target.value })}
                   style={styles.input}
+                  placeholder="Region"
                 />
               </div>
+
               <div style={styles.formRow}>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Land Area (acres)</label>
@@ -194,8 +273,9 @@ function Sites() {
                     type="number"
                     step="0.01"
                     value={formData.land_area}
-                    onChange={(e) => setFormData({...formData, land_area: parseFloat(e.target.value)})}
+                    onChange={(e) => setFormData({ ...formData, land_area: e.target.value })}
                     style={styles.input}
+                    placeholder="Land area"
                   />
                 </div>
                 <div style={styles.formGroup}>
@@ -204,30 +284,35 @@ function Sites() {
                     type="number"
                     step="0.1"
                     value={formData.elevation}
-                    onChange={(e) => setFormData({...formData, elevation: parseFloat(e.target.value)})}
+                    onChange={(e) => setFormData({ ...formData, elevation: e.target.value })}
                     style={styles.input}
+                    placeholder="Elevation"
                   />
                 </div>
               </div>
+
               <div style={styles.formGroup}>
                 <label style={styles.label}>Land Ownership</label>
                 <input
                   type="text"
                   value={formData.land_ownership}
-                  onChange={(e) => setFormData({...formData, land_ownership: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, land_ownership: e.target.value })}
                   style={styles.input}
+                  placeholder="Land ownership"
                 />
               </div>
+
               <div style={styles.formGroup}>
                 <label style={styles.label}>Existing Infrastructure</label>
                 <textarea
                   value={formData.existing_infrastructure}
-                  onChange={(e) => setFormData({...formData, existing_infrastructure: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, existing_infrastructure: e.target.value })}
                   style={styles.textarea}
                   rows="2"
                   placeholder="e.g., roads, power lines, etc."
                 />
               </div>
+
               <div style={styles.modalActions}>
                 <button type="button" onClick={() => setShowModal(false)} style={styles.cancelButton}>
                   Cancel
@@ -244,11 +329,17 @@ function Sites() {
   );
 }
 
+// ============================================
+// STYLES
+// ============================================
 const styles = {
   container: {
     padding: '20px',
     maxWidth: '1200px',
-    margin: '0 auto'
+    margin: '0 auto',
+    fontFamily: 'Arial, sans-serif',
+    minHeight: '100vh',
+    backgroundColor: '#f5f7fa'
   },
   header: {
     display: 'flex',
@@ -258,7 +349,7 @@ const styles = {
   },
   title: {
     fontSize: '28px',
-    color: '#333',
+    color: '#1a237e',
     margin: '10px 0 0 0'
   },
   backButton: {
@@ -266,7 +357,7 @@ const styles = {
     backgroundColor: '#6c757d',
     color: 'white',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '14px'
   },
@@ -275,7 +366,7 @@ const styles = {
     backgroundColor: '#4CAF50',
     color: 'white',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '16px'
   },
@@ -287,8 +378,8 @@ const styles = {
   card: {
     backgroundColor: 'white',
     padding: '20px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+    borderRadius: '12px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
     border: '1px solid #e9ecef'
   },
   cardTitle: {
@@ -349,7 +440,7 @@ const styles = {
   modal: {
     backgroundColor: 'white',
     padding: '30px',
-    borderRadius: '8px',
+    borderRadius: '12px',
     width: '600px',
     maxWidth: '90%',
     maxHeight: '90%',
@@ -378,17 +469,29 @@ const styles = {
     width: '100%',
     padding: '10px',
     border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px'
+    borderRadius: '6px',
+    fontSize: '14px',
+    boxSizing: 'border-box'
   },
   textarea: {
     width: '100%',
     padding: '10px',
     border: '1px solid #ddd',
-    borderRadius: '4px',
+    borderRadius: '6px',
     fontSize: '14px',
     fontFamily: 'Arial, sans-serif',
-    resize: 'vertical'
+    resize: 'vertical',
+    boxSizing: 'border-box'
+  },
+  geocodeButton: {
+    padding: '10px 16px',
+    backgroundColor: '#1976d2',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    whiteSpace: 'nowrap'
   },
   modalActions: {
     display: 'flex',
@@ -401,7 +504,7 @@ const styles = {
     backgroundColor: '#6c757d',
     color: 'white',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '6px',
     cursor: 'pointer'
   },
   submitButton: {
@@ -409,7 +512,7 @@ const styles = {
     backgroundColor: '#4CAF50',
     color: 'white',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '6px',
     cursor: 'pointer'
   },
   loading: {
@@ -421,17 +524,17 @@ const styles = {
   emptyState: {
     textAlign: 'center',
     padding: '50px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
     color: '#666'
   },
   error: {
     backgroundColor: '#ffebee',
     color: '#c62828',
     padding: '10px',
-    borderRadius: '4px',
+    borderRadius: '6px',
     marginBottom: '15px'
   }
 };
 
-export default Sites; 
+export default Sites;

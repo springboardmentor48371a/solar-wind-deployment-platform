@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 import sqlite3
@@ -10,9 +10,10 @@ import json
 import requests
 import numpy as np
 from typing import Dict, Any, List
+import joblib
 
 # ============================================
-# APP INITIALIZATION - MUST COME FIRST
+# APP INITIALIZATION
 # ============================================
 app = FastAPI()
 
@@ -26,7 +27,7 @@ app.add_middleware(
 )
 
 # ============================================
-# DATABASE
+# DATABASE SETUP
 # ============================================
 conn = sqlite3.connect('auth.db', check_same_thread=False)
 cursor = conn.cursor()
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     is_active INTEGER DEFAULT 1,
+    role TEXT DEFAULT 'planner',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 ''')
@@ -144,7 +146,40 @@ conn.commit()
 
 print("✅ Database initialized!")
 
-SECRET_KEY = "your-secret-key-change-this"
+SECRET_KEY = "your-secret-key-change-this-in-production"
+
+# ============================================
+# ML MODEL LOADING
+# ============================================
+ML_MODEL_LOADED = False
+ml_model = None
+ml_scaler = None
+
+def load_ml_models():
+    global ml_model, ml_scaler, ML_MODEL_LOADED
+    try:
+        if os.path.exists('models/suitability_model.pkl') and os.path.exists('models/suitability_scaler.pkl'):
+            ml_model = joblib.load('models/suitability_model.pkl')
+            ml_scaler = joblib.load('models/suitability_scaler.pkl')
+            ML_MODEL_LOADED = True
+            print("✅ ML Model loaded successfully!")
+        else:
+            print("⚠️ ML models not found. Run ml_train_full.py first.")
+    except Exception as e:
+        print(f"⚠️ Error loading ML models: {e}")
+
+load_ml_models()
+
+# ============================================
+# TOKEN EXTRACTION DEPENDENCY
+# ============================================
+async def get_token(authorization: str = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header missing")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Invalid authentication scheme")
+    return token
 
 # ============================================
 # PYDANTIC MODELS
@@ -153,6 +188,7 @@ class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
+    role: str = "planner"
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -175,11 +211,31 @@ class SiteCreate(BaseModel):
     land_ownership: str = None
     existing_infrastructure: str = None
 
+class MLPredictionRequest(BaseModel):
+    solar_irradiance: float = 5.0
+    temperature: float = 25.0
+    rainfall: float = 800.0
+    wind_speed: float = 5.0
+    cloud_cover: float = 30.0
+    elevation: float = 150.0
+    slope: float = 5.0
+    ndvi: float = 0.2
+    land_area: float = 100.0
+    road_dist: float = 2.0
+    power_dist: float = 3.0
+
+class LocationPredictionRequest(BaseModel):
+    location: str
+    land_area: float = 100.0
+
+class GeocodeRequest(BaseModel):
+    location: str
+
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
 def get_user_by_email(email):
-    cursor.execute("SELECT id, name, email, password_hash, is_active FROM users WHERE email = ?", (email,))
+    cursor.execute("SELECT id, name, email, password_hash, is_active, role FROM users WHERE email = ?", (email,))
     return cursor.fetchone()
 
 def create_token(email):
@@ -197,7 +253,37 @@ def verify_token(token):
         return None
 
 # ============================================
-# NASA POWER SERVICE (EMBEDDED)
+# GEOCODING FUNCTIONS
+# ============================================
+def geocode_location(location: str):
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {"q": location, "format": "json", "limit": 1}
+    headers = {"User-Agent": "SolarWindPlatform/1.0"}
+    try:
+        resp = requests.get(url, params=params, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        if data:
+            return float(data[0]["lat"]), float(data[0]["lon"])
+        return None, None
+    except Exception as e:
+        print(f"Geocoding error: {e}")
+        return None, None
+
+def get_elevation(lat: float, lon: float):
+    url = f"https://api.open-elevation.com/api/v1/lookup?locations={lat},{lon}"
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("results"):
+            return data["results"][0]["elevation"]
+    except:
+        pass
+    return 150.0
+
+# ============================================
+# NASA POWER SERVICE
 # ============================================
 NASA_POWER_API = "https://power.larc.nasa.gov/api/power"
 
@@ -284,7 +370,7 @@ def fetch_environmental_data(lat: float, lon: float) -> Dict[str, Any]:
         return result
 
 # ============================================
-# SOLAR ENGINE (EMBEDDED)
+# SOLAR ENGINE
 # ============================================
 class SolarEngine:
     def predict_solar_potential(self, lat, lon, irradiance, temperature, cloud_cover, elevation, slope, ndvi, capacity_mw=1.0):
@@ -319,7 +405,7 @@ class SolarEngine:
 solar_engine = SolarEngine()
 
 # ============================================
-# WIND ENGINE (EMBEDDED)
+# WIND ENGINE
 # ============================================
 class WindEngine:
     def predict_wind_potential(self, lat, lon, wind_speed, temperature, elevation, terrain="flat", capacity_mw=2.0):
@@ -358,7 +444,7 @@ class WindEngine:
 wind_engine = WindEngine()
 
 # ============================================
-# SUITABILITY ENGINE (EMBEDDED)
+# SUITABILITY ENGINE
 # ============================================
 class SuitabilityEngine:
     def calculate_suitability_score(self, solar_score, wind_score, geographic_score, infrastructure_score, environmental_score, economic_score):
@@ -395,7 +481,7 @@ suitability_engine = SuitabilityEngine()
 # ============================================
 @app.get("/")
 def root():
-    return {"message": "Solar & Wind Deployment Intelligence Platform API", "version": "1.0.0"}
+    return {"message": "Solar & Wind Deployment Intelligence Platform API", "version": "2.0.0"}
 
 # ============================================
 # AUTH ROUTES
@@ -406,10 +492,12 @@ def register(user: UserCreate):
         return {"error": "Email already exists"}, 400
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(user.password.encode('utf-8'), salt)
-    cursor.execute("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
-                   (user.name, user.email, hashed.decode('utf-8')))
+    cursor.execute(
+        "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)",
+        (user.name, user.email, hashed.decode('utf-8'), user.role)
+    )
     conn.commit()
-    return {"message": "User created successfully", "user": {"name": user.name, "email": user.email}}
+    return {"message": "User created successfully", "user": {"name": user.name, "email": user.email, "role": user.role}}
 
 @app.post("/api/auth/login")
 def login(user: UserLogin):
@@ -420,24 +508,24 @@ def login(user: UserLogin):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": {"id": result[0], "name": result[1], "email": result[2], "is_active": bool(result[4])}
+        "user": {"id": result[0], "name": result[1], "email": result[2], "is_active": bool(result[4]), "role": result[5]}
     }
 
 @app.get("/api/auth/me")
-def get_me(token: str):
+def get_me(token: str = Depends(get_token)):
     email = verify_token(token)
     if not email:
         return {"error": "Invalid token"}, 401
     result = get_user_by_email(email)
     if not result:
         return {"error": "User not found"}, 404
-    return {"id": result[0], "name": result[1], "email": result[2], "is_active": bool(result[4])}
+    return {"id": result[0], "name": result[1], "email": result[2], "is_active": bool(result[4]), "role": result[5]}
 
 # ============================================
 # PROJECT ROUTES
 # ============================================
 @app.post("/api/projects")
-def create_project(project: ProjectCreate, token: str):
+def create_project(project: ProjectCreate, token: str = Depends(get_token)):
     email = verify_token(token)
     if not email:
         return {"error": "Unauthorized"}, 401
@@ -455,7 +543,7 @@ def create_project(project: ProjectCreate, token: str):
     return {"id": row[0], "project_name": row[1], "description": row[2], "technology": row[3], "budget": row[4], "status": row[5], "created_by": row[6], "created_at": row[7]}
 
 @app.get("/api/projects")
-def get_projects(token: str):
+def get_projects(token: str = Depends(get_token)):
     email = verify_token(token)
     if not email:
         return {"error": "Unauthorized"}, 401
@@ -464,8 +552,9 @@ def get_projects(token: str):
     return [{"id": r[0], "project_name": r[1], "description": r[2], "technology": r[3], "budget": r[4], "status": r[5], "created_by": r[6], "created_at": r[7]} for r in rows]
 
 @app.delete("/api/projects/{project_id}")
-def delete_project(project_id: int, token: str):
-    if not verify_token(token):
+def delete_project(project_id: int, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     cursor.execute("DELETE FROM projects WHERE id = ?", (project_id,))
     conn.commit()
@@ -475,8 +564,9 @@ def delete_project(project_id: int, token: str):
 # SITE ROUTES
 # ============================================
 @app.post("/api/sites")
-def create_site(site: SiteCreate, token: str):
-    if not verify_token(token):
+def create_site(site: SiteCreate, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     cursor.execute(
         "INSERT INTO sites (project_id, site_name, latitude, longitude, region, land_area, elevation, land_ownership, existing_infrastructure) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -489,8 +579,9 @@ def create_site(site: SiteCreate, token: str):
     return {"id": row[0], "project_id": row[1], "site_name": row[2], "latitude": row[3], "longitude": row[4], "region": row[5], "land_area": row[6], "elevation": row[7], "land_ownership": row[8], "existing_infrastructure": row[9], "created_at": row[10]}
 
 @app.get("/api/sites")
-def get_sites(project_id: int = None, token: str = None):
-    if not verify_token(token):
+def get_sites(project_id: int = None, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     if project_id:
         cursor.execute("SELECT * FROM sites WHERE project_id = ?", (project_id,))
@@ -500,8 +591,9 @@ def get_sites(project_id: int = None, token: str = None):
     return [{"id": r[0], "project_id": r[1], "site_name": r[2], "latitude": r[3], "longitude": r[4], "region": r[5], "land_area": r[6], "elevation": r[7], "land_ownership": r[8], "existing_infrastructure": r[9], "created_at": r[10]} for r in rows]
 
 @app.get("/api/sites/{site_id}")
-def get_site(site_id: int, token: str):
-    if not verify_token(token):
+def get_site(site_id: int, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     cursor.execute("SELECT * FROM sites WHERE id = ?", (site_id,))
     row = cursor.fetchone()
@@ -509,12 +601,43 @@ def get_site(site_id: int, token: str):
         return {"error": "Site not found"}, 404
     return {"id": row[0], "project_id": row[1], "site_name": row[2], "latitude": row[3], "longitude": row[4], "region": row[5], "land_area": row[6], "elevation": row[7], "land_ownership": row[8], "existing_infrastructure": row[9], "created_at": row[10]}
 
+@app.delete("/api/sites/{site_id}")
+def delete_site(site_id: int, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
+        return {"error": "Unauthorized"}, 401
+    cursor.execute("DELETE FROM sites WHERE id = ?", (site_id,))
+    conn.commit()
+    return {"message": "Site deleted"}
+
+# ============================================
+# GEOCODE ENDPOINT
+# ============================================
+@app.post("/api/geocode")
+def geocode(req: GeocodeRequest, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
+        return {"error": "Unauthorized"}, 401
+    lat, lon = geocode_location(req.location)
+    if lat is None:
+        return {"error": "Location not found"}, 404
+    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+    headers = {"User-Agent": "SolarWindPlatform/1.0"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        data = resp.json()
+        display_name = data.get("display_name", req.location)
+    except:
+        display_name = req.location
+    return {"latitude": lat, "longitude": lon, "display_name": display_name}
+
 # ============================================
 # ENVIRONMENTAL ROUTES
 # ============================================
 @app.get("/api/environmental/fetch/{site_id}")
-def fetch_environmental(site_id: int, token: str):
-    if not verify_token(token):
+def fetch_environmental(site_id: int, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     cursor.execute("SELECT latitude, longitude FROM sites WHERE id = ?", (site_id,))
     site = cursor.fetchone()
@@ -532,8 +655,9 @@ def fetch_environmental(site_id: int, token: str):
     return {"message": "Environmental data fetched and saved", "data": env}
 
 @app.get("/api/environmental/{site_id}")
-def get_environmental(site_id: int, token: str):
-    if not verify_token(token):
+def get_environmental(site_id: int, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     cursor.execute("SELECT * FROM environmental_data WHERE site_id = ?", (site_id,))
     row = cursor.fetchone()
@@ -545,8 +669,9 @@ def get_environmental(site_id: int, token: str):
 # SOLAR ROUTES
 # ============================================
 @app.post("/api/solar/analyze/{site_id}")
-def analyze_solar(site_id: int, capacity_mw: float = 1.0, token: str = None):
-    if not verify_token(token):
+def analyze_solar(site_id: int, capacity_mw: float = 1.0, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     cursor.execute("SELECT latitude, longitude, site_name FROM sites WHERE id = ?", (site_id,))
     site = cursor.fetchone()
@@ -572,8 +697,9 @@ def analyze_solar(site_id: int, capacity_mw: float = 1.0, token: str = None):
     return {"message": "Solar analysis completed", "result": result}
 
 @app.get("/api/solar/assessment/{site_id}")
-def get_solar_assessment(site_id: int, token: str):
-    if not verify_token(token):
+def get_solar_assessment(site_id: int, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     cursor.execute("SELECT * FROM solar_assessments WHERE site_id = ?", (site_id,))
     row = cursor.fetchone()
@@ -585,8 +711,9 @@ def get_solar_assessment(site_id: int, token: str):
 # WIND ROUTES
 # ============================================
 @app.post("/api/wind/analyze/{site_id}")
-def analyze_wind(site_id: int, capacity_mw: float = 2.0, terrain: str = "flat", token: str = None):
-    if not verify_token(token):
+def analyze_wind(site_id: int, capacity_mw: float = 2.0, terrain: str = "flat", token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     cursor.execute("SELECT latitude, longitude, site_name, elevation FROM sites WHERE id = ?", (site_id,))
     site = cursor.fetchone()
@@ -612,8 +739,9 @@ def analyze_wind(site_id: int, capacity_mw: float = 2.0, terrain: str = "flat", 
     return {"message": "Wind analysis completed", "result": result}
 
 @app.get("/api/wind/assessment/{site_id}")
-def get_wind_assessment(site_id: int, token: str):
-    if not verify_token(token):
+def get_wind_assessment(site_id: int, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     cursor.execute("SELECT * FROM wind_assessments WHERE site_id = ?", (site_id,))
     row = cursor.fetchone()
@@ -625,8 +753,9 @@ def get_wind_assessment(site_id: int, token: str):
 # SUITABILITY ROUTES
 # ============================================
 @app.post("/api/suitability/analyze/{site_id}")
-def analyze_suitability(site_id: int, token: str):
-    if not verify_token(token):
+def analyze_suitability(site_id: int, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     cursor.execute("SELECT site_name FROM sites WHERE id = ?", (site_id,))
     site = cursor.fetchone()
@@ -655,8 +784,9 @@ def analyze_suitability(site_id: int, token: str):
     return {"message": "Suitability analysis completed", "result": result}
 
 @app.get("/api/suitability/score/{site_id}")
-def get_suitability(site_id: int, token: str):
-    if not verify_token(token):
+def get_suitability(site_id: int, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     cursor.execute("SELECT * FROM suitability_scores WHERE site_id = ?", (site_id,))
     row = cursor.fetchone()
@@ -671,12 +801,12 @@ def get_suitability(site_id: int, token: str):
     }
 
 # ============================================
-# NEW: OPTIMIZATION ENGINE
+# OPTIMIZATION ENGINE
 # ============================================
 @app.get("/api/optimization/recommend")
-def recommend_best_sites(project_id: int = None, token: str = None):
-    """Recommend best sites based on suitability scores"""
-    if not verify_token(token):
+def recommend_best_sites(project_id: int = None, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     
     if project_id:
@@ -720,11 +850,12 @@ def recommend_best_sites(project_id: int = None, token: str = None):
     }
 
 # ============================================
-# NEW: INVESTMENT ANALYSIS
+# INVESTMENT ANALYSIS
 # ============================================
 @app.post("/api/investment/analyze/{site_id}")
-def analyze_investment(site_id: int, capex_per_mw: float = 1_200_000, opex_percent: float = 2.0, electricity_price: float = 0.08, token: str = None):
-    if not verify_token(token):
+def analyze_investment(site_id: int, capex_per_mw: float = 1_200_000, opex_percent: float = 2.0, electricity_price: float = 0.08, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     
     cursor.execute("SELECT site_name FROM sites WHERE id = ?", (site_id,))
@@ -749,7 +880,7 @@ def analyze_investment(site_id: int, capex_per_mw: float = 1_200_000, opex_perce
     if annual_energy == 0:
         return {"error": "Annual energy not estimated. Run solar/wind analysis first."}, 400
     
-    capacity_mw = 1.0  # default
+    capacity_mw = 1.0
     
     total_capex = capex_per_mw * capacity_mw
     annual_opex = total_capex * (opex_percent / 100)
@@ -781,11 +912,12 @@ def analyze_investment(site_id: int, capex_per_mw: float = 1_200_000, opex_perce
     }
 
 # ============================================
-# NEW: FORECASTING ENGINE
+# FORECASTING ENGINE
 # ============================================
 @app.get("/api/forecasting/site/{site_id}")
-def get_energy_forecast(site_id: int, months: int = 12, token: str = None):
-    if not verify_token(token):
+def get_energy_forecast(site_id: int, months: int = 12, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
         return {"error": "Unauthorized"}, 401
     
     cursor.execute("SELECT site_name FROM sites WHERE id = ?", (site_id,))
@@ -830,13 +962,104 @@ def get_energy_forecast(site_id: int, months: int = 12, token: str = None):
     }
 
 # ============================================
-# RUN THE APP
+# ML PREDICTION ENDPOINTS
+# ============================================
+@app.post("/api/ml/predict")
+def ml_predict(features: MLPredictionRequest, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
+        return {"error": "Unauthorized"}, 401
+    if not ML_MODEL_LOADED:
+        return {"error": "ML model not loaded. Train first."}, 503
+    
+    feature_cols = ['solar_irradiance', 'temperature', 'rainfall', 'wind_speed', 'cloud_cover',
+                    'elevation', 'slope', 'ndvi', 'land_area', 'road_dist', 'power_dist']
+    X = np.array([[getattr(features, f) for f in feature_cols]])
+    X_scaled = ml_scaler.transform(X)
+    prediction = ml_model.predict(X_scaled)[0]
+    if prediction >= 90: category = "Excellent"
+    elif prediction >= 80: category = "Highly Suitable"
+    elif prediction >= 65: category = "Moderately Suitable"
+    elif prediction >= 40: category = "Low Suitability"
+    else: category = "Unsuitable"
+    return {"suitability_score": round(prediction, 2), "category": category, "features": features.dict()}
+
+@app.post("/api/ml/predict-location")
+def predict_by_location(req: LocationPredictionRequest, token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
+        return {"error": "Unauthorized"}, 401
+    lat, lon = geocode_location(req.location)
+    if lat is None:
+        return {"error": "Location not found"}, 404
+    env_data = fetch_environmental_data(lat, lon)
+    if not env_data["success"]:
+        return {"error": "Failed to fetch environmental data"}, 500
+    env = env_data["data"]
+    elevation = get_elevation(lat, lon)
+    features = {
+        "solar_irradiance": env["solar_irradiance"],
+        "temperature": env["temperature"],
+        "rainfall": env["rainfall"],
+        "wind_speed": env["wind_speed"],
+        "cloud_cover": env["cloud_cover"],
+        "elevation": elevation,
+        "slope": 5.0,
+        "ndvi": 0.2,
+        "land_area": req.land_area,
+        "road_dist": 2.0,
+        "power_dist": 3.0
+    }
+    if not ML_MODEL_LOADED:
+        return {"error": "ML model not loaded"}, 503
+    feature_cols = ['solar_irradiance', 'temperature', 'rainfall', 'wind_speed', 'cloud_cover',
+                    'elevation', 'slope', 'ndvi', 'land_area', 'road_dist', 'power_dist']
+    X = np.array([[features[f] for f in feature_cols]])
+    X_scaled = ml_scaler.transform(X)
+    prediction = ml_model.predict(X_scaled)[0]
+    if prediction >= 90: category = "Excellent"
+    elif prediction >= 80: category = "Highly Suitable"
+    elif prediction >= 65: category = "Moderately Suitable"
+    elif prediction >= 40: category = "Low Suitability"
+    else: category = "Unsuitable"
+    return {
+        "location": req.location,
+        "latitude": lat,
+        "longitude": lon,
+        "suitability_score": round(prediction, 2),
+        "category": category,
+        "environmental_data": env,
+        "features_used": features
+    }
+
+@app.post("/api/ml/retrain")
+def retrain_model(token: str = Depends(get_token)):
+    email = verify_token(token)
+    if not email:
+        return {"error": "Unauthorized"}, 401
+    user = get_user_by_email(email)
+    if user and user[5] != "admin":
+        return {"error": "Admin access required"}, 403
+    try:
+        import subprocess
+        result = subprocess.run(['python', 'ml_train_full.py'], capture_output=True, text=True, cwd=os.getcwd())
+        if result.returncode == 0:
+            load_ml_models()
+            return {"message": "Model retrained successfully", "output": result.stdout}
+        else:
+            return {"error": "Training failed", "output": result.stderr}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+# ============================================
+# RUN APP
 # ============================================
 if __name__ == "__main__":
     import uvicorn
     print("="*50)
-    print("🚀 Starting Solar & Wind Intelligence API")
+    print("🚀 Starting Solar & Wind Intelligence API v2.0")
     print("📝 API running on: http://localhost:8000")
     print("📚 API Docs: http://localhost:8000/docs")
+    print("🤖 ML Model Loaded:", "✅" if ML_MODEL_LOADED else "❌")
     print("="*50)
     uvicorn.run(app, host="0.0.0.0", port=8000)

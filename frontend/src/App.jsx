@@ -6,7 +6,7 @@ import Projects from './pages/Projects';
 import Sites from './pages/Sites';
 import SiteDetails from './pages/SiteDetails';
 import Dashboard from './pages/Dashboard';
-
+import Predict from './pages/Predict';
 function App() {
   const isAuthenticated = !!localStorage.getItem('token');
 
@@ -22,7 +22,7 @@ function App() {
         <Route path="/projects" element={isAuthenticated ? <Projects /> : <Navigate to="/login" replace />} />
         <Route path="/projects/:projectId/sites" element={isAuthenticated ? <Sites /> : <Navigate to="/login" replace />} />
         <Route path="/sites/:siteId" element={isAuthenticated ? <SiteDetails /> : <Navigate to="/login" replace />} />
-        
+        <Route path="/predict" element={isAuthenticated ? <Predict /> : <Navigate to="/login" />} />
         {/* Default route */}
         <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
       </Routes>
