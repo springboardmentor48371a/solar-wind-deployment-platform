@@ -10,6 +10,9 @@ import {
   EyeOff, 
   MapPin, 
   Compass, 
+  Layers, 
+  Zap, 
+  ArrowRight, 
   LogOut, 
   AlertCircle, 
   PlusCircle, 
@@ -601,6 +604,60 @@ export default function App() {
                       </p>
                       <p className="text-[11px] text-emerald-400/80 mt-1">Grid Distance: {currentSiteData.grid_proximity || currentSiteData.gridProximity || '2.0 km'}</p>
                     </div>
+                  </div>
+                </div>
+
+                {/* Action Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 hover:border-emerald-500/40 transition">
+                    <div className="w-11 h-11 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mb-4">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-base font-bold text-white">GIS Elevation & Terrain</h3>
+                    <p className="text-xs text-slate-400 mt-1.5 mb-5 leading-relaxed">
+                      Analyze digital elevation models (DEM), slope gradients, and infrastructure proximity buffers.
+                    </p>
+                    <button 
+                      onClick={() => setIsMapModalOpen(true)}
+                      className="flex items-center space-x-1.5 text-xs font-bold text-emerald-400 hover:text-emerald-300 cursor-pointer"
+                    >
+                      <span>Open Map Picker</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 hover:border-amber-500/40 transition">
+                    <div className="w-11 h-11 bg-amber-500/10 text-amber-400 rounded-2xl flex items-center justify-center mb-4">
+                      <Zap className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-base font-bold text-white">Yield Prediction Engine</h3>
+                    <p className="text-xs text-slate-400 mt-1.5 mb-5 leading-relaxed">
+                      Simulate annual generation (MWh) and Capacity Utilization Factor (CUF) with ML algorithms.
+                    </p>
+                    <button 
+                      onClick={() => setActiveTab('view-report')}
+                      className="flex items-center space-x-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 cursor-pointer"
+                    >
+                      <span>Simulate Yield</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 hover:border-sky-500/40 transition">
+                    <div className="w-11 h-11 bg-sky-500/10 text-sky-400 rounded-2xl flex items-center justify-center mb-4">
+                      <TrendingUp className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-base font-bold text-white">Multi-Site Comparison</h3>
+                    <p className="text-xs text-slate-400 mt-1.5 mb-5 leading-relaxed">
+                      Benchmark candidate sites across irradiance, wind speed, CAPEX, and grid connectivity.
+                    </p>
+                    <button 
+                      onClick={() => setActiveTab('compare-sites')}
+                      className="flex items-center space-x-1.5 text-xs font-bold text-sky-400 hover:text-sky-300 cursor-pointer"
+                    >
+                      <span>Compare Sites</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
 
