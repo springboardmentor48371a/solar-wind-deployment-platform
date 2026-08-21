@@ -1,85 +1,66 @@
 import React, { useState } from "react";
 import "./siteselection.css";
 
-function SiteSelection({ user, onBack }) {
-  const [form, setForm] = useState({
-    location: "",
-    landArea: "",
-    irradiance: "",
-    windSpeed: "",
-  });
+function SiteSelection() {
+  const [location, setLocation] = useState("");
+  const [area, setArea] = useState("");
+  const [result, setResult] = useState(null);
 
-  const [results, setResults] = useState(null);
-
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+  const goTo = (path) => {
+    window.location.href = path;
   };
 
-  const findSites = (e) => {
-    e.preventDefault();
-
-    if (
-      !form.location ||
-      !form.landArea ||
-      !form.irradiance ||
-      !form.windSpeed
-    ) {
+  const analyzeSite = () => {
+    if (!location.trim() || !area) {
+      alert("Please enter location and land area.");
       return;
     }
 
-    setResults([
-      {
-        name: `${form.location} North`,
-        type: "Solar + Wind",
-        capacity: "12.4 MW",
-        score: 98,
-      },
-      {
-        name: `${form.location} East`,
-        type: "Solar",
-        capacity: "9.8 MW",
-        score: 95,
-      },
-      {
-        name: `${form.location} South`,
-        type: "Wind",
-        capacity: "8.6 MW",
-        score: 92,
-      },
-    ]);
+    const land = Number(area);
+
+    // Simple rule-based site suitability calculation
+    const solarScore = Math.min(95, Math.max(45, 65 + land * 0.25));
+    const windScore = Math.min(92, Math.max(40, 55 + land * 0.18));
+
+    const overallScore = (solarScore * 0.6 + windScore * 0.4).toFixed(1);
+
+    let category = "Moderate";
+    if (overallScore >= 80) category = "Excellent";
+    else if (overallScore >= 65) category = "Good";
+
+    const technology =
+      solarScore >= windScore
+        ? "Solar Energy"
+        : "Wind Energy";
+
+    setResult({
+      solar: solarScore.toFixed(1),
+      wind: windScore.toFixed(1),
+      overall: overallScore,
+      category,
+      technology,
+    });
   };
 
   return (
-    <div className="site-page">
+    <div className="site-selection-page">
 
       {/* HEADER */}
-      <header className="module-header">
+      <header className="site-header">
 
         <button
-          className="module-back-btn"
-          onClick={onBack}
+          className="back-button"
+          onClick={() => goTo("/dashboard")}
         >
           ← Dashboard
         </button>
 
-        <div className="module-user">
-
-          <div className="module-avatar">
-            {user?.name?.charAt(0)?.toUpperCase() || "U"}
-          </div>
-
-          <div className="module-user-info">
-            <strong>{user?.name || "User"}</strong>
-            <span>{user?.email || ""}</span>
-          </div>
-
+        <div className="site-user">
+          <div className="site-avatar">U</div>
+          <strong>User</strong>
         </div>
 
       </header>
-
 
       {/* TITLE */}
       <section className="site-title">
@@ -90,161 +71,142 @@ function SiteSelection({ user, onBack }) {
 
         <div>
           <h1>Site Selection</h1>
-
           <p>
-            Find the best locations for renewable energy deployment
+            Find the most suitable renewable energy technology
+            for your location.
           </p>
         </div>
 
       </section>
 
-
+      {/* MAIN */}
       <main className="site-container">
 
-        {/* REQUIREMENTS */}
-        <section className="site-card">
+        {/* INPUT CARD */}
+        <section className="site-input-card">
 
-          <div className="site-card-header">
-            <h2>Site Requirements</h2>
-            <p>
-              Enter your requirements to find suitable locations
-            </p>
+          <h2>Site Information</h2>
+
+          <p>
+            Enter your location and available land area to
+            evaluate renewable energy potential.
+          </p>
+
+          <label>Location</label>
+
+          <input
+            type="text"
+            placeholder="e.g. Agra"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
+
+          <label>Land Area (acres)</label>
+
+          <input
+            type="number"
+            placeholder="e.g. 50"
+            value={area}
+            onChange={(e) => setArea(e.target.value)}
+          />
+
+          <div className="info-box">
+            🌍 Environmental data will be considered automatically
+            for the selected site.
           </div>
 
-          <form onSubmit={findSites}>
-
-            <div className="site-input-grid">
-
-              <div className="site-input-group">
-                <label>Region / Location</label>
-
-                <input
-                  type="text"
-                  name="location"
-                  placeholder="e.g. Vizag"
-                  value={form.location}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-
-
-              <div className="site-input-group">
-                <label>Available Land (acres)</label>
-
-                <input
-                  type="number"
-                  name="landArea"
-                  placeholder="e.g. 100"
-                  min="1"
-                  value={form.landArea}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-
-
-              <div className="site-input-group">
-                <label>Solar Irradiance</label>
-
-                <input
-                  type="number"
-                  name="irradiance"
-                  placeholder="e.g. 5.2"
-                  step="0.1"
-                  min="0"
-                  value={form.irradiance}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-
-
-              <div className="site-input-group">
-                <label>Wind Speed (m/s)</label>
-
-                <input
-                  type="number"
-                  name="windSpeed"
-                  placeholder="e.g. 6.0"
-                  step="0.1"
-                  min="0"
-                  value={form.windSpeed}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-
-            </div>
-
-
-            <button
-              type="submit"
-              className="find-sites-btn"
-            >
-              🗺️ Find Best Sites
-            </button>
-
-          </form>
+          <button
+            className="analyze-site-button"
+            onClick={analyzeSite}
+          >
+            🗺️ Analyze Site
+          </button>
 
         </section>
 
+        {/* RESULT CARD */}
+        <section className="site-result-card">
 
-        {/* RESULTS */}
-        {results && (
-          <section className="site-results-card">
+          {!result ? (
+            <div className="empty-result">
 
-            <div className="site-results-header">
-              <div>
-                <h2>AI Recommended Sites</h2>
+              <div className="large-icon">
+                🗺️
+              </div>
+
+              <h2>Site Suitability</h2>
+
+              <p>
+                Enter location and land area to evaluate
+                the site.
+              </p>
+
+            </div>
+          ) : (
+
+            <div className="result-content">
+
+              <h2>Site Selection Result</h2>
+
+              <p className="result-location">
+                📍 {location}
+              </p>
+
+              <div className="overall-score">
+
+                <span>Overall Suitability</span>
+
+                <strong>
+                  {result.overall}%
+                </strong>
+
+                <div className="score-category">
+                  {result.category}
+                </div>
+
+              </div>
+
+              <div className="result-grid">
+
+                <div className="result-box">
+                  <span>☀️ Solar Potential</span>
+                  <strong>{result.solar}%</strong>
+                </div>
+
+                <div className="result-box">
+                  <span>💨 Wind Potential</span>
+                  <strong>{result.wind}%</strong>
+                </div>
+
+                <div className="result-box">
+                  <span>🌱 Land Area</span>
+                  <strong>{area} acres</strong>
+                </div>
+
+                <div className="result-box recommended">
+                  <span>⚡ Recommended Technology</span>
+                  <strong>{result.technology}</strong>
+                </div>
+
+              </div>
+
+              <div className="recommendation">
+                <h3>Recommendation</h3>
+
                 <p>
-                  Best locations based on your requirements
+                  Based on the available land and calculated
+                  renewable potential,{" "}
+                  <strong>{result.technology}</strong>{" "}
+                  is currently the recommended technology
+                  for this site.
                 </p>
               </div>
 
-              <span>3 Sites</span>
             </div>
 
+          )}
 
-            {results.map((site, index) => (
-              <div
-                className="site-result"
-                key={site.name}
-              >
-
-                <div className="site-rank">
-                  {index + 1}
-                </div>
-
-                <div className="site-result-info">
-
-                  <h3>{site.name}</h3>
-
-                  <p>{site.type}</p>
-
-                  <span>
-                    Estimated Capacity: {site.capacity}
-                  </span>
-
-                </div>
-
-                <div className="site-score">
-
-                  <strong>
-                    {site.score}%
-                  </strong>
-
-                  <span>
-                    Match Score
-                  </span>
-
-                </div>
-
-              </div>
-            ))}
-
-          </section>
-        )}
+        </section>
 
       </main>
 

@@ -1,363 +1,315 @@
 import React, { useState } from "react";
-import "./SolarAnalysis.css";
+import "./index.css";
 
-function SolarAnalysis({ user, onBack }) {
-  const [form, setForm] = useState({
-    location: "",
-    landArea: "",
-    irradiance: "",
-    temperature: "",
-    cloudCover: "",
-  });
+const API_URL = "http://127.0.0.1:8000";
+
+function SolarAnalysis() {
+  const [location, setLocation] = useState("");
+  const [landArea, setLandArea] = useState("");
 
   const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  // ============================================================
+  // ANALYZE SOLAR
+  // ============================================================
 
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    setError("");
-  };
-
-  const analyzeSolar = (e) => {
-    e.preventDefault();
-
+  const analyzeSolar = async () => {
     setError("");
     setResult(null);
 
-    // Convert input values to numbers
-    const landArea = Number(form.landArea);
-    const irradiance = Number(form.irradiance);
-    const temperature = Number(form.temperature);
-    const cloudCover = Number(form.cloudCover);
-
-    // Validation
-    if (!form.location.trim()) {
+    // Validate location
+    if (!location.trim()) {
       setError("Please enter a location.");
       return;
     }
 
-    if (landArea <= 0) {
-      setError("Land area must be greater than 0.");
+    // Validate land area
+    if (!landArea || Number(landArea) <= 0) {
+      setError("Please enter a valid land area.");
       return;
     }
 
-    if (irradiance <= 0) {
-      setError("Solar irradiance must be greater than 0.");
-      return;
+    setLoading(true);
+
+    try {
+      // --------------------------------------------------------
+      // GET USER ID
+      // --------------------------------------------------------
+
+      const storedUserId =
+        localStorage.getItem("user_id") ||
+        localStorage.getItem("userId");
+
+      const userId = Number(storedUserId || 1);
+
+      if (!userId || userId <= 0) {
+        throw new Error("Invalid user ID. Please login again.");
+      }
+
+      // --------------------------------------------------------
+      // REQUEST BODY
+      // --------------------------------------------------------
+
+      const requestBody = {
+        user_id: userId,
+        location: location.trim(),
+        land_area: Number(landArea),
+      };
+
+      console.log("SOLAR REQUEST:", requestBody);
+
+      // --------------------------------------------------------
+      // CALL BACKEND
+      // --------------------------------------------------------
+
+      const response = await fetch(
+        `${API_URL}/solar-analysis`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      // --------------------------------------------------------
+      // READ RESPONSE
+      // --------------------------------------------------------
+
+      const raw = await response.text();
+
+      console.log("STATUS:", response.status);
+      console.log("RAW SOLAR RESPONSE:", raw);
+
+      let data;
+
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error(
+          `Backend returned non-JSON response: ${raw.substring(
+            0,
+            300
+          )}`
+        );
+      }
+
+      // --------------------------------------------------------
+      // HANDLE BACKEND ERROR
+      // --------------------------------------------------------
+
+      if (!response.ok) {
+        if (Array.isArray(data.detail)) {
+          throw new Error(
+            data.detail
+              .map((item) => item.msg || JSON.stringify(item))
+              .join(", ")
+          );
+        }
+
+        throw new Error(
+          data.detail || `HTTP ${response.status}`
+        );
+      }
+
+      // --------------------------------------------------------
+      // SUCCESS
+      // --------------------------------------------------------
+
+      console.log("SOLAR RESPONSE:", data);
+
+      setResult(data);
+
+    } catch (err) {
+      console.error("SOLAR ANALYSIS ERROR:", err);
+
+      setError(
+        err.message ||
+        "Unable to connect to the backend."
+      );
+
+    } finally {
+      setLoading(false);
     }
-
-    if (temperature === "" || Number.isNaN(temperature)) {
-      setError("Please enter the average temperature.");
-      return;
-    }
-
-    if (
-      cloudCover === "" ||
-      Number.isNaN(cloudCover) ||
-      cloudCover < 0 ||
-      cloudCover > 100
-    ) {
-      setError("Cloud cover must be between 0 and 100.");
-      return;
-    }
-
-    /*
-    =====================================================
-    SOLAR POTENTIAL CALCULATION
-    =====================================================
-
-    This is currently a preliminary calculation.
-    Later this can be replaced by the FastAPI/ML model.
-    */
-
-    // Base panel efficiency
-    let efficiency = 20;
-
-    // Cloud cover reduces efficiency
-    efficiency -= cloudCover * 0.08;
-
-    // High temperature reduces efficiency
-    if (temperature > 25) {
-      efficiency -= (temperature - 25) * 0.25;
-    }
-
-    // Keep efficiency within realistic demo limits
-    efficiency = Math.max(10, Math.min(22, efficiency));
-
-    // Estimated installed capacity
-    const capacityMW = landArea * 0.04;
-
-    // Estimated daily energy production
-    const dailyEnergy =
-      capacityMW *
-      irradiance *
-      (efficiency / 100);
-
-    // Solar potential score
-    let score =
-      irradiance * 12 +
-      (100 - cloudCover) * 0.25;
-
-    // Keep score between 0 and 100
-    score = Math.max(0, Math.min(100, score));
-
-    // Rating
-    let rating = "Moderate";
-
-    if (score >= 80) {
-      rating = "Excellent";
-    } else if (score >= 60) {
-      rating = "Good";
-    }
-
-    // Save result
-    setResult({
-      score: score.toFixed(1),
-      rating,
-      capacity: capacityMW.toFixed(2),
-      energy: dailyEnergy.toFixed(2),
-      efficiency: efficiency.toFixed(1),
-    });
   };
 
+  // ============================================================
+  // BACK TO DASHBOARD
+  // ============================================================
+
+  const goBack = () => {
+    window.location.href = "/dashboard";
+  };
+
+  // ============================================================
+  // UI
+  // ============================================================
+
   return (
-    <div className="solar-page">
+    <div className="analysis-page">
 
-      {/* =================================================
+      {/* ======================================================
+          BACK BUTTON
+      ====================================================== */}
+
+      <button
+        className="back-button"
+        onClick={goBack}
+      >
+        ← Dashboard
+      </button>
+
+
+      {/* ======================================================
           HEADER
-      ================================================= */}
+      ====================================================== */}
 
-      <header className="solar-header">
+      <div className="analysis-header">
 
-        <button
-          className="back-btn"
-          onClick={onBack}
-          type="button"
-        >
-          ← Dashboard
-        </button>
-
-        <div className="solar-user">
-
-          <div className="solar-user-icon">
-            {(user?.name || "User")
-              .charAt(0)
-              .toUpperCase()}
-          </div>
-
-          <div>
-            <strong>
-              {user?.name || "User"}
-            </strong>
-
-            <span>
-              {user?.email || ""}
-            </span>
-          </div>
-
-        </div>
-
-      </header>
-
-
-      {/* =================================================
-          TITLE
-      ================================================= */}
-
-      <section className="solar-title">
-
-        <div className="solar-title-icon">
+        <div className="analysis-icon">
           ☀️
         </div>
 
         <div>
-          <h1>Solar Analysis</h1>
+
+          <h1>
+            Solar Analysis
+          </h1>
 
           <p>
-            Analyze the solar energy potential of a location
+            Analyze solar potential using real environmental data
           </p>
+
         </div>
 
-      </section>
+      </div>
 
 
-      {/* =================================================
-          MAIN CONTENT
-      ================================================= */}
+      {/* ======================================================
+          MAIN GRID
+      ====================================================== */}
 
-      <div className="solar-content">
+      <div className="analysis-grid">
 
 
-        {/* =================================================
+        {/* ====================================================
             INPUT CARD
-        ================================================= */}
+        ==================================================== */}
 
-        <div className="solar-card">
+        <div className="input-card">
 
-          <div className="solar-card-header">
+          <h2>
+            Site Information
+          </h2>
 
-            <h2>
-              Site Information
-            </h2>
+          <p>
+            Enter only the location and available land.
+            Solar data will be fetched automatically.
+          </p>
+
+
+          {/* LOCATION */}
+
+          <label>
+            Location
+          </label>
+
+          <input
+            type="text"
+            value={location}
+            onChange={(e) =>
+              setLocation(e.target.value)
+            }
+            placeholder="Example: Shimla"
+            disabled={loading}
+          />
+
+
+          {/* LAND AREA */}
+
+          <label>
+            Land Area (acres)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            value={landArea}
+            onChange={(e) =>
+              setLandArea(e.target.value)
+            }
+            placeholder="Example: 76"
+            disabled={loading}
+          />
+
+
+          {/* AUTOMATIC DATA */}
+
+          <div className="automatic-data">
+
+            <strong>
+              ☀️ Automatic Solar Data
+            </strong>
 
             <p>
-              Enter the environmental and site parameters
+              NASA POWER automatically provides solar
+              irradiance, temperature and other environmental
+              information for the selected location.
             </p>
 
           </div>
 
 
-          <form onSubmit={analyzeSolar}>
+          {/* ERROR */}
 
-            {/* LOCATION */}
+          {error && (
 
-            <div className="input-group">
-
-              <label>
-                Location
-              </label>
-
-              <input
-                type="text"
-                name="location"
-                placeholder="e.g. Visakhapatnam, Andhra Pradesh"
-                value={form.location}
-                onChange={handleChange}
-              />
-
+            <div className="error-message">
+              {error}
             </div>
 
-
-            {/* LAND + IRRADIANCE */}
-
-            <div className="input-row">
-
-              <div className="input-group">
-
-                <label>
-                  Land Area (acres)
-                </label>
-
-                <input
-                  type="number"
-                  name="landArea"
-                  placeholder="e.g. 100"
-                  min="1"
-                  step="0.1"
-                  value={form.landArea}
-                  onChange={handleChange}
-                />
-
-              </div>
+          )}
 
 
-              <div className="input-group">
+          {/* ANALYZE BUTTON */}
 
-                <label>
-                  Solar Irradiance (kWh/m²/day)
-                </label>
+          <button
+            className="analyze-button"
+            onClick={analyzeSolar}
+            disabled={loading}
+          >
 
-                <input
-                  type="number"
-                  name="irradiance"
-                  placeholder="e.g. 5.5"
-                  min="0"
-                  step="0.1"
-                  value={form.irradiance}
-                  onChange={handleChange}
-                />
+            {loading
+              ? "⏳ Analyzing..."
+              : "☀️ Analyze Solar Potential"}
 
-              </div>
-
-            </div>
-
-
-            {/* TEMPERATURE + CLOUD */}
-
-            <div className="input-row">
-
-              <div className="input-group">
-
-                <label>
-                  Average Temperature (°C)
-                </label>
-
-                <input
-                  type="number"
-                  name="temperature"
-                  placeholder="e.g. 28"
-                  step="0.1"
-                  value={form.temperature}
-                  onChange={handleChange}
-                />
-
-              </div>
-
-
-              <div className="input-group">
-
-                <label>
-                  Cloud Cover (%)
-                </label>
-
-                <input
-                  type="number"
-                  name="cloudCover"
-                  placeholder="e.g. 20"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={form.cloudCover}
-                  onChange={handleChange}
-                />
-
-              </div>
-
-            </div>
-
-
-            {/* ERROR */}
-
-            {error && (
-              <div className="error-message">
-                {error}
-              </div>
-            )}
-
-
-            {/* ANALYZE BUTTON */}
-
-            <button
-              type="submit"
-              className="analyze-btn"
-            >
-              ☀️ Analyze Solar Potential
-            </button>
-
-          </form>
+          </button>
 
         </div>
 
 
-        {/* =================================================
+        {/* ====================================================
             RESULT CARD
-        ================================================= */}
+        ==================================================== */}
 
-        <div className="solar-card result-card">
+        <div className="result-card">
 
-          {!result ? (
 
-            /* EMPTY RESULT */
+          {/* ==================================================
+              EMPTY STATE
+          ================================================== */}
+
+          {!result && !loading && (
 
             <div className="empty-result">
 
-              <div className="empty-icon">
+              <div className="large-sun">
                 ☀️
               </div>
 
@@ -366,35 +318,85 @@ function SolarAnalysis({ user, onBack }) {
               </h2>
 
               <p>
-                Enter the site information and click
-                <strong>
-                  {" "}Analyze Solar Potential{" "}
-                </strong>
-                to see the results.
+                Enter the location and land area.
+                The backend will automatically retrieve
+                real environmental information and
+                calculate the solar potential.
               </p>
 
             </div>
 
-          ) : (
+          )}
 
-            /* RESULT */
 
-            <>
+          {/* ==================================================
+              LOADING STATE
+          ================================================== */}
+
+          {loading && (
+
+            <div className="empty-result">
+
+              <div className="large-sun">
+                ☀️
+              </div>
+
+              <h2>
+                Analyzing...
+              </h2>
+
+              <p>
+                Converting location into coordinates
+                and fetching environmental data...
+              </p>
+
+            </div>
+
+          )}
+
+
+          {/* ==================================================
+              RESULT
+          ================================================== */}
+
+          {result && (
+
+            <div className="result-content">
+
 
               {/* RESULT HEADER */}
 
-              <div className="result-header">
+              <div className="result-title">
+
+                <div className="large-sun">
+                  ☀️
+                </div>
 
                 <div>
 
                   <h2>
-                    Analysis Result
+                    Solar Analysis Result
                   </h2>
 
                   <p>
-                    {form.location}
+                    {result.location}
                   </p>
 
+                </div>
+
+              </div>
+
+
+              {/* SCORE */}
+
+              <div className="score-section">
+
+                <span>
+                  Solar Potential Score
+                </span>
+
+                <div className="score">
+                  {result.score}%
                 </div>
 
                 <div className="rating">
@@ -404,42 +406,115 @@ function SolarAnalysis({ user, onBack }) {
               </div>
 
 
-              {/* SCORE */}
-
-              <div className="potential-score">
-
-                <span>
-                  Solar Potential Score
-                </span>
-
-                <strong>
-                  {result.score}%
-                </strong>
-
-                <div className="score-bar">
-
-                  <div
-                    style={{
-                      width: `${result.score}%`,
-                    }}
-                  />
-
-                </div>
-
-              </div>
-
-
-              {/* RESULT GRID */}
+              {/* =================================================
+                  RESULT GRID
+              ================================================= */}
 
               <div className="result-grid">
 
 
-                {/* CAPACITY */}
+                {/* LOCATION */}
 
-                <div className="result-box">
+                <div className="result-item">
 
                   <span>
-                    Estimated Capacity
+                    Location
+                  </span>
+
+                  <strong>
+                    {result.location}
+                  </strong>
+
+                </div>
+
+
+                {/* LATITUDE */}
+
+                <div className="result-item">
+
+                  <span>
+                    Latitude
+                  </span>
+
+                  <strong>
+                    {result.latitude !== undefined &&
+                    result.latitude !== null
+                      ? Number(result.latitude).toFixed(6)
+                      : "N/A"}
+                  </strong>
+
+                </div>
+
+
+                {/* LONGITUDE */}
+
+                <div className="result-item">
+
+                  <span>
+                    Longitude
+                  </span>
+
+                  <strong>
+                    {result.longitude !== undefined &&
+                    result.longitude !== null
+                      ? Number(result.longitude).toFixed(6)
+                      : "N/A"}
+                  </strong>
+
+                </div>
+
+
+                {/* LAND AREA */}
+
+                <div className="result-item">
+
+                  <span>
+                    Land Area
+                  </span>
+
+                  <strong>
+                    {result.land_area} acres
+                  </strong>
+
+                </div>
+
+
+                {/* SOLAR IRRADIANCE */}
+
+                <div className="result-item">
+
+                  <span>
+                    Solar Irradiance
+                  </span>
+
+                  <strong>
+                    {result.irradiance}
+                  </strong>
+
+                </div>
+
+
+                {/* TEMPERATURE */}
+
+                <div className="result-item">
+
+                  <span>
+                    Temperature
+                  </span>
+
+                  <strong>
+                    {result.temperature} °C
+                  </strong>
+
+                </div>
+
+
+                {/* SOLAR CAPACITY */}
+
+                <div className="result-item">
+
+                  <span>
+                    Solar Capacity
                   </span>
 
                   <strong>
@@ -449,9 +524,9 @@ function SolarAnalysis({ user, onBack }) {
                 </div>
 
 
-                {/* ENERGY */}
+                {/* DAILY ENERGY */}
 
-                <div className="result-box">
+                <div className="result-item">
 
                   <span>
                     Daily Energy
@@ -464,12 +539,27 @@ function SolarAnalysis({ user, onBack }) {
                 </div>
 
 
-                {/* EFFICIENCY */}
+                {/* ANNUAL ENERGY */}
 
-                <div className="result-box">
+                <div className="result-item">
 
                   <span>
-                    Panel Efficiency
+                    Annual Energy
+                  </span>
+
+                  <strong>
+                    {result.annual_energy} MWh
+                  </strong>
+
+                </div>
+
+
+                {/* EFFICIENCY */}
+
+                <div className="result-item">
+
+                  <span>
+                    Efficiency
                   </span>
 
                   <strong>
@@ -479,16 +569,16 @@ function SolarAnalysis({ user, onBack }) {
                 </div>
 
 
-                {/* LAND */}
+                {/* DATA SOURCE */}
 
-                <div className="result-box">
+                <div className="result-item">
 
                   <span>
-                    Land Area
+                    Data Source
                   </span>
 
                   <strong>
-                    {form.landArea} acres
+                    {result.data_source}
                   </strong>
 
                 </div>
@@ -496,27 +586,49 @@ function SolarAnalysis({ user, onBack }) {
               </div>
 
 
-              {/* RECOMMENDATION */}
+              {/* =================================================
+                  COORDINATE INFORMATION
+              ================================================= */}
 
-              <div className="recommendation">
+              <div
+                className="automatic-data"
+                style={{
+                  marginTop: "20px"
+                }}
+              >
 
-                <h3>
-                  💡 Recommendation
-                </h3>
+                <strong>
+                  📍 Geographic Coordinates
+                </strong>
 
                 <p>
-                  This location has a{" "}
+                  The location was automatically converted
+                  into latitude and longitude using
+                  OpenStreetMap geocoding.
+                </p>
+
+                <p>
                   <strong>
-                    {result.rating.toLowerCase()}
+                    Latitude:
                   </strong>{" "}
-                  solar energy potential. Further
-                  geographical and environmental analysis
-                  can be performed before final deployment.
+                  {result.latitude !== undefined
+                    ? Number(result.latitude).toFixed(6)
+                    : "N/A"}
+                </p>
+
+                <p>
+                  <strong>
+                    Longitude:
+                  </strong>{" "}
+                  {result.longitude !== undefined
+                    ? Number(result.longitude).toFixed(6)
+                    : "N/A"}
                 </p>
 
               </div>
 
-            </>
+
+            </div>
 
           )}
 

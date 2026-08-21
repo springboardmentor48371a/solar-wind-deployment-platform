@@ -1,104 +1,179 @@
+import React from "react";
 import "./dashboard.css";
 
-function Dashboard({ user, onLogout, onNavigate }) {
+function Dashboard() {
+
+  // =========================
+  // GET LOGGED-IN USER
+  // =========================
+
+  let storedUser = {};
+
+  try {
+    storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+  } catch {
+    storedUser = {};
+  }
+
+  const userName =
+    storedUser.name ||
+    localStorage.getItem("user_name") ||
+    "User";
+
+  const userEmail =
+    storedUser.email ||
+    localStorage.getItem("user_email") ||
+    "";
+
+  const userInitial =
+    userName.charAt(0).toUpperCase();
+
+  // =========================
+  // NAVIGATION
+  // =========================
+
+  const goTo = (path) => {
+    window.location.href = path;
+  };
+
+  // =========================
+  // LOGOUT
+  // =========================
+
+  const logout = () => {
+
+    localStorage.removeItem("user");
+    localStorage.removeItem("user_id");
+    localStorage.removeItem("user_name");
+    localStorage.removeItem("user_email");
+    localStorage.removeItem("loggedInUser");
+    localStorage.removeItem("token");
+
+    window.location.href = "/";
+  };
+
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-container">
 
       {/* ================= SIDEBAR ================= */}
-      <aside className="dashboard-sidebar">
 
-        <div className="brand">
+      <aside className="sidebar">
 
-          <div className="brand-icons">
-            <span>☀️</span>
-            <span>🌬️</span>
+        <div className="logo-section">
+
+          <div className="logo-icons">
+            ☀️ 💨
           </div>
 
-          <h1>Solar & Wind</h1>
+          <h1>
+            Solar & Wind
+          </h1>
 
-          <p>Deployment Intelligence</p>
+          <p>
+            Deployment Intelligence
+          </p>
 
         </div>
 
+        <nav className="sidebar-menu">
 
-        {/* NAVIGATION */}
-
-        <nav className="sidebar-nav">
+          {/* DASHBOARD */}
 
           <button
-            className="nav-item active"
-            onClick={() => onNavigate("dashboard")}
+            className="sidebar-item active"
+            onClick={() =>
+              goTo("/dashboard")
+            }
           >
-            📊
+            <span>📊</span>
             <span>Dashboard</span>
           </button>
 
 
+          {/* SOLAR */}
+
           <button
-            className="nav-item"
-            onClick={() => onNavigate("solar")}
+            className="sidebar-item"
+            onClick={() =>
+              goTo("/solar-analysis")
+            }
           >
-            ☀️
+            <span>☀️</span>
             <span>Solar Analysis</span>
           </button>
 
 
+          {/* WIND */}
+
           <button
-            className="nav-item"
-            onClick={() => onNavigate("wind")}
+            className="sidebar-item"
+            onClick={() =>
+              goTo("/wind-analysis")
+            }
           >
-            🌬️
+            <span>💨</span>
             <span>Wind Analysis</span>
           </button>
 
 
+          {/* SITE SELECTION */}
+
           <button
-            className="nav-item"
-            onClick={() => onNavigate("sites")}
+            className="sidebar-item"
+            onClick={() =>
+              goTo("/site-selection")
+            }
           >
-            🗺️
+            <span>🗺️</span>
             <span>Site Selection</span>
           </button>
 
 
+          {/* PREDICTIONS */}
+
           <button
-            className="nav-item"
-            onClick={() => onNavigate("predictions")}
+            className="sidebar-item"
+            onClick={() =>
+              goTo("/predictions")
+            }
           >
-            📈
+            <span>📈</span>
             <span>Predictions</span>
           </button>
 
 
+          {/* REPORTS */}
+
           <button
-            className="nav-item"
-            onClick={() => onNavigate("reports")}
+            className="sidebar-item"
+            onClick={() =>
+              goTo("/reports")
+            }
           >
-            📄
+            <span>📄</span>
             <span>Reports</span>
+          </button>
+
+
+          {/* LOGOUT */}
+
+          <button
+            type="button"
+            className="sidebar-item logout-btn"
+            onClick={logout}
+          >
+            <span>🚪</span>
+            <span>Logout</span>
           </button>
 
         </nav>
 
-
-        {/* LOGOUT */}
-
-        <div className="sidebar-bottom">
-
-          <button
-            className="logout-btn"
-            onClick={onLogout}
-          >
-            🚪
-            <span>Logout</span>
-          </button>
-
-        </div>
-
       </aside>
 
 
-      {/* ================= MAIN CONTENT ================= */}
+      {/* ================= MAIN ================= */}
 
       <main className="dashboard-main">
 
@@ -108,7 +183,9 @@ function Dashboard({ user, onLogout, onNavigate }) {
 
           <div>
 
-            <h2>Dashboard</h2>
+            <h1>
+              Dashboard
+            </h1>
 
             <p>
               Renewable energy deployment overview
@@ -117,21 +194,29 @@ function Dashboard({ user, onLogout, onNavigate }) {
           </div>
 
 
-          <div className="user-profile">
+          {/* USER */}
 
-            <div className="user-avatar">
-              {user?.name?.charAt(0)?.toUpperCase() || "U"}
+          <div className="user-section">
+
+            <div className="user-circle">
+              {userInitial}
             </div>
 
-            <div className="user-details">
-
+            <div>
               <strong>
-                {user?.name || "User"}
+                {userName}
               </strong>
 
-              <span>
-                {user?.email || ""}
-              </span>
+              {userEmail && (
+                <small
+                  style={{
+                    display: "block",
+                    opacity: 0.7,
+                  }}
+                >
+                  {userEmail}
+                </small>
+              )}
 
             </div>
 
@@ -144,96 +229,124 @@ function Dashboard({ user, onLogout, onNavigate }) {
 
         <section className="welcome-section">
 
-          <div>
+          <h2>
+            Welcome back, {userName} 👋
+          </h2>
 
-            <h1>
-              Welcome back, {user?.name || "User"} 👋
-            </h1>
-
-            <p>
-              Monitor and analyze renewable energy
-              deployment opportunities.
-            </p>
-
-          </div>
+          <p>
+            Monitor and analyze renewable
+            energy deployment opportunities.
+          </p>
 
         </section>
 
 
-        {/* ================= STAT CARDS ================= */}
+        {/* ================= STATISTICS ================= */}
 
         <section className="stats-grid">
 
+          {/* SOLAR */}
+
           <div className="stat-card">
 
-            <div className="stat-icon solar-icon">
+            <div className="stat-icon solar">
               ☀️
             </div>
 
             <div>
 
-              <span>Solar Potential</span>
+              <span>
+                Solar Potential
+              </span>
 
-              <strong>77.6%</strong>
+              <h2>
+                77.6%
+              </h2>
 
-              <small>Good</small>
+              <small>
+                Good
+              </small>
 
             </div>
 
           </div>
 
 
+          {/* WIND */}
+
           <div className="stat-card">
 
-            <div className="stat-icon wind-icon">
-              🌬️
+            <div className="stat-icon wind">
+              💨
             </div>
 
             <div>
 
-              <span>Wind Potential</span>
+              <span>
+                Wind Potential
+              </span>
 
-              <strong>82.2%</strong>
+              <h2>
+                82.2%
+              </h2>
 
-              <small>Excellent</small>
+              <small>
+                Excellent
+              </small>
 
             </div>
 
           </div>
 
 
+          {/* SITES */}
+
           <div className="stat-card">
 
-            <div className="stat-icon site-icon">
+            <div className="stat-icon sites">
               🗺️
             </div>
 
             <div>
 
-              <span>Sites Analyzed</span>
+              <span>
+                Sites Analyzed
+              </span>
 
-              <strong>12</strong>
+              <h2>
+                12
+              </h2>
 
-              <small>+3 this month</small>
+              <small>
+                +3 this month
+              </small>
 
             </div>
 
           </div>
 
 
+          {/* REPORTS */}
+
           <div className="stat-card">
 
-            <div className="stat-icon report-icon">
+            <div className="stat-icon reports">
               📄
             </div>
 
             <div>
 
-              <span>Reports</span>
+              <span>
+                Reports
+              </span>
 
-              <strong>3</strong>
+              <h2>
+                3
+              </h2>
 
-              <small>Generated</small>
+              <small>
+                Generated
+              </small>
 
             </div>
 
@@ -242,507 +355,179 @@ function Dashboard({ user, onLogout, onNavigate }) {
         </section>
 
 
-        {/* ================= CONTENT GRID ================= */}
+        {/* ================= CONTENT ================= */}
 
-        <section className="dashboard-grid">
+        <section className="dashboard-content">
 
+          {/* OVERVIEW */}
 
-          {/* ================= CHART ================= */}
+          <div className="overview-card">
 
-          <div className="dashboard-card overview-card">
+            <h2>
+              Renewable Energy Overview
+            </h2>
 
-            <div className="card-header">
+            <p>
+              Current deployment potential
+            </p>
 
-              <div>
 
-                <h2>
-                  Renewable Energy Overview
-                </h2>
+            <div className="chart-placeholder">
 
-                <p>
-                  Current deployment potential
-                </p>
-
-              </div>
-
-
-              <select defaultValue="6">
-
-                <option value="6">
-                  Last 6 Months
-                </option>
-
-                <option value="12">
-                  Last 12 Months
-                </option>
-
-              </select>
-
-            </div>
-
-
-            <div className="chart">
-
-              <div className="chart-y">
-
-                <span>100%</span>
-                <span>80%</span>
-                <span>60%</span>
-                <span>40%</span>
-                <span>20%</span>
-                <span>0%</span>
-
-              </div>
-
-
-              <div className="chart-area">
-
-                <div className="grid-line line1"></div>
-                <div className="grid-line line2"></div>
-                <div className="grid-line line3"></div>
-                <div className="grid-line line4"></div>
-                <div className="grid-line line5"></div>
-
-
-                <div className="bars">
-
-                  <div className="bar-group">
-
-                    <div className="bar solar-bar b1">
-                      <span>54%</span>
-                    </div>
-
-                    <div className="bar wind-bar w1">
-                      <span>38%</span>
-                    </div>
-
-                    <small>Mar</small>
-
-                  </div>
-
-
-                  <div className="bar-group">
-
-                    <div className="bar solar-bar b2">
-                      <span>65%</span>
-                    </div>
-
-                    <div className="bar wind-bar w2">
-                      <span>47%</span>
-                    </div>
-
-                    <small>Apr</small>
-
-                  </div>
-
-
-                  <div className="bar-group">
-
-                    <div className="bar solar-bar b3">
-                      <span>74%</span>
-                    </div>
-
-                    <div className="bar wind-bar w3">
-                      <span>57%</span>
-                    </div>
-
-                    <small>May</small>
-
-                  </div>
-
-
-                  <div className="bar-group">
-
-                    <div className="bar solar-bar b4">
-                      <span>82%</span>
-                    </div>
-
-                    <div className="bar wind-bar w4">
-                      <span>66%</span>
-                    </div>
-
-                    <small>Jun</small>
-
-                  </div>
-
-
-                  <div className="bar-group">
-
-                    <div className="bar solar-bar b5">
-                      <span>92%</span>
-                    </div>
-
-                    <div className="bar wind-bar w5">
-                      <span>72%</span>
-                    </div>
-
-                    <small>Jul</small>
-
-                  </div>
-
-
-                  <div className="bar-group">
-
-                    <div className="bar solar-bar b6">
-                      <span>98%</span>
-                    </div>
-
-                    <div className="bar wind-bar w6">
-                      <span>87%</span>
-                    </div>
-
-                    <small>Aug</small>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            </div>
-
-
-            <div className="chart-legend">
-
-              <span>
-                <i className="legend-solar"></i>
-                Solar
-              </span>
-
-              <span>
-                <i className="legend-wind"></i>
-                Wind
-              </span>
-
-            </div>
-
-          </div>
-
-
-          {/* ================= QUICK ACTIONS ================= */}
-
-          <div className="dashboard-card quick-card">
-
-            <div className="card-header">
-
-              <div>
-
-                <h2>Quick Actions</h2>
-
-                <p>
-                  Start a new analysis
-                </p>
-
-              </div>
-
-            </div>
-
-
-            <div className="quick-actions">
-
-
-              <button
-                className="quick-action"
-                onClick={() => onNavigate("solar")}
-              >
-
-                <div className="quick-icon">
-                  ☀️
-                </div>
-
-                <div>
-
-                  <strong>
-                    Solar Analysis
-                  </strong>
-
-                  <span>
-                    Analyze solar potential
-                  </span>
-
-                </div>
-
-                <b>→</b>
-
-              </button>
-
-
-              <button
-                className="quick-action"
-                onClick={() => onNavigate("wind")}
-              >
-
-                <div className="quick-icon">
-                  🌬️
-                </div>
-
-                <div>
-
-                  <strong>
-                    Wind Analysis
-                  </strong>
-
-                  <span>
-                    Analyze wind potential
-                  </span>
-
-                </div>
-
-                <b>→</b>
-
-              </button>
-
-
-              <button
-                className="quick-action"
-                onClick={() => onNavigate("sites")}
-              >
-
-                <div className="quick-icon">
-                  🗺️
-                </div>
-
-                <div>
-
-                  <strong>
-                    Find Best Site
-                  </strong>
-
-                  <span>
-                    AI-powered site selection
-                  </span>
-
-                </div>
-
-                <b>→</b>
-
-              </button>
-
-
-              <button
-                className="quick-action"
-                onClick={() => onNavigate("predictions")}
-              >
-
-                <div className="quick-icon">
-                  📈
-                </div>
-
-                <div>
-
-                  <strong>
-                    Energy Predictions
-                  </strong>
-
-                  <span>
-                    View future potential
-                  </span>
-
-                </div>
-
-                <b>→</b>
-
-              </button>
-
-
-              <button
-                className="quick-action"
-                onClick={() => onNavigate("reports")}
-              >
-
-                <div className="quick-icon">
-                  📄
-                </div>
-
-                <div>
-
-                  <strong>
-                    View Reports
-                  </strong>
-
-                  <span>
-                    Download analysis reports
-                  </span>
-
-                </div>
-
-                <b>→</b>
-
-              </button>
-
-            </div>
-
-          </div>
-
-        </section>
-
-
-        {/* ================= BOTTOM SECTION ================= */}
-
-        <section className="bottom-grid">
-
-
-          <div className="dashboard-card activity-card">
-
-            <div className="card-header">
-
-              <div>
-
-                <h2>Recent Activity</h2>
-
-                <p>
-                  Latest platform activity
-                </p>
-
-              </div>
-
-            </div>
-
-
-            <div className="activity-list">
-
-              <div className="activity-item">
-
-                <div className="activity-icon">
-                  ☀️
-                </div>
-
-                <div>
-
-                  <strong>
-                    Solar analysis completed
-                  </strong>
-
-                  <span>
-                    Visakhapatnam • Score 77.6%
-                  </span>
-
-                </div>
-
-                <small>
-                  Today
-                </small>
-
-              </div>
-
-
-              <div className="activity-item">
-
-                <div className="activity-icon">
-                  🌬️
-                </div>
-
-                <div>
-
-                  <strong>
-                    Wind assessment completed
-                  </strong>
-
-                  <span>
-                    Vizag • Score 82.2%
-                  </span>
-
-                </div>
-
-                <small>
-                  Yesterday
-                </small>
-
-              </div>
-
-
-              <div className="activity-item">
-
-                <div className="activity-icon">
-                  🗺️
-                </div>
-
-                <div>
-
-                  <strong>
-                    Site selection completed
-                  </strong>
-
-                  <span>
-                    3 recommended locations
-                  </span>
-
-                </div>
-
-                <small>
-                  2 days ago
-                </small>
-
-              </div>
-
-            </div>
-
-          </div>
-
-
-          {/* RECOMMENDED SITE */}
-
-          <div className="dashboard-card recommendation-card">
-
-            <div className="card-header">
-
-              <div>
-
-                <h2>
-                  Top Recommended Site
-                </h2>
-
-                <p>
-                  AI-based recommendation
-                </p>
-
-              </div>
-
-            </div>
-
-
-            <div className="top-site">
-
-              <div className="site-rank">
-                #1
-              </div>
-
-              <div className="site-info">
-
-                <h3>
-                  Vizag North
-                </h3>
-
-                <p>
-                  Solar + Wind
-                </p>
+              <div className="bar">
 
                 <span>
-                  Estimated Capacity: 12.4 MW
+                  74%
                 </span>
+
+                <div
+                  style={{
+                    height: "74%",
+                  }}
+                />
+
+                <label>
+                  Jan
+                </label>
 
               </div>
 
-              <div className="match-score">
 
-                <strong>
+              <div className="bar">
+
+                <span>
+                  82%
+                </span>
+
+                <div
+                  style={{
+                    height: "82%",
+                  }}
+                />
+
+                <label>
+                  Feb
+                </label>
+
+              </div>
+
+
+              <div className="bar">
+
+                <span>
+                  92%
+                </span>
+
+                <div
+                  style={{
+                    height: "92%",
+                  }}
+                />
+
+                <label>
+                  Mar
+                </label>
+
+              </div>
+
+
+              <div className="bar">
+
+                <span>
                   98%
-                </strong>
-
-                <span>
-                  Match
                 </span>
+
+                <div
+                  style={{
+                    height: "98%",
+                  }}
+                />
+
+                <label>
+                  Apr
+                </label>
 
               </div>
 
             </div>
 
+          </div>
+
+
+          {/* QUICK ACTIONS */}
+
+          <div className="quick-actions">
+
+            <h2>
+              Quick Actions
+            </h2>
+
+            <p>
+              Start a new analysis
+            </p>
+
+
+            {/* SOLAR */}
 
             <button
-              className="site-btn"
-              onClick={() => onNavigate("sites")}
+              type="button"
+              onClick={() =>
+                goTo("/solar-analysis")
+              }
             >
-              View All Recommended Sites →
+
+              <span className="quick-icon">
+                ☀️
+              </span>
+
+              <span className="quick-text">
+
+                <strong>
+                  Solar Analysis
+                </strong>
+
+                <small>
+                  Analyze solar potential
+                </small>
+
+              </span>
+
+              <span className="arrow">
+                →
+              </span>
+
+            </button>
+
+
+            {/* WIND */}
+
+            <button
+              type="button"
+              onClick={() =>
+                goTo("/wind-analysis")
+              }
+            >
+
+              <span className="quick-icon">
+                💨
+              </span>
+
+              <span className="quick-text">
+
+                <strong>
+                  Wind Analysis
+                </strong>
+
+                <small>
+                  Analyze wind potential
+                </small>
+
+              </span>
+
+              <span className="arrow">
+                →
+              </span>
+
             </button>
 
           </div>

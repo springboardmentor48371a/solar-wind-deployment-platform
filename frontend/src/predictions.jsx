@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import "./predictions.css";
 
 function Predictions({ user, onBack }) {
+
   const [type, setType] = useState("Solar");
 
   const solarData = [
@@ -10,7 +11,7 @@ function Predictions({ user, onBack }) {
     { month: "Mar", value: 74 },
     { month: "Apr", value: 81 },
     { month: "May", value: 88 },
-    { month: "Jun", value: 94 },
+    { month: "Jun", value: 94 }
   ];
 
   const windData = [
@@ -19,33 +20,63 @@ function Predictions({ user, onBack }) {
     { month: "Mar", value: 67 },
     { month: "Apr", value: 73 },
     { month: "May", value: 80 },
-    { month: "Jun", value: 87 },
+    { month: "Jun", value: 87 }
   ];
 
-  const data = type === "Solar" ? solarData : windData;
+  const data =
+    type === "Solar"
+      ? solarData
+      : windData;
+
+  const userName =
+    user?.name ||
+    user?.full_name ||
+    "User";
+
+  const userEmail =
+    user?.email ||
+    "";
 
   return (
+
     <div className="prediction-page">
 
-      {/* HEADER */}
       <header className="module-header">
 
         <button
           className="module-back-btn"
-          onClick={onBack}
+          onClick={
+            onBack ||
+            (() => {
+              window.location.href =
+                "/dashboard";
+            })
+          }
         >
           ← Dashboard
         </button>
 
+
         <div className="module-user">
 
           <div className="module-avatar">
-            {user?.name?.charAt(0)?.toUpperCase() || "U"}
+
+            {userName
+              .charAt(0)
+              .toUpperCase()}
+
           </div>
 
           <div className="module-user-info">
-            <strong>{user?.name || "User"}</strong>
-            <span>{user?.email || ""}</span>
+
+            <strong>
+              {userName}
+            </strong>
+
+            <span>
+              {userEmail}
+            </span>
+
           </div>
 
         </div>
@@ -53,7 +84,6 @@ function Predictions({ user, onBack }) {
       </header>
 
 
-      {/* TITLE */}
       <section className="prediction-title">
 
         <div className="prediction-icon">
@@ -61,17 +91,20 @@ function Predictions({ user, onBack }) {
         </div>
 
         <div>
-          <h1>Energy Predictions</h1>
+
+          <h1>
+            Energy Predictions
+          </h1>
 
           <p>
             Forecast renewable energy deployment potential
           </p>
+
         </div>
 
       </section>
 
 
-      {/* FORECAST */}
       <main className="prediction-container">
 
         <section className="prediction-card">
@@ -79,25 +112,37 @@ function Predictions({ user, onBack }) {
           <div className="prediction-header">
 
             <div>
-              <h2>6 Month Forecast</h2>
+
+              <h2>
+                6 Month Forecast
+              </h2>
 
               <p>
                 Predicted energy potential
               </p>
+
             </div>
+
 
             <select
               value={type}
-              onChange={(e) => setType(e.target.value)}
+              onChange={(e) =>
+                setType(e.target.value)
+              }
             >
-              <option>Solar</option>
-              <option>Wind</option>
+
+              <option value="Solar">
+                Solar
+              </option>
+
+              <option value="Wind">
+                Wind
+              </option>
+
             </select>
 
           </div>
 
-
-          {/* CHART */}
 
           <div className="prediction-chart">
 
@@ -117,9 +162,10 @@ function Predictions({ user, onBack }) {
                   <div
                     className="prediction-bar"
                     style={{
-                      height: `${item.value}%`,
+                      height:
+                        `${item.value}%`
                     }}
-                  ></div>
+                  />
 
                 </div>
 
@@ -134,25 +180,44 @@ function Predictions({ user, onBack }) {
           </div>
 
 
-          {/* SUMMARY */}
-
           <div className="prediction-summary">
 
             <div>
-              <span>Current Potential</span>
-              <strong>{data[0].value}%</strong>
+
+              <span>
+                Current Potential
+              </span>
+
+              <strong>
+                {data[0].value}%
+              </strong>
+
             </div>
 
-            <div>
-              <span>6 Month Potential</span>
-              <strong>{data[5].value}%</strong>
-            </div>
 
             <div>
-              <span>Growth</span>
+
+              <span>
+                6 Month Potential
+              </span>
+
+              <strong>
+                {data[5].value}%
+              </strong>
+
+            </div>
+
+
+            <div>
+
+              <span>
+                Growth
+              </span>
+
               <strong>
                 +{data[5].value - data[0].value}%
               </strong>
+
             </div>
 
           </div>

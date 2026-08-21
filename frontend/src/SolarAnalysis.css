@@ -1,399 +1,657 @@
-.solar-page {
+/* =========================================================
+   SOLAR ANALYSIS PAGE
+========================================================= */
+
+.solar-analysis-page {
   min-height: 100vh;
-  background: #f4f7fa;
-  color: #17324d;
-}
-
-
-/* =========================
-   HEADER
-========================= */
-
-.solar-header {
-  height: 75px;
-  background: white;
-  border-bottom: 1px solid #e2e9ee;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 40px;
+  width: 100%;
+  padding: 30px 40px 60px;
   box-sizing: border-box;
+
+  background: linear-gradient(
+    135deg,
+    #064e73 0%,
+    #087d8c 55%,
+    #0b8f86 100%
+  );
+
+  color: #16324f;
 }
 
-.back-btn {
+
+/* =========================================================
+   BACK BUTTON
+========================================================= */
+
+.back-navigation {
+  width: min(1100px, 100%);
+  margin: 0 auto 18px;
+}
+
+.back-button {
   border: none;
   background: transparent;
-  color: #078b98;
+  color: #ffffff;
   font-size: 15px;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
+  padding: 8px 4px;
 }
 
-.back-btn:hover {
-  color: #056d77;
-}
-
-.solar-user {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.solar-user-icon {
-  width: 42px;
-  height: 42px;
-  background: #0b98a3;
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-}
-
-.solar-user strong,
-.solar-user span {
-  display: block;
-}
-
-.solar-user strong {
-  font-size: 14px;
-}
-
-.solar-user span {
-  margin-top: 3px;
-  color: #7c8995;
-  font-size: 11px;
+.back-button:hover {
+  text-decoration: underline;
 }
 
 
-/* =========================
-   TITLE
-========================= */
+/* =========================================================
+   HEADER
+========================================================= */
 
-.solar-title {
-  max-width: 1200px;
-  margin: 35px auto 25px;
-  padding: 0 25px;
+.solar-header {
+  width: min(1100px, 100%);
+  margin: 0 auto 24px;
+
+  background: #ffffff;
+  border-radius: 16px;
+
+  padding: 24px 30px;
+
   display: flex;
   align-items: center;
   gap: 18px;
+
+  box-sizing: border-box;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 
-.solar-title-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 15px;
-  background: #fff3cd;
+.solar-icon {
+  width: 58px;
+  height: 58px;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
+  background: #fff4cc;
+  border-radius: 16px;
+
   font-size: 30px;
 }
 
-.solar-title h1 {
-  margin: 0 0 5px;
-  font-size: 30px;
-  color: #103b5a;
-}
-
-.solar-title p {
+.solar-header h1 {
   margin: 0;
-  color: #718096;
+
+  font-size: 30px;
+  font-weight: 750;
+
+  color: #173957;
+}
+
+.solar-header p {
+  margin: 5px 0 0;
+
+  font-size: 15px;
+  color: #66809b;
 }
 
 
-/* =========================
-   CONTENT
-========================= */
+/* =========================================================
+   MAIN CONTENT
+========================================================= */
 
 .solar-content {
-  max-width: 1200px;
-  margin: auto;
-  padding: 0 25px 50px;
+  width: min(1100px, 100%);
+  margin: 0 auto;
+
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 25px;
+  grid-template-columns: 0.95fr 1.05fr;
+
+  gap: 24px;
+
+  align-items: stretch;
 }
 
-.solar-card {
-  background: white;
+
+/* =========================================================
+   INPUT CARD
+========================================================= */
+
+.solar-input-card {
+  background: #ffffff;
+
   border-radius: 16px;
+
   padding: 28px;
-  box-shadow: 0 4px 18px rgba(20, 50, 70, 0.07);
+
+  box-sizing: border-box;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 
-.solar-card-header {
-  margin-bottom: 25px;
-}
-
-.solar-card-header h2 {
+.solar-input-card h2 {
   margin: 0 0 6px;
-  font-size: 20px;
+
+  font-size: 22px;
+  color: #173957;
 }
 
-.solar-card-header p {
-  margin: 0;
-  color: #7b8996;
+.solar-description {
+  margin: 0 0 24px;
+
+  color: #71859a;
+
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   LABELS
+========================================================= */
+
+.solar-input-card label {
+  display: block;
+
+  margin: 18px 0 7px;
+
+  font-size: 14px;
+  font-weight: 650;
+
+  color: #284761;
+}
+
+
+/* =========================================================
+   INPUTS
+========================================================= */
+
+.solar-input-card input {
+  width: 100%;
+
+  height: 48px;
+
+  padding: 0 14px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #d5e1eb;
+
+  border-radius: 9px;
+
+  background: #ffffff;
+
+  color: #173957;
+
+  font-size: 15px;
+
+  outline: none;
+
+  transition: 0.2s ease;
+}
+
+.solar-input-card input:focus {
+  border-color: #0ca4b4;
+
+  box-shadow:
+    0 0 0 3px rgba(12, 164, 180, 0.12);
+}
+
+.solar-input-card input:disabled {
+  background: #eef4f8;
+}
+
+
+/* =========================================================
+   INFORMATION BOX
+========================================================= */
+
+.solar-info-box {
+  margin-top: 22px;
+
+  padding: 16px;
+
+  border-radius: 11px;
+
+  background: #fff7df;
+
+  border: 1px solid #f7df9d;
+}
+
+.solar-info-box strong {
+  display: block;
+
+  color: #6c4d00;
+
+  font-size: 14px;
+}
+
+.solar-info-box p {
+  margin: 7px 0 0;
+
+  color: #725d2b;
+
+  font-size: 13px;
+
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   ERROR
+========================================================= */
+
+.solar-error {
+  margin-top: 15px;
+
+  padding: 12px 14px;
+
+  border-radius: 9px;
+
+  background: #fff0f0;
+
+  border: 1px solid #ffcccc;
+
+  color: #c62828;
+
   font-size: 13px;
 }
 
 
-/* =========================
-   FORM
-========================= */
+/* =========================================================
+   ANALYZE BUTTON
+========================================================= */
 
-.input-group {
+.solar-input-card > button {
+  width: 100%;
+
+  height: 50px;
+
+  margin-top: 20px;
+
+  border: none;
+
+  border-radius: 9px;
+
+  background: #0da1ad;
+
+  color: white;
+
+  font-size: 15px;
+
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.solar-input-card > button:hover {
+  background: #078c98;
+
+  transform: translateY(-1px);
+}
+
+.solar-input-card > button:disabled {
+  opacity: 0.65;
+
+  cursor: not-allowed;
+
+  transform: none;
+}
+
+
+/* =========================================================
+   RESULT CARD
+========================================================= */
+
+.solar-result-card {
+  min-height: 500px;
+
+  background: #ffffff;
+
+  border-radius: 16px;
+
+  padding: 28px;
+
+  box-sizing: border-box;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
+
+.solar-empty {
+  height: 100%;
+
+  min-height: 440px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: center;
+
+  align-items: center;
+
+  text-align: center;
+
+  padding: 30px;
+
+  box-sizing: border-box;
+}
+
+.solar-empty-icon,
+.solar-loading {
+  width: 75px;
+  height: 75px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #fff4cc;
+
+  font-size: 38px;
+
   margin-bottom: 20px;
 }
 
-.input-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 13px;
-  font-weight: bold;
-  color: #304b61;
-}
-
-.input-group input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 13px 14px;
-  border: 1px solid #d4e0e7;
-  border-radius: 9px;
-  background: #fbfdff;
-  color: #17324d;
-  font-size: 14px;
-  outline: none;
-}
-
-.input-group input:focus {
-  border-color: #0b9ba5;
-  box-shadow: 0 0 0 3px rgba(11, 155, 165, 0.1);
-}
-
-.input-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-}
-
-.analyze-btn {
-  width: 100%;
-  padding: 14px;
-  border: none;
-  border-radius: 9px;
-  background: #0b96a2;
-  color: white;
-  font-size: 14px;
-  font-weight: bold;
-  cursor: pointer;
-  margin-top: 5px;
-}
-
-.analyze-btn:hover {
-  background: #087f89;
-}
-
-
-/* =========================
-   EMPTY RESULT
-========================= */
-
-.empty-result {
-  height: 100%;
-  min-height: 380px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-}
-
-.empty-icon {
-  width: 80px;
-  height: 80px;
-  background: #fff4d2;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  margin-bottom: 18px;
-}
-
-.empty-result h2 {
+.solar-empty h2 {
   margin: 0 0 8px;
+
+  font-size: 24px;
+
+  color: #173957;
 }
 
-.empty-result p {
-  max-width: 350px;
-  line-height: 1.6;
-  color: #7b8996;
-  font-size: 13px;
-}
+.solar-empty p {
+  max-width: 430px;
 
-
-/* =========================
-   RESULT
-========================= */
-
-.result-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 30px;
-}
-
-.result-header h2 {
-  margin: 0 0 5px;
-}
-
-.result-header p {
   margin: 0;
-  color: #7b8996;
-  font-size: 13px;
-}
 
-.rating {
-  background: #e3f7ea;
-  color: #16824b;
-  padding: 7px 13px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: bold;
-}
+  color: #71859a;
 
-
-/* =========================
-   SCORE
-========================= */
-
-.potential-score {
-  margin-bottom: 25px;
-}
-
-.potential-score span {
-  display: block;
-  color: #718096;
-  font-size: 13px;
-  margin-bottom: 7px;
-}
-
-.potential-score strong {
-  display: block;
-  font-size: 38px;
-  color: #0b929d;
-  margin-bottom: 12px;
-}
-
-.score-bar {
-  width: 100%;
-  height: 9px;
-  background: #e8eef2;
-  border-radius: 20px;
-  overflow: hidden;
-}
-
-.score-bar div {
-  height: 100%;
-  background: #0b9ba5;
-  border-radius: 20px;
-}
-
-
-/* =========================
-   RESULT GRID
-========================= */
-
-.result-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 25px;
-}
-
-.result-box {
-  background: #f7fafc;
-  border: 1px solid #e8eef2;
-  padding: 17px;
-  border-radius: 10px;
-}
-
-.result-box span {
-  display: block;
-  color: #7b8996;
-  font-size: 11px;
-  margin-bottom: 7px;
-}
-
-.result-box strong {
-  font-size: 18px;
-  color: #17324d;
-}
-
-
-/* =========================
-   RECOMMENDATION
-========================= */
-
-.recommendation {
-  background: #edf9fa;
-  border-left: 4px solid #0b9ba5;
-  padding: 16px;
-  border-radius: 8px;
-}
-
-.recommendation h3 {
-  margin: 0 0 7px;
   font-size: 14px;
-}
 
-.recommendation p {
-  margin: 0;
-  color: #536b7d;
-  font-size: 12px;
   line-height: 1.6;
 }
 
 
-/* =========================
-   RESPONSIVE
-========================= */
+/* =========================================================
+   RESULT HEADER
+========================================================= */
 
-@media (max-width: 850px) {
+.solar-result-header {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: flex-start;
+
+  gap: 15px;
+
+  padding-bottom: 20px;
+
+  border-bottom: 1px solid #e4ebf1;
+}
+
+.solar-result-header h2 {
+  margin: 0;
+
+  font-size: 22px;
+
+  color: #173957;
+}
+
+.solar-result-header p {
+  margin: 6px 0 0;
+
+  color: #71859a;
+
+  font-size: 13px;
+
+  line-height: 1.4;
+}
+
+
+/* =========================================================
+   RATING
+========================================================= */
+
+.solar-rating {
+  padding: 7px 13px;
+
+  border-radius: 20px;
+
+  font-size: 12px;
+
+  font-weight: 700;
+
+  white-space: nowrap;
+}
+
+.solar-rating.excellent {
+  background: #dff6e8;
+  color: #16834a;
+}
+
+.solar-rating.good {
+  background: #e1f3f8;
+  color: #087f94;
+}
+
+.solar-rating.moderate {
+  background: #fff3d7;
+  color: #9a6800;
+}
+
+.solar-rating.low {
+  background: #ffe5e5;
+  color: #c43d3d;
+}
+
+
+/* =========================================================
+   SCORE
+========================================================= */
+
+.solar-score-section {
+  padding: 22px 0;
+}
+
+.solar-score-section > span {
+  display: block;
+
+  color: #71859a;
+
+  font-size: 13px;
+
+  margin-bottom: 4px;
+}
+
+.solar-score-section > strong {
+  display: block;
+
+  color: #0a9dab;
+
+  font-size: 38px;
+
+  line-height: 1.1;
+}
+
+.solar-score-bar {
+  width: 100%;
+
+  height: 8px;
+
+  margin-top: 12px;
+
+  overflow: hidden;
+
+  background: #e4edf1;
+
+  border-radius: 20px;
+}
+
+.solar-score-bar > div {
+  height: 100%;
+
+  background: #0da1ad;
+
+  border-radius: 20px;
+
+  transition: width 0.5s ease;
+}
+
+
+/* =========================================================
+   DATA GRID
+========================================================= */
+
+.solar-data-grid {
+  display: grid;
+
+  grid-template-columns: repeat(2, 1fr);
+
+  gap: 14px;
+}
+
+.solar-data-box {
+  min-height: 82px;
+
+  padding: 15px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #e1e9ef;
+
+  border-radius: 11px;
+
+  background: #f8fafc;
+}
+
+.solar-data-box span {
+  display: block;
+
+  margin-bottom: 8px;
+
+  color: #71859a;
+
+  font-size: 12px;
+}
+
+.solar-data-box strong {
+  display: block;
+
+  color: #173957;
+
+  font-size: 16px;
+
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   DATA SOURCE
+========================================================= */
+
+.solar-source {
+  margin-top: 18px;
+
+  padding: 16px;
+
+  border-radius: 11px;
+
+  background: #f4f8fa;
+
+  border: 1px solid #e0e9ed;
+}
+
+.solar-source strong {
+  display: block;
+
+  color: #173957;
+
+  font-size: 14px;
+
+  margin-bottom: 7px;
+}
+
+.solar-source p {
+  margin: 0 0 5px;
+
+  color: #087f94;
+
+  font-size: 14px;
+
+  font-weight: 650;
+}
+
+.solar-source small {
+  color: #71859a;
+
+  font-size: 12px;
+
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 900px) {
+
+  .solar-analysis-page {
+    padding: 20px;
+  }
 
   .solar-content {
     grid-template-columns: 1fr;
   }
 
   .solar-header {
-    padding: 0 20px;
+    padding: 20px;
+  }
+
+  .solar-header h1 {
+    font-size: 26px;
   }
 
 }
 
-@media (max-width: 550px) {
 
-  .input-row {
-    grid-template-columns: 1fr;
-    gap: 0;
+@media (max-width: 600px) {
+
+  .solar-analysis-page {
+    padding: 15px;
   }
 
-  .solar-title {
-    margin-top: 25px;
+  .solar-header {
+    flex-direction: column;
+
+    align-items: flex-start;
   }
 
-  .solar-title h1 {
-    font-size: 24px;
-  }
-
-  .solar-content {
-    padding: 0 15px 30px;
-  }
-
-  .solar-card {
+  .solar-input-card,
+  .solar-result-card {
     padding: 20px;
+  }
+
+  .solar-data-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .solar-result-header {
+    flex-direction: column;
   }
 
 }

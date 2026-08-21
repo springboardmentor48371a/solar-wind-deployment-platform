@@ -1,289 +1,587 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import "./windanalysis.css";
 
-function WindAnalysis({ user, onBack }) {
-  const [form, setForm] = useState({
-    location: "",
-    landArea: "",
-    windSpeed: "",
-    temperature: "",
-    airDensity: "1.225",
-  });
+const API_URL = "http://127.0.0.1:8000";
 
+function WindAnalysis() {
+  const [location, setLocation] = useState("");
+  const [landArea, setLandArea] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
-  };
+  // ============================================================
+  // ANALYZE WIND
+  // ============================================================
 
-  const analyzeWind = async (e) => {
-    e.preventDefault();
+  const analyzeWind = async () => {
+    // Clear old data
+    setError("");
+    setResult(null);
 
-    if (
-      !form.location ||
-      !form.landArea ||
-      !form.windSpeed ||
-      !form.temperature ||
-      !form.airDensity
-    ) {
-      alert("Please fill all fields.");
+    // Validate location
+    if (!location.trim()) {
+      setError("Please enter a location.");
+      return;
+    }
+
+    // Validate land area
+    if (!landArea || Number(landArea) <= 0) {
+      setError("Please enter a valid land area.");
       return;
     }
 
     setLoading(true);
 
     try {
+      // --------------------------------------------------------
+      // GET USER ID
+      // --------------------------------------------------------
+      // If your login stores user_id, it will use that.
+      // Otherwise, user ID 1 is used for testing.
+      // --------------------------------------------------------
+
+      const storedUserId =
+        localStorage.getItem("user_id") ||
+        localStorage.getItem("userId");
+
+      const userId = Number(storedUserId || 1);
+
+      if (!userId || userId <= 0) {
+        throw new Error("Invalid user ID. Please login again.");
+      }
+
+      // --------------------------------------------------------
+      // REQUEST BODY
+      // --------------------------------------------------------
+
+      const requestBody = {
+        user_id: userId,
+        location: location.trim(),
+        land_area: Number(landArea)
+      };
+
+      console.log("WIND REQUEST:", requestBody);
+
+      // --------------------------------------------------------
+      // CALL FASTAPI
+      // --------------------------------------------------------
+
       const response = await fetch(
-        "http://127.0.0.1:8000/wind-analysis",
+        `${API_URL}/wind-analysis`,
         {
           method: "POST",
+
           headers: {
             "Content-Type": "application/json",
+            Accept: "application/json"
           },
-          body: JSON.stringify({
-            location: form.location,
-            land_area: Number(form.landArea),
-            wind_speed: Number(form.windSpeed),
-            temperature: Number(form.temperature),
-            air_density: Number(form.airDensity),
-          }),
+
+          body: JSON.stringify(requestBody)
         }
       );
 
+      // --------------------------------------------------------
+      // READ RESPONSE
+      // --------------------------------------------------------
+
       const data = await response.json();
 
+      console.log("WIND RESPONSE:", data);
+
+      // --------------------------------------------------------
+      // HANDLE ERROR
+      // --------------------------------------------------------
+
       if (!response.ok) {
-        throw new Error(data.detail || "Wind analysis failed");
+        let message = "Wind analysis failed.";
+
+        if (typeof data.detail === "string") {
+          message = data.detail;
+        } else if (Array.isArray(data.detail)) {
+          message = data.detail
+            .map((item) => item.msg || JSON.stringify(item))
+            .join(", ");
+        } else if (data.detail) {
+          message = JSON.stringify(data.detail);
+        }
+
+        throw new Error(message);
       }
 
+      // --------------------------------------------------------
+      // SUCCESS
+      // --------------------------------------------------------
+
       setResult(data);
-    } catch (error) {
-      console.error(error);
-      alert(
-        "Wind endpoint is not available yet. Add the backend code below."
+
+    } catch (err) {
+      console.error("WIND ANALYSIS ERROR:", err);
+
+      setError(
+        err.message ||
+        "Unable to connect to the backend."
       );
     } finally {
       setLoading(false);
     }
   };
 
+  // ============================================================
+  // BACK TO DASHBOARD
+  // ============================================================
+
+  const goBack = () => {
+    window.history.back();
+  };
+
+  // ============================================================
+  // SAFELY READ RESULT
+  // ============================================================
+
+  const wind = result?.wind || {};
+
+  const score = Number(
+    result?.score ??
+    wind?.score ??
+    0
+  );
+
+  const rating =
+    result?.rating ||
+    wind?.rating ||
+    (
+      score >= 80
+        ? "Excellent"
+        : score >= 60
+        ? "Good"
+        : score >= 40
+        ? "Moderate"
+        : "Low"
+    );
+
+  const capacity =
+    result?.capacity ??
+    result?.capacity_mw ??
+    wind?.capacity ??
+    wind?.capacity_mw ??
+    "N/A";
+
+  const dailyEnergy =
+    result?.energy ??
+    result?.daily_energy_mwh ??
+    wind?.daily_energy ??
+    wind?.daily_energy_mwh ??
+    "N/A";
+
+  const annualEnergy =
+    result?.annual_energy ??
+    result?.annual_energy_mwh ??
+    wind?.annual_energy ??
+    wind?.annual_energy_mwh ??
+    "N/A";
+
+  const capacityFactor =
+    result?.capacity_factor ??
+    wind?.capacity_factor ??
+    "N/A";
+
+  const windSpeed =
+    result?.wind_speed ??
+    result?.environment?.wind_speed ??
+    wind?.wind_speed ??
+    "N/A";
+
+  const powerDensity =
+    result?.wind_power_density_w_m2 ??
+    result?.environment?.wind_power_density_w_m2 ??
+    wind?.wind_power_density_w_m2 ??
+    "N/A";
+
+  const dataSource =
+    result?.data_source ||
+    result?.environment?.wind_data_source ||
+    "Global Wind Atlas / NASA POWER";
+
+  const resolvedLocation =
+    result?.location ||
+    result?.site?.resolved_location ||
+    location;
+
+  // ============================================================
+  // UI
+  // ============================================================
+
   return (
-    <div className="wind-page">
+    <div className="wind-analysis-page">
 
-      <header className="wind-header">
-        <button className="back-btn" onClick={onBack}>
-          ← Dashboard
-        </button>
+      {/* BACK BUTTON */}
 
-        <div className="wind-user">
-          <div className="wind-user-icon">
-            {user?.name?.charAt(0)?.toUpperCase() || "U"}
-          </div>
+      <button
+        className="back-button"
+        onClick={goBack}
+      >
+        ← Dashboard
+      </button>
 
-          <div>
-            <strong>{user?.name || "User"}</strong>
-            <span>{user?.email || ""}</span>
-          </div>
+      {/* HEADER */}
+
+      <div className="wind-header">
+
+        <div className="wind-icon">
+          💨
         </div>
-      </header>
-
-      <section className="wind-title">
-        <div className="wind-title-icon">🌬️</div>
 
         <div>
           <h1>Wind Analysis</h1>
-          <p>Analyze the wind energy potential of a location</p>
+
+          <p>
+            Analyze wind potential using real environmental data
+          </p>
         </div>
-      </section>
+
+      </div>
+
+      {/* MAIN CONTENT */}
 
       <div className="wind-content">
 
-        <div className="wind-card">
+        {/* ======================================================
+            LEFT CARD
+        ====================================================== */}
 
-          <div className="wind-card-header">
-            <h2>Site Information</h2>
-            <p>Enter the environmental and site parameters</p>
+        <div className="wind-input-card">
+
+          <h2>Site Information</h2>
+
+          <p className="wind-description">
+            Enter only the location and available land.
+            Wind data will be fetched automatically.
+          </p>
+
+          {/* LOCATION */}
+
+          <label>
+            Location
+          </label>
+
+          <input
+            type="text"
+            value={location}
+            onChange={(e) =>
+              setLocation(e.target.value)
+            }
+            placeholder="e.g. Agra, Uttar Pradesh"
+            disabled={loading}
+          />
+
+          {/* LAND AREA */}
+
+          <label>
+            Land Area (acres)
+          </label>
+
+          <input
+            type="number"
+            value={landArea}
+            onChange={(e) =>
+              setLandArea(e.target.value)
+            }
+            placeholder="e.g. 100"
+            min="0"
+            disabled={loading}
+          />
+
+          {/* INFORMATION BOX */}
+
+          <div className="wind-info-box">
+
+            <strong>
+              💨 Automatic Wind Data
+            </strong>
+
+            <p>
+              Wind information is retrieved automatically
+              by the backend for the selected location.
+            </p>
+
           </div>
 
-          <form onSubmit={analyzeWind}>
+          {/* ERROR */}
 
-            <div className="input-group">
-              <label>Location</label>
-
-              <input
-                type="text"
-                name="location"
-                placeholder="e.g. Visakhapatnam"
-                value={form.location}
-                onChange={handleChange}
-              />
+          {error && (
+            <div className="wind-error">
+              {error}
             </div>
+          )}
 
-            <div className="input-row">
+          {/* ====================================================
+              ANALYZE WIND BUTTON
+          ==================================================== */}
 
-              <div className="input-group">
-                <label>Land Area (acres)</label>
+          <button
+            className="wind-analyze-button"
+            onClick={analyzeWind}
+            disabled={loading}
+          >
+            {loading
+              ? "⏳ Analyzing..."
+              : "💨 Analyze Wind Potential"}
+          </button>
 
-                <input
-                  type="number"
-                  name="landArea"
-                  placeholder="e.g. 100"
-                  min="1"
-                  value={form.landArea}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="input-group">
-                <label>Average Wind Speed (m/s)</label>
-
-                <input
-                  type="number"
-                  name="windSpeed"
-                  placeholder="e.g. 7.5"
-                  step="0.1"
-                  min="0"
-                  value={form.windSpeed}
-                  onChange={handleChange}
-                />
-              </div>
-
-            </div>
-
-            <div className="input-row">
-
-              <div className="input-group">
-                <label>Average Temperature (°C)</label>
-
-                <input
-                  type="number"
-                  name="temperature"
-                  placeholder="e.g. 30"
-                  value={form.temperature}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div className="input-group">
-                <label>Air Density (kg/m³)</label>
-
-                <input
-                  type="number"
-                  name="airDensity"
-                  placeholder="e.g. 1.225"
-                  step="0.001"
-                  value={form.airDensity}
-                  onChange={handleChange}
-                />
-              </div>
-
-            </div>
-
-            <button
-              type="submit"
-              className="analyze-btn"
-              disabled={loading}
-            >
-              {loading
-                ? "⏳ Analyzing..."
-                : "🌬️ Analyze Wind Potential"}
-            </button>
-
-          </form>
         </div>
 
-        <div className="wind-card result-card">
+        {/* ======================================================
+            RIGHT RESULT CARD
+        ====================================================== */}
 
-          {!result ? (
-            <div className="empty-result">
-              <div className="empty-icon">🌬️</div>
+        <div className="wind-result-card">
 
-              <h2>Wind Potential</h2>
+          {/* EMPTY */}
+
+          {!result && !loading && (
+
+            <div className="wind-empty">
+
+              <div className="wind-empty-icon">
+                💨
+              </div>
+
+              <h2>
+                Wind Potential
+              </h2>
 
               <p>
-                Enter site information and click
-                <strong> Analyze Wind Potential </strong>
-                to see the results.
+                Enter the location and land area
+                to calculate wind potential.
               </p>
+
             </div>
-          ) : (
 
-            <>
-              <div className="result-header">
+          )}
 
-                <div>
-                  <h2>Analysis Result</h2>
-                  <p>{result.location}</p>
-                </div>
+          {/* LOADING */}
 
-                <div className="rating">
-                  {result.rating}
-                </div>
+          {loading && (
 
+            <div className="wind-empty">
+
+              <div className="wind-empty-icon">
+                💨
               </div>
 
-              <div className="potential-score">
+              <h2>
+                Analyzing Site...
+              </h2>
 
-                <span>Wind Potential Score</span>
+              <p>
+                Fetching location and wind data
+                from the backend.
+              </p>
 
-                <strong>{result.score}%</strong>
+            </div>
 
-                <div className="score-bar">
-                  <div
-                    style={{
-                      width: `${result.score}%`,
-                    }}
-                  />
+          )}
+
+          {/* RESULT */}
+
+          {result && !loading && (
+
+            <div className="wind-result">
+
+              <div className="wind-result-header">
+
+                <div className="wind-result-icon">
+                  💨
                 </div>
 
-              </div>
-
-              <div className="result-grid">
-
-                <div className="result-box">
-                  <span>Estimated Capacity</span>
-                  <strong>{result.capacity} MW</strong>
-                </div>
-
-                <div className="result-box">
-                  <span>Daily Energy</span>
-                  <strong>{result.energy} MWh</strong>
-                </div>
-
-                <div className="result-box">
-                  <span>Capacity Factor</span>
-                  <strong>{result.capacity_factor}%</strong>
-                </div>
-
-                <div className="result-box">
-                  <span>Wind Speed</span>
-                  <strong>{result.wind_speed} m/s</strong>
-                </div>
-
-              </div>
-
-              <div className="recommendation">
-                <h3>💡 Recommendation</h3>
+                <h2>
+                  Wind Analysis Result
+                </h2>
 
                 <p>
-                  This location has a{" "}
-                  <strong>
-                    {result.rating.toLowerCase()}
-                  </strong>{" "}
-                  wind energy potential. Further wind-resource
-                  and geographical analysis should be performed
-                  before final deployment.
+                  {resolvedLocation}
                 </p>
+
               </div>
-            </>
+
+              {/* SCORE */}
+
+              <div className="wind-score-section">
+
+                <span>
+                  Wind Potential Score
+                </span>
+
+                <strong>
+                  {score}%
+                </strong>
+
+                <div className="wind-rating">
+                  {rating}
+                </div>
+
+              </div>
+
+              {/* DATA GRID */}
+
+              <div className="wind-data-grid">
+
+                {/* LOCATION */}
+
+                <div className="wind-data-box">
+
+                  <span>
+                    Location
+                  </span>
+
+                  <strong>
+                    {resolvedLocation}
+                  </strong>
+
+                </div>
+
+                {/* LAND */}
+
+                <div className="wind-data-box">
+
+                  <span>
+                    Land Area
+                  </span>
+
+                  <strong>
+                    {landArea} acres
+                  </strong>
+
+                </div>
+
+                {/* WIND SPEED */}
+
+                <div className="wind-data-box">
+
+                  <span>
+                    Average Wind Speed
+                  </span>
+
+                  <strong>
+                    {typeof windSpeed === "number"
+                      ? `${windSpeed.toFixed(2)} m/s`
+                      : windSpeed}
+                  </strong>
+
+                </div>
+
+                {/* POWER DENSITY */}
+
+                <div className="wind-data-box">
+
+                  <span>
+                    Wind Power Density
+                  </span>
+
+                  <strong>
+                    {typeof powerDensity === "number"
+                      ? `${powerDensity.toFixed(2)} W/m²`
+                      : powerDensity}
+                  </strong>
+
+                </div>
+
+                {/* CAPACITY */}
+
+                <div className="wind-data-box">
+
+                  <span>
+                    Estimated Capacity
+                  </span>
+
+                  <strong>
+                    {typeof capacity === "number"
+                      ? `${capacity.toFixed(2)} MW`
+                      : capacity}
+                  </strong>
+
+                </div>
+
+                {/* CAPACITY FACTOR */}
+
+                <div className="wind-data-box">
+
+                  <span>
+                    Capacity Factor
+                  </span>
+
+                  <strong>
+                    {typeof capacityFactor === "number"
+                      ? `${capacityFactor.toFixed(1)}%`
+                      : capacityFactor}
+                  </strong>
+
+                </div>
+
+                {/* DAILY ENERGY */}
+
+                <div className="wind-data-box">
+
+                  <span>
+                    Daily Energy
+                  </span>
+
+                  <strong>
+                    {typeof dailyEnergy === "number"
+                      ? `${dailyEnergy.toFixed(2)} MWh`
+                      : dailyEnergy}
+                  </strong>
+
+                </div>
+
+                {/* ANNUAL ENERGY */}
+
+                <div className="wind-data-box">
+
+                  <span>
+                    Annual Energy
+                  </span>
+
+                  <strong>
+                    {typeof annualEnergy === "number"
+                      ? `${annualEnergy.toFixed(2)} MWh`
+                      : annualEnergy}
+                  </strong>
+
+                </div>
+
+              </div>
+
+              {/* DATA SOURCE */}
+
+              <div className="wind-source">
+
+                <strong>
+                  🔬 Data Source
+                </strong>
+
+                <p>
+                  {typeof dataSource === "string"
+                    ? dataSource
+                    : JSON.stringify(dataSource)}
+                </p>
+
+                <small>
+                  Wind data is retrieved automatically
+                  by the backend for the selected location.
+                </small>
+
+              </div>
+
+            </div>
+
           )}
 
         </div>
+
       </div>
+
     </div>
   );
 }

@@ -12,6 +12,7 @@ function Login({ onLogin }) {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     setForm({
@@ -22,6 +23,7 @@ function Login({ onLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setError("");
     setLoading(true);
 
@@ -34,12 +36,12 @@ function Login({ onLogin }) {
       const body =
         mode === "login"
           ? {
-              email: form.email,
+              email: form.email.trim(),
               password: form.password,
             }
           : {
-              name: form.name,
-              email: form.email,
+              name: form.name.trim(),
+              email: form.email.trim(),
               password: form.password,
             };
 
@@ -57,18 +59,55 @@ function Login({ onLogin }) {
         throw new Error(data.detail || "Something went wrong");
       }
 
+      // =========================
+      // LOGIN SUCCESS
+      // =========================
       if (mode === "login") {
-        onLogin(data.user);
-      } else {
+        const loggedUser = data.user;
+
+        // Save complete user information
+        localStorage.setItem(
+          "user",
+          JSON.stringify(loggedUser)
+        );
+
+        localStorage.setItem(
+          "user_id",
+          String(loggedUser.id)
+        );
+
+        localStorage.setItem(
+          "user_name",
+          loggedUser.name
+        );
+
+        localStorage.setItem(
+          "user_email",
+          loggedUser.email
+        );
+
+        // Send user to App
+        onLogin(loggedUser);
+      }
+
+      // =========================
+      // REGISTER SUCCESS
+      // =========================
+      else {
+        alert("Registration successful. Please login.");
+
         setMode("login");
+
         setForm({
           name: "",
           email: form.email,
           password: "",
         });
-        alert("Registration successful. Please login.");
+
+        setShowPassword(false);
       }
     } catch (err) {
+      console.error("LOGIN ERROR:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -80,7 +119,7 @@ function Login({ onLogin }) {
 
       <div className="login-card">
 
-        {/* Logo */}
+        {/* LOGO */}
         <div className="login-logo">
           <span>☀️</span>
           <span>🌬️</span>
@@ -92,12 +131,16 @@ function Login({ onLogin }) {
           Deployment Intelligence Platform
         </p>
 
-        {/* Tabs */}
+        {/* TABS */}
         <div className="login-tabs">
 
           <button
             type="button"
-            className={mode === "login" ? "tab active" : "tab"}
+            className={
+              mode === "login"
+                ? "tab active"
+                : "tab"
+            }
             onClick={() => {
               setMode("login");
               setError("");
@@ -108,7 +151,11 @@ function Login({ onLogin }) {
 
           <button
             type="button"
-            className={mode === "register" ? "tab active" : "tab"}
+            className={
+              mode === "register"
+                ? "tab active"
+                : "tab"
+            }
             onClick={() => {
               setMode("register");
               setError("");
@@ -119,8 +166,10 @@ function Login({ onLogin }) {
 
         </div>
 
+        {/* FORM */}
         <form onSubmit={handleSubmit}>
 
+          {/* NAME */}
           {mode === "register" && (
             <div className="form-group">
 
@@ -138,6 +187,7 @@ function Login({ onLogin }) {
             </div>
           )}
 
+          {/* EMAIL */}
           <div className="form-group">
 
             <label>Email</label>
@@ -153,27 +203,48 @@ function Login({ onLogin }) {
 
           </div>
 
+          {/* PASSWORD */}
           <div className="form-group">
 
             <label>Password</label>
 
-            <input
-              type="password"
-              name="password"
-              placeholder="Enter your password"
-              value={form.password}
-              onChange={handleChange}
-              required
-            />
+            <div className="password-container">
+
+              <input
+                type={
+                  showPassword
+                    ? "text"
+                    : "password"
+                }
+                name="password"
+                placeholder="Enter your password"
+                value={form.password}
+                onChange={handleChange}
+                required
+              />
+
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() =>
+                  setShowPassword(!showPassword)
+                }
+              >
+                {showPassword ? "🙈" : "👁️"}
+              </button>
+
+            </div>
 
           </div>
 
+          {/* ERROR */}
           {error && (
             <div className="login-error">
               {error}
             </div>
           )}
 
+          {/* SUBMIT */}
           <button
             type="submit"
             className="login-submit"
@@ -188,14 +259,19 @@ function Login({ onLogin }) {
 
         </form>
 
+        {/* FOOTER */}
         <div className="login-footer">
 
           {mode === "login" ? (
             <>
               Don't have an account?{" "}
+
               <button
                 type="button"
-                onClick={() => setMode("register")}
+                onClick={() => {
+                  setMode("register");
+                  setError("");
+                }}
               >
                 Register
               </button>
@@ -203,9 +279,13 @@ function Login({ onLogin }) {
           ) : (
             <>
               Already have an account?{" "}
+
               <button
                 type="button"
-                onClick={() => setMode("login")}
+                onClick={() => {
+                  setMode("login");
+                  setError("");
+                }}
               >
                 Login
               </button>

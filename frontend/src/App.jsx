@@ -1,154 +1,80 @@
-import { useState } from "react";
+import React, { useState } from "react";
 
 import Login from "./login";
 import Dashboard from "./Dashboard";
-
 import SolarAnalysis from "./SolarAnalysis";
 import WindAnalysis from "./windanalysis";
 import SiteSelection from "./siteselection";
 import Predictions from "./predictions";
 import Reports from "./reports";
 
-import "./App.css";
-
 function App() {
-
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem("solarWindUser");
-
-    return savedUser
-      ? JSON.parse(savedUser)
-      : null;
+    const savedUser = localStorage.getItem("user");
+    return savedUser ? JSON.parse(savedUser) : null;
   });
 
-  const [page, setPage] = useState("dashboard");
+  const [path, setPath] = useState(window.location.pathname);
 
-
-  // =========================
-  // LOGIN
-  // =========================
+  const navigate = (newPath) => {
+    window.history.pushState({}, "", newPath);
+    setPath(newPath);
+  };
 
   const handleLogin = (loggedInUser) => {
+    const currentUser = loggedInUser || {
+      name: "User",
+      email: "user@example.com",
+    };
 
-    setUser(loggedInUser);
-
-    localStorage.setItem(
-      "solarWindUser",
-      JSON.stringify(loggedInUser)
-    );
-
-    setPage("dashboard");
+    localStorage.setItem("user", JSON.stringify(currentUser));
+    setUser(currentUser);
+    navigate("/dashboard");
   };
-
-
-  // =========================
-  // LOGOUT
-  // =========================
 
   const handleLogout = () => {
-
-    localStorage.removeItem("solarWindUser");
-
+    localStorage.removeItem("user");
+    sessionStorage.clear();
     setUser(null);
-
-    setPage("dashboard");
+    navigate("/");
   };
 
-
-  // =========================
-  // NOT LOGGED IN
-  // =========================
-
+  // LOGIN
   if (!user) {
-
-    return (
-      <Login
-        onLogin={handleLogin}
-      />
-    );
+    return <Login onLogin={handleLogin} />;
   }
 
+  // DASHBOARD
+  if (path === "/" || path === "/dashboard") {
+    return <Dashboard user={user} onLogout={handleLogout} />;
+  }
 
-  // =========================
-  // PAGE NAVIGATION
-  // =========================
+  // SOLAR
+  if (path === "/solar-analysis") {
+    return <SolarAnalysis user={user} onBack={() => navigate("/dashboard")} />;
+  }
 
-  const renderPage = () => {
+  // WIND
+  if (path === "/wind-analysis") {
+    return <WindAnalysis user={user} onBack={() => navigate("/dashboard")} />;
+  }
 
-    switch (page) {
+  // SITE SELECTION
+  if (path === "/site-selection") {
+    return <SiteSelection user={user} onBack={() => navigate("/dashboard")} />;
+  }
 
-      case "solar":
+  // PREDICTIONS
+  if (path === "/predictions") {
+    return <Predictions user={user} onBack={() => navigate("/dashboard")} />;
+  }
 
-        return (
-          <SolarAnalysis
-            user={user}
-            onBack={() => setPage("dashboard")}
-          />
-        );
+  // REPORTS
+  if (path === "/reports") {
+    return <Reports user={user} onBack={() => navigate("/dashboard")} />;
+  }
 
-
-      case "wind":
-
-        return (
-          <WindAnalysis
-            user={user}
-            onBack={() => setPage("dashboard")}
-          />
-        );
-
-
-      case "sites":
-
-        return (
-          <SiteSelection
-            user={user}
-            onBack={() => setPage("dashboard")}
-          />
-        );
-
-
-      case "predictions":
-
-        return (
-          <Predictions
-            user={user}
-            onBack={() => setPage("dashboard")}
-          />
-        );
-
-
-      case "reports":
-
-        return (
-          <Reports
-            user={user}
-            onBack={() => setPage("dashboard")}
-          />
-        );
-
-
-      case "dashboard":
-
-      default:
-
-        return (
-          <Dashboard
-            user={user}
-            onLogout={handleLogout}
-            onNavigate={setPage}
-          />
-        );
-    }
-  };
-
-
-  return (
-    <div className="app">
-
-      {renderPage()}
-
-    </div>
-  );
+  return <Dashboard user={user} onLogout={handleLogout} />;
 }
 
 export default App;
