@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 import sqlite3
 import bcrypt
 import jwt
@@ -9,7 +9,8 @@ import os
 import json
 import requests
 import numpy as np
-from typing import Dict, Any, List
+import math
+from typing import Dict, Any, List, Optional
 import joblib
 
 # ============================================
@@ -182,7 +183,7 @@ async def get_token(authorization: str = Header(None)):
     return token
 
 # ============================================
-# PYDANTIC MODELS
+# PYDANTIC MODELS (Altered to prevent 422 errors)
 # ============================================
 class UserCreate(BaseModel):
     name: str
@@ -196,20 +197,47 @@ class UserLogin(BaseModel):
 
 class ProjectCreate(BaseModel):
     project_name: str
-    description: str = None
+    description: Optional[str] = None
     technology: str = "SOLAR"
-    budget: float = 0.0
+    budget: Optional[float] = 0.0
+
+    @field_validator('budget', mode='before')
+    @classmethod
+    def validate_budget(cls, v):
+        if v is None or v == "":
+            return 0.0
+        try:
+            if isinstance(v, float) and math.isnan(v):
+                return 0.0
+            return float(v)
+        except:
+            return 0.0
 
 class SiteCreate(BaseModel):
-    project_id: int
+    project_id: Optional[int] = None
     site_name: str
     latitude: float
     longitude: float
-    region: str = None
-    land_area: float = None
-    elevation: float = None
-    land_ownership: str = None
-    existing_infrastructure: str = None
+    region: Optional[str] = None
+    land_area: Optional[float] = None
+    elevation: Optional[float] = None
+    land_ownership: Optional[str] = None
+    existing_infrastructure: Optional[str] = None
+
+    # This catches 'NaN' or '' coming from your frontend and turns it into None
+    @field_validator('latitude', 'longitude', 'land_area', 'elevation', 'project_id', mode='before')
+    @classmethod
+    def validate_numeric_fields(cls, v):
+        if v is None or v == "":
+            return None
+        try:
+            if isinstance(v, float) and math.isnan(v):
+                return None
+            if isinstance(v, str) and v.lower() == 'nan':
+                return None
+            return v
+        except:
+            return None
 
 class MLPredictionRequest(BaseModel):
     solar_irradiance: float = 5.0
@@ -283,75 +311,43 @@ def get_elevation(lat: float, lon: float):
     return 150.0
 
 # ============================================
-# NASA POWER SERVICE
+# NASA POWER SERVICE (Altered to use new API format)
 # ============================================
-NASA_POWER_API = "https://power.larc.nasa.gov/api/power"
+NASA_POWER_API = "https://power.larc.nasa.gov/api/temporal/daily/point"
 
 def fetch_environmental_data(lat: float, lon: float) -> Dict[str, Any]:
+    # Using start and end instead of startDate/endDate, community instead of userCommunity
     end_date = datetime.now().strftime("%Y%m%d")
     start_date = (datetime.now() - timedelta(days=365)).strftime("%Y%m%d")
     result = {"success": False, "data": {}, "error": None}
     
     try:
         # Solar irradiance
-        resp = requests.get(f"{NASA_POWER_API}/daily", params={
-            "request": "execute", "parameters": "ALLSKY_SFC_SW_DWN",
-            "startDate": start_date, "endDate": end_date,
-            "userCommunity": "RE", "format": "JSON",
-            "latitude": lat, "longitude": lon
+        resp = requests.get(NASA_POWER_API, params={
+            "parameters": "ALLSKY_SFC_SW_DWN,T2M,PRECTOTCORR,WS10M,CLOUD_AMT",
+            "community": "RE", "format": "JSON",
+            "longitude": lon, "latitude": lat,
+            "start": start_date, "end": end_date
         }, timeout=30)
         resp.raise_for_status()
         data = resp.json()
-        vals = data.get("properties", {}).get("parameter", {}).get("ALLSKY_SFC_SW_DWN", {})
-        irradiance = sum(vals.values())/len(vals) if vals else 5.0
+        # Data is under 'properties' -> 'parameter'
+        params = data.get("properties", {}).get("parameter", {})
+        
+        solar_vals = params.get("ALLSKY_SFC_SW_DWN", {})
+        irradiance = sum(solar_vals.values())/len(solar_vals) if solar_vals else 5.0
 
-        # Temperature
-        resp = requests.get(f"{NASA_POWER_API}/daily", params={
-            "request": "execute", "parameters": "T2M",
-            "startDate": start_date, "endDate": end_date,
-            "userCommunity": "RE", "format": "JSON",
-            "latitude": lat, "longitude": lon
-        }, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        vals = data.get("properties", {}).get("parameter", {}).get("T2M", {})
-        temp = sum(vals.values())/len(vals) if vals else 25.0
+        temp_vals = params.get("T2M", {})
+        temp = sum(temp_vals.values())/len(temp_vals) if temp_vals else 25.0
 
-        # Precipitation
-        resp = requests.get(f"{NASA_POWER_API}/daily", params={
-            "request": "execute", "parameters": "PRECTOTCORR",
-            "startDate": start_date, "endDate": end_date,
-            "userCommunity": "RE", "format": "JSON",
-            "latitude": lat, "longitude": lon
-        }, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        vals = data.get("properties", {}).get("parameter", {}).get("PRECTOTCORR", {})
-        rainfall = (sum(vals.values())/len(vals) * 365) if vals else 800.0
+        rain_vals = params.get("PRECTOTCORR", {})
+        rainfall = (sum(rain_vals.values())/len(rain_vals) * 365) if rain_vals else 800.0
 
-        # Wind speed
-        resp = requests.get(f"{NASA_POWER_API}/daily", params={
-            "request": "execute", "parameters": "WS10M",
-            "startDate": start_date, "endDate": end_date,
-            "userCommunity": "RE", "format": "JSON",
-            "latitude": lat, "longitude": lon
-        }, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        vals = data.get("properties", {}).get("parameter", {}).get("WS10M", {})
-        wind = sum(vals.values())/len(vals) if vals else 5.0
+        wind_vals = params.get("WS10M", {})
+        wind = sum(wind_vals.values())/len(wind_vals) if wind_vals else 5.0
 
-        # Cloud cover
-        resp = requests.get(f"{NASA_POWER_API}/daily", params={
-            "request": "execute", "parameters": "CLOUD_AMT",
-            "startDate": start_date, "endDate": end_date,
-            "userCommunity": "RE", "format": "JSON",
-            "latitude": lat, "longitude": lon
-        }, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        vals = data.get("properties", {}).get("parameter", {}).get("CLOUD_AMT", {})
-        cloud = sum(vals.values())/len(vals) if vals else 30.0
+        cloud_vals = params.get("CLOUD_AMT", {})
+        cloud = sum(cloud_vals.values())/len(cloud_vals) if cloud_vals else 30.0
 
         result["success"] = True
         result["data"] = {

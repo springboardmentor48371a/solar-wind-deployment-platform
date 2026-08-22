@@ -1,40 +1,64 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from .core.database import engine, Base
-from .routers import auth, users, projects, sites, environmental, solar, wind, suitability
+from sqlalchemy.orm import Session
+import models, schemas
+from database import engine, get_db
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Create tables in SQLite
+models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    title="Solar & Wind Deployment Intelligence Platform",
-    description="AI-powered renewable energy site selection platform",
-    version="1.0.0"
-)
+app = FastAPI()
 
-# CORS
+# CRITICAL: Allow your frontend on port 5173!
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"],
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/")
-def root():
-    return {"message": "Solar & Wind Deployment Intelligence Platform API", "version": "1.0.0"}
+# --- PROJECT ENDPOINTS ---
+@app.get("/api/projects")
+def get_projects(db: Session = Depends(get_db)):
+    return db.query(models.Project).all()
 
-# Include routers
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(users.router, prefix="/api/users", tags=["Users"])
-app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
-app.include_router(sites.router, prefix="/api/sites", tags=["Sites"])
-app.include_router(environmental.router, prefix="/api/environmental", tags=["Environmental"])
-app.include_router(solar.router, prefix="/api/solar", tags=["Solar"])
-app.include_router(wind.router, prefix="/api/wind", tags=["Wind"])
-app.include_router(suitability.router, prefix="/api/suitability", tags=["Suitability"])
+@app.post("/api/projects", status_code=201)
+def create_project(project: schemas.ProjectCreate, db: Session = Depends(get_db)):
+    db_project = models.Project(project_name=project.project_name, description=project.description)
+    db.add(db_project)
+    db.commit()
+    db.refresh(db_project)
+    return db_project
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# --- SITE ENDPOINTS ---
+@app.get("/api/sites")
+def get_sites(db: Session = Depends(get_db)):
+    return db.query(models.Site).all()
+
+@app.post("/api/sites", status_code=201)
+def create_site(site: schemas.SiteCreate, db: Session = Depends(get_db)):
+    # Auto-fill elevation if missing (Open-Meteo API, no key needed)
+    if site.elevation is None or site.elevation == 0:
+        import requests
+        try:
+            response = requests.get(f"https://api.open-meteo.com/v1/elevation?latitude={site.latitude}&longitude={site.longitude}")
+            site.elevation = float(response.json()['elevation'][0])
+        except:
+            site.elevation = 0.0
+
+    db_site = models.Site(
+        project_id=site.project_id,
+        site_name=site.site_name,
+        latitude=site.latitude,
+        longitude=site.longitude,
+        elevation=site.elevation,
+        land_area=site.land_area,
+        land_ownership=site.land_ownership,
+        existing_infrastructure=site.existing_infrastructure,
+        region=site.region
+    )
+    db.add(db_site)
+    db.commit()
+    db.refresh(db_site)
+    return db_site

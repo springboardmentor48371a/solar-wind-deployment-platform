@@ -1,30 +1,27 @@
-from pydantic import BaseModel, EmailStr
-from datetime import datetime
+from pydantic import BaseModel, field_validator
 from typing import Optional
 
-class UserCreate(BaseModel):
-    name: str
-    email: EmailStr
-    password: str
+# --- Project Schemas ---
+class ProjectCreate(BaseModel):
+    project_name: str
+    description: Optional[str] = None
 
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
+# --- Site Schemas (Matches your frontend exactly) ---
+class SiteCreate(BaseModel):
+    project_id: Optional[int] = None
+    site_name: str
+    latitude: float
+    longitude: float
+    region: Optional[str] = None
+    land_area: Optional[float] = None
+    elevation: Optional[float] = None
+    land_ownership: Optional[str] = None
+    existing_infrastructure: Optional[str] = None
 
-class UserResponse(BaseModel):
-    id: int
-    name: str
-    email: str
-    is_active: bool
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user: UserResponse
-
-class TokenData(BaseModel):
-    email: Optional[str] = None
+    # This turns empty strings into None, preventing 422 errors
+    @field_validator('land_area', 'elevation', 'project_id', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v

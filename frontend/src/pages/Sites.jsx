@@ -105,7 +105,7 @@ function Sites() {
   }
 
   const payload = {
-    project_id: parseInt(projectId),
+    project_id: parseInt(projectId) || null,
     site_name: formData.site_name.trim(),
     latitude: parseFloat(formData.latitude),
     longitude: parseFloat(formData.longitude),
@@ -124,7 +124,9 @@ function Sites() {
     setShowModal(false);
     setFormData(initialState);
     fetchSites();
-    setError(''); // clear any previous error
+    setError(''); 
+    await fetchSites();
+    alert('Site created successfully!');
   } catch (err) {
     setError(err.response?.data?.detail || 'Failed to create site');
   }
