@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.database.session import Base, engine
-from app.routes import auth
+from app.models import user, site  # Register models on Base metadata
+from app.routes import auth, sites
 
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
@@ -23,8 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Authentication Routes
+# Include Routes
 app.include_router(auth.router)
+app.include_router(sites.router)
 
 @app.get("/")
 def root():
