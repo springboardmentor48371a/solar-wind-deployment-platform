@@ -1,0 +1,20 @@
+{
+  "version": "rf_v1_2026-08-21",
+  "trained_on_rows": 3235,
+  "plants_used": [
+    1,
+    2
+  ],
+  "estimated_capacity_kw": 28145.76692897,
+  "test_rmse": 14.889399739401203,
+  "test_mae": 10.618725802846042,
+  "test_r2": 0.43997075440212896,
+  "feature_columns": [
+    "ambient_temperature",
+    "irradiation",
+    "temp_x_irradiance"
+  ],
+  "training_data_type": "REAL measured plant telemetry (not synthetic) \u2014 Kaggle \"Solar Power Generation Data\" (anikannal), two real Indian solar plants, inverter-level generation + plant-level weather sensors, joined on timestamp",
+  "data_source_url": "https://www.kaggle.com/datasets/anikannal/solar-power-generation-data",
+  "known_limitation": "Only 34 days of data from 2 plants (one geographic region/climate) \u2014 real telemetry, but a narrow sample. Predictions for sites in very different climates than these two Indian plants should be treated with appropriate caution."
+}

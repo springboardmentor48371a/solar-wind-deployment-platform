@@ -316,6 +316,7 @@ class EnvironmentalConstraintOut(BaseModel):
     country_iso3: Optional[str]
     population_density_km2: Optional[float]
     gdp_per_capita_usd: Optional[float]
+    electricity_consumption_kwh_per_capita: Optional[float]
     data_source: Optional[str]
     fetched_at: datetime.datetime
 
@@ -335,6 +336,9 @@ class SolarPotentialOut(BaseModel):
     performance_ratio_pct: Optional[float]
     expected_energy_output_mwh_yr: Optional[float]
     capacity_factor_pct: Optional[float]
+    ml_performance_ratio_pct: Optional[float]
+    ml_expected_energy_output_mwh_yr: Optional[float]
+    ml_model_version: Optional[str]
     computed_at: datetime.datetime
 
     class Config:
@@ -351,6 +355,9 @@ class WindPotentialOut(BaseModel):
     turbine_class: Optional[str]
     expected_aep_mwh_yr: Optional[float]
     capacity_factor_pct: Optional[float]
+    ml_capacity_factor_pct: Optional[float]
+    ml_expected_aep_mwh_yr: Optional[float]
+    ml_model_version: Optional[str]
     computed_at: datetime.datetime
 
     class Config:
@@ -524,3 +531,48 @@ class PowerSimulationOut(BaseModel):
     technology: str
     capacity_mw: float
     series: List[PowerSimulationHourOut]
+
+
+# ---------- Deployment Optimization Engine ----------
+
+class TechnologyRecommendationOut(BaseModel):
+    recommendation: str  # "Solar" | "Wind" | "Hybrid" | "Insufficient data"
+    reasoning: str
+    suggested_capacity_mw: dict
+
+
+class GridContributionOut(BaseModel):
+    homes_powered_equivalent: Optional[int]
+    basis: Optional[str]
+
+
+class SeasonalForecastOut(BaseModel):
+    site_id: int
+    monthly_output_mwh_per_mw: dict
+    note: str
+
+
+# ---------- AI/ML Prediction Layer additions (PDF's named AI/ML models) ----------
+
+class MLInvestmentEstimateRequest(BaseModel):
+    capacity_mw: float = Field(..., gt=0)
+    capex_usd: float = Field(..., gt=0)
+    opex_usd_per_yr: float = Field(..., ge=0)
+    discount_rate_pct: float = Field(..., ge=0, le=30)
+    project_lifetime_yrs: int = Field(..., ge=1, le=50)
+    electricity_price_usd_per_mwh: float = Field(..., gt=0)
+    annual_energy_mwh: float = Field(..., gt=0)
+
+
+class MLInvestmentEstimateOut(BaseModel):
+    npv_usd: float
+    irr_pct: float
+    model_version: str
+    note: str
+
+
+class MLRiskAssessmentOut(BaseModel):
+    risk_category: str
+    confidence_pct: float
+    model_version: str
+    note: str

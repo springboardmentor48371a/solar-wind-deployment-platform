@@ -92,6 +92,12 @@ class Project(Base):
     owner = relationship("User", back_populates="projects")
     sites = relationship("Site", back_populates="project", cascade="all, delete-orphan")
     region_ref = relationship("Region", back_populates="projects")
+    # Alerts and integrations can exist at project level with no site_id
+    # (site_id is nullable on Alert) — without these, deleting a project
+    # that has either would fail with a foreign-key violation, same bug
+    # class as the missing Site-level cascades below.
+    alerts = relationship("Alert", cascade="all, delete-orphan")
+    integration_connections = relationship("IntegrationConnection", cascade="all, delete-orphan")
 
 
 class Site(Base):
@@ -132,6 +138,23 @@ class Site(Base):
     suitability_scores = relationship(
         "SuitabilityScore", back_populates="site", cascade="all, delete-orphan"
     )
+    # These 9 were missing cascade-delete entirely — every one of them is
+    # populated automatically for every registered site (the intelligence
+    # pipeline creates a SolarPotential + WindPotential row on every
+    # registration, for example), so in practice almost any real site
+    # had at least one of these, and the database's default foreign-key
+    # behavior (RESTRICT) blocked deleting the Site — and therefore
+    # blocked deleting its parent Project too, surfacing as a generic
+    # "Could not delete project" error with no indication of why.
+    supplemental_weather_readings = relationship("SupplementalWeatherReading", back_populates="site", cascade="all, delete-orphan")
+    alerts = relationship("Alert", cascade="all, delete-orphan")
+    images = relationship("SiteImage", back_populates="site", cascade="all, delete-orphan")
+    environmental_constraints = relationship("EnvironmentalConstraint", back_populates="site", cascade="all, delete-orphan")
+    solar_potentials = relationship("SolarPotential", back_populates="site", cascade="all, delete-orphan")
+    wind_potentials = relationship("WindPotential", back_populates="site", cascade="all, delete-orphan")
+    financial_analyses = relationship("FinancialAnalysis", back_populates="site", cascade="all, delete-orphan")
+    telemetry_readings = relationship("TelemetryReading", back_populates="site", cascade="all, delete-orphan")
+    rollup = relationship("SiteRollup", cascade="all, delete-orphan")
 
 
 class WeatherReading(Base):
@@ -177,7 +200,7 @@ class SupplementalWeatherReading(Base):
     condition_text = Column(String, nullable=True)
     forecast_period = Column(String, nullable=True)  # NOAA only, e.g. "Tonight", "Wednesday"
 
-    site = relationship("Site")
+    site = relationship("Site", back_populates="supplemental_weather_readings")
 
 
 class InfrastructureFeature(Base):
@@ -266,7 +289,7 @@ class SiteImage(Base):
     source_status = Column(String, nullable=False, default="live")  # "live" or "unavailable_no_credentials"
     fetched_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    site = relationship("Site")
+    site = relationship("Site", back_populates="images")
 
 
 class EnvironmentalConstraint(Base):
@@ -289,11 +312,12 @@ class EnvironmentalConstraint(Base):
     country_iso3 = Column(String, nullable=True)
     population_density_km2 = Column(Float, nullable=True)  # World Bank, country-level proxy
     gdp_per_capita_usd = Column(Float, nullable=True)
+    electricity_consumption_kwh_per_capita = Column(Float, nullable=True)  # World Bank EG.USE.ELEC.KH.PC — feeds Grid Contribution Forecasting
     data_source = Column(String, nullable=True)
 
     fetched_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    site = relationship("Site")
+    site = relationship("Site", back_populates="environmental_constraints")
 
 
 class SolarPotential(Base):
@@ -311,9 +335,18 @@ class SolarPotential(Base):
     expected_energy_output_mwh_yr = Column(Float, nullable=True)  # per installed MWp
     capacity_factor_pct = Column(Float, nullable=True)
 
+    # ML-Assisted Prediction (Beta) — see app/services/ml_solar_predictor.py.
+    # Trained on real measured plant data (not the same physics formula
+    # above), null until a model has actually been trained and the file
+    # exists. Always shown alongside, never in place of, the physics
+    # numbers above — the physics engine is the validated baseline.
+    ml_performance_ratio_pct = Column(Float, nullable=True)
+    ml_expected_energy_output_mwh_yr = Column(Float, nullable=True)
+    ml_model_version = Column(String, nullable=True)  # e.g. "rf_v1_2026-08-21" — which trained model produced this
+
     computed_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    site = relationship("Site")
+    site = relationship("Site", back_populates="solar_potentials")
 
 
 class WindPotential(Base):
@@ -331,9 +364,15 @@ class WindPotential(Base):
     expected_aep_mwh_yr = Column(Float, nullable=True)        # per installed MW
     capacity_factor_pct = Column(Float, nullable=True)
 
+    # ML-Assisted Prediction — see app/services/ml_wind_predictor.py.
+    # Always shown alongside, never in place of, the physics numbers above.
+    ml_capacity_factor_pct = Column(Float, nullable=True)
+    ml_expected_aep_mwh_yr = Column(Float, nullable=True)
+    ml_model_version = Column(String, nullable=True)
+
     computed_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    site = relationship("Site")
+    site = relationship("Site", back_populates="wind_potentials")
 
 
 class FinancialAnalysis(Base):
@@ -359,7 +398,7 @@ class FinancialAnalysis(Base):
 
     computed_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    site = relationship("Site")
+    site = relationship("Site", back_populates="financial_analyses")
 
 
 class ReportTemplate(Base):
@@ -430,7 +469,7 @@ class TelemetryReading(Base):
     unit = Column(String, nullable=True)
     recorded_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
 
-    site = relationship("Site")
+    site = relationship("Site", back_populates="telemetry_readings")
 
 
 class AuditLog(Base):

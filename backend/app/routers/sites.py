@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas, auth, authz
 from app.database import get_db
-from app.services.environmental import fetch_and_store_weather_data
+from app.services.environmental import fetch_and_store_weather_data, fetch_seasonal_climatology, distribute_annual_output_by_month
 from app.services.terrain import fetch_elevation, estimate_slope_pct
 from app.services.infrastructure import fetch_and_store_infrastructure
 from app.services.geo_utils import site_point_wkt
@@ -19,6 +19,9 @@ from app.services.solar_engine import compute_solar_potential
 from app.services.wind_engine import compute_wind_potential
 from app.services.financial import compute_financial_analysis
 from app.services.power_simulation import simulate_power_output
+from app.services.deployment_optimizer import recommend_technology, estimate_grid_contribution
+from app.services.ml_investment_predictor import predict_npv_and_irr
+from app.services.ml_risk_predictor import predict_risk_category
 from app.security import log_action
 from app import mongo
 from app import data_lake
@@ -126,14 +129,25 @@ def register_site(
     # Step 4 of the User Workflow: system fetches weather/terrain/infra data
     # in the background. Kept synchronous here for simplicity — swap for a
     # background task queue (Celery/RQ) before production scale.
-    if site.elevation_m is None:
-        elevation = fetch_elevation(site.latitude, site.longitude)
-        if elevation is not None:
-            site.elevation_m = elevation
-    if site.land_slope_pct is None:
-        slope = estimate_slope_pct(site.latitude, site.longitude)
-        if slope is not None:
-            site.land_slope_pct = slope
+    #
+    # Wrapped in try/except like every other stage of this pipeline (see
+    # _run_full_intelligence_pipeline below) — this was a real bug found
+    # via live testing: it was the one external call in this whole
+    # endpoint NOT protected this way, so an Open-Elevation hiccup
+    # (rate-limit, gateway error, malformed response) could raise all
+    # the way up to an unhandled 500, surfacing to the user as a bare
+    # "Could not register site" with zero indication why.
+    try:
+        if site.elevation_m is None:
+            elevation = fetch_elevation(site.latitude, site.longitude)
+            if elevation is not None:
+                site.elevation_m = elevation
+        if site.land_slope_pct is None:
+            slope = estimate_slope_pct(site.latitude, site.longitude)
+            if slope is not None:
+                site.land_slope_pct = slope
+    except Exception as exc:  # noqa: BLE001
+        print(f"Warning: elevation/slope lookup failed for site {site.id}: {exc}")
     db.commit()
     db.refresh(site)
 
@@ -592,3 +606,215 @@ def simulate_site_power_output(
         "capacity_mw": body.capacity_mw,
         "series": series,
     }
+
+
+# ---------- Deployment Optimization Engine ----------
+
+@router.get("/{site_id}/technology-recommendation", response_model=schemas.TechnologyRecommendationOut)
+def get_technology_recommendation(
+    project_id: int,
+    site_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    Technology Selection + Hybrid Solar-Wind Recommendations: compares
+    this site's already-computed solar and wind capacity factors (does
+    not run any new prediction) and recommends Solar, Wind, or Hybrid,
+    with a capacity plan sized from the site's actual land area using
+    published NREL land-use figures.
+    """
+    project = _get_project_or_404(project_id, db)
+    authz.require_project_read(project, current_user)
+    site = _get_site_or_404(project_id, site_id, db)
+
+    latest_solar = (
+        db.query(models.SolarPotential)
+        .filter(models.SolarPotential.site_id == site.id)
+        .order_by(models.SolarPotential.computed_at.desc())
+        .first()
+    )
+    latest_wind = (
+        db.query(models.WindPotential)
+        .filter(models.WindPotential.site_id == site.id)
+        .order_by(models.WindPotential.computed_at.desc())
+        .first()
+    )
+    result = recommend_technology(
+        latest_solar.capacity_factor_pct if latest_solar else None,
+        latest_wind.capacity_factor_pct if latest_wind else None,
+        site.land_area_hectares,
+    )
+    return result
+
+
+@router.get("/{site_id}/grid-contribution", response_model=schemas.GridContributionOut)
+def get_grid_contribution(
+    project_id: int,
+    site_id: int,
+    technology: str = "solar",
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    Grid Contribution Forecasting: translates the site's already-computed
+    annual output into a "homes powered" estimate, using this site's own
+    country's real World Bank per-capita electricity consumption figure.
+    """
+    project = _get_project_or_404(project_id, db)
+    authz.require_project_read(project, current_user)
+    site = _get_site_or_404(project_id, site_id, db)
+
+    if technology == "wind":
+        latest = (
+            db.query(models.WindPotential)
+            .filter(models.WindPotential.site_id == site.id)
+            .order_by(models.WindPotential.computed_at.desc())
+            .first()
+        )
+        annual_output = latest.expected_aep_mwh_yr if latest else None
+    else:
+        latest = (
+            db.query(models.SolarPotential)
+            .filter(models.SolarPotential.site_id == site.id)
+            .order_by(models.SolarPotential.computed_at.desc())
+            .first()
+        )
+        annual_output = latest.expected_energy_output_mwh_yr if latest else None
+
+    env = (
+        db.query(models.EnvironmentalConstraint)
+        .filter(models.EnvironmentalConstraint.site_id == site.id)
+        .order_by(models.EnvironmentalConstraint.fetched_at.desc())
+        .first()
+    )
+    result = estimate_grid_contribution(
+        annual_output, env.electricity_consumption_kwh_per_capita if env else None
+    )
+    if result is None:
+        return schemas.GridContributionOut(homes_powered_equivalent=None, basis="Not enough data yet \u2014 needs both computed output and environmental/demographic data (run \u201cRefresh data\u201d).")
+    return result
+
+
+@router.get("/{site_id}/seasonal-forecast", response_model=schemas.SeasonalForecastOut)
+def get_seasonal_forecast(
+    project_id: int,
+    site_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    Seasonal Generation Prediction: redistributes the site's already-
+    computed annual solar output across 12 months using NASA POWER's
+    long-term climatology (a different, longer-baseline endpoint than
+    the 7-day one the daily pipeline uses) — not a new independent
+    annual estimate.
+    """
+    project = _get_project_or_404(project_id, db)
+    authz.require_project_read(project, current_user)
+    site = _get_site_or_404(project_id, site_id, db)
+
+    latest_solar = (
+        db.query(models.SolarPotential)
+        .filter(models.SolarPotential.site_id == site.id)
+        .order_by(models.SolarPotential.computed_at.desc())
+        .first()
+    )
+    if not latest_solar or not latest_solar.expected_energy_output_mwh_yr:
+        raise HTTPException(status_code=422, detail="No solar potential computed yet for this site \u2014 run \u201cRefresh data\u201d first.")
+
+    monthly_climatology = fetch_seasonal_climatology(site)
+    if not monthly_climatology:
+        raise HTTPException(status_code=503, detail="NASA POWER climatology data is currently unavailable for this location.")
+
+    monthly_output = distribute_annual_output_by_month(latest_solar.expected_energy_output_mwh_yr, monthly_climatology)
+    return schemas.SeasonalForecastOut(
+        site_id=site.id,
+        monthly_output_mwh_per_mw=monthly_output,
+        note="Redistributes the already-computed annual output across months using NASA POWER's long-term climatology, not a new independent prediction.",
+    )
+
+
+# ---------- AI/ML: Investment Prediction Model + Risk Assessment Model ----------
+
+@router.post("/{site_id}/ml-investment-estimate", response_model=schemas.MLInvestmentEstimateOut)
+def get_ml_investment_estimate(
+    project_id: int,
+    site_id: int,
+    body: schemas.MLInvestmentEstimateRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    Investment Prediction Model (PDF: Regression/XGBoost) — an instant
+    NPV/IRR estimate from a trained model, without running the full
+    financial.py calculation. Always a fast estimate, never a
+    replacement for POST .../financial-analysis, which remains the
+    authoritative real calculation once you commit to real assumptions.
+    """
+    project = _get_project_or_404(project_id, db)
+    authz.require_project_read(project, current_user)
+    _get_site_or_404(project_id, site_id, db)  # 404s if the site doesn't exist/belong to this project
+
+    result = predict_npv_and_irr(
+        body.capacity_mw, body.capex_usd, body.opex_usd_per_yr, body.discount_rate_pct,
+        body.project_lifetime_yrs, body.electricity_price_usd_per_mwh, body.annual_energy_mwh,
+    )
+    if result is None:
+        raise HTTPException(status_code=503, detail="Investment prediction model is not available.")
+
+    from app.services.ml_investment_predictor import model_version as _mv
+    return schemas.MLInvestmentEstimateOut(
+        npv_usd=result["npv_usd"],
+        irr_pct=result["irr_pct"],
+        model_version=_mv() or "unknown",
+        note="Fast ML estimate, trained on the platform's own validated financial formula. Run the full financial analysis for the authoritative number.",
+    )
+
+
+@router.get("/{site_id}/ml-risk-assessment", response_model=schemas.MLRiskAssessmentOut)
+def get_ml_risk_assessment(
+    project_id: int,
+    site_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    Risk Assessment Model (PDF: LSTM/Prophet, substituted here — see
+    app/services/ml_risk_predictor.py's docstring for why). Uses the
+    site's real computed wind data plus environmental siting factors.
+    """
+    project = _get_project_or_404(project_id, db)
+    authz.require_project_read(project, current_user)
+    site = _get_site_or_404(project_id, site_id, db)
+
+    latest_wind = (
+        db.query(models.WindPotential)
+        .filter(models.WindPotential.site_id == site.id)
+        .order_by(models.WindPotential.computed_at.desc())
+        .first()
+    )
+    env = (
+        db.query(models.EnvironmentalConstraint)
+        .filter(models.EnvironmentalConstraint.site_id == site.id)
+        .order_by(models.EnvironmentalConstraint.fetched_at.desc())
+        .first()
+    )
+    if not latest_wind or not latest_wind.average_wind_speed_ms:
+        raise HTTPException(status_code=422, detail="No wind data computed yet for this site \u2014 run \u201cRefresh data\u201d first.")
+
+    result = predict_risk_category(
+        latest_wind.average_wind_speed_ms,
+        env.protected_area_distance_km if env and env.protected_area_distance_km is not None else 20.0,
+        site.land_slope_pct if site.land_slope_pct is not None else 5.0,
+    )
+    if result is None:
+        raise HTTPException(status_code=503, detail="Risk assessment model is not available.")
+
+    from app.services.ml_risk_predictor import model_version as _mv
+    return schemas.MLRiskAssessmentOut(
+        risk_category=result["risk_category"],
+        confidence_pct=result["confidence_pct"],
+        model_version=_mv() or "unknown",
+        note="Currently driven almost entirely by wind speed (99%+ of the model's decision weight, verified via feature importance) \u2014 not yet a meaningful environmental/permitting risk assessment despite accepting those inputs. See the model's metadata for the full honest limitation.",
+    )

@@ -1,0 +1,20 @@
+{
+  "version": "rf_v1_2026-08-21",
+  "trained_on_rows": 30000,
+  "training_data_type": "Ground truth IS the real scoring.py formula (exact re-derivation), sampled across a wide synthetic range of site parameter combinations. This model learns to approximate the trusted rule quickly, not to replace it.",
+  "purpose": "Instant rough suitability estimate from partial/estimated inputs, before running the full data-collection pipeline. The real scoring.py engine remains the authoritative score once real data is collected.",
+  "test_accuracy_vs_real_formula": 0.857,
+  "feature_columns": [
+    "avg_irradiance",
+    "avg_wind",
+    "land_slope_pct",
+    "elevation_m",
+    "substation_km",
+    "road_km",
+    "transmission_km",
+    "protected_area_km",
+    "water_body_km",
+    "agricultural_nearby"
+  ],
+  "n_estimators": 40
+}

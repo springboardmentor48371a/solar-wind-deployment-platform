@@ -15,6 +15,7 @@ from statistics import mean, pstdev
 from sqlalchemy.orm import Session
 
 from app import models
+from app.services import ml_solar_predictor
 
 # Standard Test Condition reference values
 STC_IRRADIANCE_W_M2 = 1000.0
@@ -84,6 +85,15 @@ def compute_solar_potential(db: Session, site: models.Site) -> models.SolarPoten
     expected_output_mwh_per_mwp = round((annual_irradiance / 1.0) * (performance_ratio / 100), 1)
     capacity_factor = round(min((expected_output_mwh_per_mwp / 8760) * 100, 35.0), 1)
 
+    # ML-Assisted Prediction (Beta) — runs alongside the physics numbers
+    # above, never replacing them. Returns None (and the app shows
+    # "not trained yet") until someone actually runs
+    # scripts/ml/train_solar_model.py against real plant data.
+    ml_performance_ratio = ml_solar_predictor.predict_performance_ratio_pct(avg_temp, avg_daily_irradiance)
+    ml_expected_output = None
+    if ml_performance_ratio is not None:
+        ml_expected_output = round((annual_irradiance / 1.0) * (ml_performance_ratio / 100), 1)
+
     record = models.SolarPotential(
         site_id=site.id,
         annual_irradiance_kwh_m2=annual_irradiance,
@@ -93,6 +103,9 @@ def compute_solar_potential(db: Session, site: models.Site) -> models.SolarPoten
         performance_ratio_pct=performance_ratio,
         expected_energy_output_mwh_yr=expected_output_mwh_per_mwp,
         capacity_factor_pct=capacity_factor,
+        ml_performance_ratio_pct=ml_performance_ratio,
+        ml_expected_energy_output_mwh_yr=ml_expected_output,
+        ml_model_version=ml_solar_predictor.model_version(),
     )
     db.add(record)
     db.commit()

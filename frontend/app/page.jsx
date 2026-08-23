@@ -16,7 +16,8 @@ const engines = [
   { name: 'Environmental Data Engine', desc: 'Live solar irradiance, temperature, rainfall and cloud-cover series from NASA POWER for every registered site.' },
   { name: 'Geographic Intelligence Engine', desc: 'Terrain via Rasterio/GDAL & Open-Elevation, plus roads, substations and transmission lines via OpenStreetMap, measured with GeoPandas/Shapely.' },
   { name: 'Site Suitability Scoring Engine', desc: 'A transparent, weighted rule-based score — Resource 35%, Geographic 25%, Infrastructure 15%, Environmental 15%, Economic 10%.' },
-  { name: 'Deployment Optimization & Forecasting', desc: 'Reserved for the AI/ML phase — solar & wind prediction models, energy forecasting, and hybrid deployment optimization plug in here next.', comingSoon: true },
+  { name: 'ML-Assisted Solar & Wind Prediction', desc: 'Random Forest models trained on real measured data — real Indian solar plant generation/weather sensors (Kaggle) and real Kelmarsh wind farm SCADA telemetry (Zenodo) — shown alongside, never replacing, the physics-based estimates above.' },
+  { name: 'Suitability Quick-Classifier', desc: 'An ML model trained directly on the validated scoring formula gives an instant rough category estimate from ballpark inputs, before a site is even registered — a triage tool, not a replacement for the real score.' },
 ]
 
 const dataSources = [
@@ -70,14 +71,15 @@ export default function Landing() {
       <section className="py-16">
         <div className="max-w-[1120px] mx-auto px-7 grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <span className="badge">Pre-AI phase &middot; AI/ML forecasting layer coming next</span>
+            <span className="badge">Physics engine + ML-assisted predictions</span>
             <h1 className="text-[40px] leading-[1.12] mt-3.5 mb-4 tracking-tight">
               Find the best ground for your next solar &amp; wind project.
             </h1>
             <p className="text-ink-muted text-base leading-relaxed max-w-[560px]">
-              Solstice OS is an AI-ready Solar &amp; Wind Deployment Intelligence Platform that recommends
+              Solstice OS is a Solar &amp; Wind Deployment Intelligence Platform that recommends
               optimal renewable energy sites by analyzing environmental, geographic, climatic, and
-              infrastructure data — so planners, analysts, and investors can make faster, defensible
+              infrastructure data — combining a transparent physics engine with a trained ML-assisted
+              prediction layer — so planners, analysts, and investors can make faster, defensible
               decisions.
             </p>
             <div className="flex gap-3 mt-6 flex-wrap">
@@ -139,7 +141,7 @@ export default function Landing() {
               <div className="card-hover" key={e.name}>
                 <div className="flex items-center justify-between">
                   <h3 className="text-[14.5px]">{e.name}</h3>
-                  {e.comingSoon && <span className="badge badge-amber">AI phase</span>}
+                  {e.beta && <span className="badge badge-amber">Beta</span>}
                 </div>
                 <p className="text-ink-muted text-[13.5px] mt-1.5">{e.desc}</p>
               </div>
@@ -183,7 +185,7 @@ export default function Landing() {
                 <li><b className="text-ink">API Gateway</b> — FastAPI, JWT auth, rate limiting, CORS, security headers</li>
                 <li><b className="text-ink">Microservices</b> — user &amp; access, project &amp; site, environmental data, GIS/spatial, suitability &amp; scoring, alerts, reports</li>
                 <li><b className="text-ink">Data layer</b> — PostgreSQL + PostGIS (primary, structured/geospatial) and MongoDB (secondary, raw payload archive)</li>
-                <li><b className="text-ink">AI/ML layer</b> — reserved interface for the upcoming prediction &amp; optimization models</li>
+                <li><b className="text-ink">ML-assisted prediction layer</b> — 3 trained Random Forest models: solar and wind trained on real measured plant/turbine data (Kaggle, Zenodo), suitability quick-classifier trained on the platform's own validated formula, all run alongside the deterministic physics engine above</li>
               </ul>
             </div>
           </div>

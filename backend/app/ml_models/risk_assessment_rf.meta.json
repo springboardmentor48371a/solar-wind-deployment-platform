@@ -1,0 +1,13 @@
+{
+  "version": "rf_v1_2026-08-22",
+  "algorithm": "RandomForestClassifier (scikit-learn) \u2014 substituted for LSTM/Prophet. A genuine LSTM/Prophet time-series model needs much longer historical data per site than this platform's live 7-day NASA POWER window provides; building one on 7 days of data would be a fabricated/overfit model with no real forecasting value. This classifier instead predicts risk CATEGORY from real turbulence + siting factors, which is a defensible, testable alternative given the data actually available.",
+  "training_data_type": "Turbulence intensity computed from REAL Kelmarsh wind speed telemetry (rolling std/mean), classified using the real IEC 61400-1 turbulence category standard. Environmental siting factors (protected-area distance, slope) are synthetic, sampled across realistic ranges.",
+  "trained_on_rows": 1215901,
+  "test_accuracy": 0.6303329618679091,
+  "feature_columns": [
+    "wind_speed_50m",
+    "protected_area_distance_km",
+    "land_slope_pct"
+  ],
+  "known_limitation": "Not a time-series forecast (LSTM/Prophet as the PDF specifies) -- a point-in-time risk classification from wind speed + siting factors instead, for the reasons in this file. IMPORTANT, checked via feature_importances_: wind_speed_50m accounts for 99.3% of this model's decisions; protected_area_distance_km and land_slope_pct together account for well under 1%, because they were sampled as uncorrelated random noise during training and never actually influenced the real label. In its current form this model is functionally a wind-speed-derived turbulence-risk classifier only -- it does not meaningfully assess environmental/permitting risk despite accepting those inputs. Also note: turbulence intensity (as a %) is genuinely higher at LOW wind speeds in real data (small denominator in std/mean), so this model correctly learned that low wind speed can correspond to HIGHER risk category -- a real, if counterintuitive, wind-engineering relationship, not a bug. Retraining with real (not synthetic) environmental risk labels would be needed before the environmental inputs carry real signal."
+}

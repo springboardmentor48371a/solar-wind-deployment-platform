@@ -35,7 +35,15 @@ def fetch_elevation(latitude: float, longitude: float) -> float | None:
         results = response.json().get("results", [])
         if results:
             return results[0].get("elevation")
-    except requests.RequestException as exc:
+    except Exception as exc:  # noqa: BLE001
+        # Deliberately broad, not just requests.RequestException: an
+        # upstream hiccup (rate-limit page, gateway error, malformed
+        # body) can return HTTP 200 with a non-JSON or unexpectedly
+        # shaped body, which raises JSONDecodeError/AttributeError/
+        # IndexError here — none of which are RequestException
+        # subclasses. A real 500 from this — "Could not register site"
+        # with no explanation — is worse than a logged warning and a
+        # None elevation the pipeline already knows how to handle.
         print(f"Warning: elevation lookup failed: {exc}")
     return None
 

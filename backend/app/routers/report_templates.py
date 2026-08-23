@@ -22,6 +22,7 @@ from reportlab.lib import colors
 
 from app import models, schemas, auth, authz
 from app.database import get_db
+from app.services.score_explanation import explain_suitability_score
 from app.security import log_action
 
 router = APIRouter(tags=["Report Builder"])
@@ -132,6 +133,23 @@ def _section_suitability(styles, project, sites, db):
     table = Table(data, hAlign="LEFT")
     table.setStyle(HEADER_STYLE)
     elements.extend([table, Spacer(1, 10)])
+
+    # Reasoning per site — same explanation logic the fixed-format PDF
+    # export uses, so "why did this site score this way" is answered
+    # consistently across both report formats.
+    for site in sites:
+        latest = (
+            db.query(models.SuitabilityScore)
+            .filter(models.SuitabilityScore.site_id == site.id)
+            .order_by(models.SuitabilityScore.computed_at.desc())
+            .first()
+        )
+        if not latest:
+            continue
+        elements.append(Paragraph(f"Why {site.name} scored {latest.overall_score} ({latest.category})", styles["Heading3"]))
+        for reason in explain_suitability_score(db, site, latest):
+            elements.append(Paragraph(f"\u2022 {reason}", styles["BodyText"]))
+        elements.append(Spacer(1, 8))
     return elements
 
 

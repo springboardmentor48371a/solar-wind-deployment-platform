@@ -20,6 +20,42 @@ from app import mongo
 from app import data_lake
 
 
+_FIELD_BOUNDS = {
+    "solar_irradiance": (0, 15),      # kWh/m^2/day — 0 to ~15 covers even the most extreme real-world sites
+    "wind_speed": (0, 120),            # m/s — generously covers even extreme storm readings
+    "wind_speed_50m": (0, 120),
+    "temperature": (-90, 60),          # deg C — widest recorded surface temps on Earth
+    "rainfall": (0, 1000),             # mm/day — generous upper bound for extreme storm days
+    "cloud_cover_pct": (0, 100),
+}
+
+
+def _valid_reading(value, min_val: float, max_val: float):
+    """
+    NASA POWER (and most scientific weather APIs) use -999 as a "no data
+    for this day" fill value rather than omitting the key entirely — this
+    codebase was previously storing that literal -999 as if it were a
+    real reading, which corrupted every downstream average (solar/wind
+    potential, suitability score) whenever a single day had a data gap.
+    Rejects the -999 family of sentinels plus anything outside a
+    physically plausible range for the parameter, storing None instead so
+    every existing `is not None` filter throughout the codebase (scoring.py,
+    solar_engine.py, wind_engine.py) already handles it correctly as
+    "no data for this day" rather than "measured value of -999."
+    """
+    if value is None:
+        return None
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    if value <= -900:  # covers -999, -999.0, -99900 (scaled variants some datasets use)
+        return None
+    if value < min_val or value > max_val:
+        return None
+    return value
+
+
 def fetch_and_store_weather_data(db: Session, site: models.Site, days_back: int = 7) -> None:
     """
     Fetch recent daily weather data from the NASA POWER API for a site's
@@ -78,10 +114,19 @@ def fetch_and_store_weather_data(db: Session, site: models.Site, days_back: int 
     cloud = daily.get("CLOUD_AMT", {})
 
     fetched_count = 0
+    repaired_count = 0
     for date_str in irradiance.keys():
         reading_date = datetime.datetime.strptime(date_str, "%Y%m%d")
 
-        # Skip if we already have a reading for this site/date
+        fresh_values = {
+            "solar_irradiance": _valid_reading(irradiance.get(date_str), 0, 15),
+            "wind_speed": _valid_reading(wind.get(date_str), 0, 120),
+            "wind_speed_50m": _valid_reading(wind_50m.get(date_str), 0, 120),
+            "temperature": _valid_reading(temp.get(date_str), -90, 60),
+            "rainfall": _valid_reading(rain.get(date_str), 0, 1000),
+            "cloud_cover_pct": _valid_reading(cloud.get(date_str), 0, 100),
+        }
+
         existing = (
             db.query(models.WeatherReading)
             .filter(
@@ -91,20 +136,91 @@ def fetch_and_store_weather_data(db: Session, site: models.Site, days_back: int 
             .first()
         )
         if existing:
+            # Self-healing repair: a row stored before the sentinel-value
+            # fix above may still hold a raw, invalid value (e.g. a
+            # literal -999) in a column that's supposed to be None. Re-run
+            # the same validity check against what's *currently stored*
+            # and overwrite only the columns that fail it — this means
+            # simply clicking "Refresh data" repairs old corrupted rows
+            # without the user needing to delete and re-register the site.
+            for field, fresh_value in fresh_values.items():
+                stored_value = getattr(existing, field)
+                if stored_value is not None and _valid_reading(stored_value, *_FIELD_BOUNDS[field]) is None:
+                    setattr(existing, field, fresh_value)
+                    repaired_count += 1
             continue
 
         reading = models.WeatherReading(
             site_id=site.id,
             reading_date=reading_date,
-            solar_irradiance=irradiance.get(date_str),
-            wind_speed=wind.get(date_str),
-            wind_speed_50m=wind_50m.get(date_str),
-            temperature=temp.get(date_str),
-            rainfall=rain.get(date_str),
-            cloud_cover_pct=cloud.get(date_str),
+            **fresh_values,
         )
         db.add(reading)
         fetched_count += 1
 
     db.commit()
+    if repaired_count:
+        print(f"Info: repaired {repaired_count} previously-corrupted weather field(s) for site {site.id}")
     return fetched_count
+
+
+def fetch_seasonal_climatology(site: models.Site) -> dict | None:
+    """
+    Seasonal Generation Prediction — a genuinely different NASA POWER
+    endpoint from fetch_and_store_weather_data's daily one: the
+    /temporal/climatology/point endpoint returns long-term monthly
+    averages (JAN-DEC) computed from decades of historical data, rather
+    than a short recent window. Used to redistribute an already-computed
+    annual output figure into a monthly shape, not to compute a new
+    annual estimate — solar_engine.py/wind_engine.py's daily-driven
+    annual figures remain the source of truth for the yearly total.
+    """
+    cache_key = f"nasa_power_climatology:{round(site.latitude, 3)}:{round(site.longitude, 3)}"
+    payload = cache_get(cache_key)
+    if payload is None:
+        try:
+            response = requests.get(
+                "https://power.larc.nasa.gov/api/temporal/climatology/point",
+                params={
+                    "parameters": "ALLSKY_SFC_SW_DWN,WS50M",
+                    "community": "RE",
+                    "longitude": site.longitude,
+                    "latitude": site.latitude,
+                    "format": "JSON",
+                },
+                timeout=15,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            cache_set(cache_key, payload, ttl_seconds=90 * 24 * 60 * 60)  # climatology is long-term, safe to cache for months
+        except Exception as exc:  # noqa: BLE001
+            print(f"Warning: NASA POWER climatology fetch failed for site {site.id}: {exc}")
+            return None
+
+    try:
+        params = payload["properties"]["parameter"]
+        irradiance_by_month = params.get("ALLSKY_SFC_SW_DWN", {})
+        months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+        monthly_values = {}
+        for m in months:
+            v = irradiance_by_month.get(m)
+            if v is not None and -900 < v < 15:  # same sentinel/plausibility guard as the daily fetch
+                monthly_values[m] = v
+        return monthly_values or None
+    except Exception as exc:  # noqa: BLE001
+        print(f"Warning: could not parse NASA POWER climatology response for site {site.id}: {exc}")
+        return None
+
+
+def distribute_annual_output_by_month(annual_output_mwh: float, monthly_irradiance: dict) -> dict:
+    """
+    Splits an already-computed annual output figure across 12 months in
+    proportion to each month's share of total climatological irradiance
+    — e.g. a month with 10% of the year's irradiance gets ~10% of the
+    annual output, not an equal 1/12th share. This is a redistribution
+    of an existing number, not a new independent prediction.
+    """
+    total = sum(monthly_irradiance.values())
+    if total <= 0:
+        return {}
+    return {month: round(annual_output_mwh * (value / total), 1) for month, value in monthly_irradiance.items()}

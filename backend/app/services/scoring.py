@@ -117,6 +117,12 @@ def _score_environmental_impact(db: Session, site: models.Site) -> float:
     # and permitting penalty.
     if constraint.water_body_distance_km is not None and constraint.water_body_distance_km < 0.5:
         score -= 10
+    # Agricultural land nearby is a real siting friction (land-use
+    # conversion resistance, potential compensation/rezoning requirements)
+    # — smaller penalty than protected areas since it's a soft constraint,
+    # not a hard legal one.
+    if constraint.agricultural_land_nearby:
+        score -= 8
     return round(max(score, 0), 1)
 
 

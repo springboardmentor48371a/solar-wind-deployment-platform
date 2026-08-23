@@ -138,7 +138,7 @@ export default function Sites() {
     setIntelLoading(true)
     setSimResult(null)
     const base = `/projects/${projectId}/sites/${siteId}`
-    const [satellite, environmental, solar, wind, financial, telemetry, supplementalWeather] = await Promise.all([
+    const [satellite, environmental, solar, wind, financial, telemetry, supplementalWeather, techRec, gridContribution, riskAssessment] = await Promise.all([
       api.get(`${base}/satellite`).catch(() => null),
       api.get(`${base}/environmental-constraints`).catch(() => null),
       api.get(`${base}/solar-potential`).catch(() => null),
@@ -146,6 +146,9 @@ export default function Sites() {
       api.get(`${base}/financial-analysis`).catch(() => null),
       api.get(`${base}/telemetry?limit=10`).catch(() => null),
       api.get(`${base}/supplemental-weather`).catch(() => null),
+      api.get(`${base}/technology-recommendation`).catch(() => null),
+      api.get(`${base}/grid-contribution`).catch(() => null),
+      api.get(`${base}/ml-risk-assessment`).catch(() => null),
     ])
     setIntel({
       satellite: satellite?.data || null,
@@ -155,8 +158,47 @@ export default function Sites() {
       financial: financial?.data?.[0] || null,
       telemetry: telemetry?.data || [],
       supplementalWeather: supplementalWeather?.data || [],
+      techRec: techRec?.data || null,
+      gridContribution: gridContribution?.data || null,
+      riskAssessment: riskAssessment?.data || null,
     })
     setIntelLoading(false)
+  }
+
+  const [seasonalForecast, setSeasonalForecast] = useState(null)
+  const [seasonalLoading, setSeasonalLoading] = useState(false)
+  const loadSeasonalForecast = async (siteId) => {
+    setSeasonalLoading(true)
+    try {
+      const res = await api.get(`/projects/${projectId}/sites/${siteId}/seasonal-forecast`)
+      setSeasonalForecast(res.data)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Could not compute seasonal forecast — run "Refresh data" first so solar potential exists.')
+    } finally {
+      setSeasonalLoading(false)
+    }
+  }
+
+  const [mlInvestment, setMlInvestment] = useState(null)
+  const [mlInvestmentLoading, setMlInvestmentLoading] = useState(false)
+  const runMlInvestmentEstimate = async (siteId) => {
+    setMlInvestmentLoading(true)
+    try {
+      const res = await api.post(`/projects/${projectId}/sites/${siteId}/ml-investment-estimate`, {
+        capacity_mw: parseFloat(finForm.capacity_mw) || 10,
+        capex_usd: parseFloat(finForm.capex_usd) || 8000000,
+        opex_usd_per_yr: parseFloat(finForm.opex_usd_per_yr) || 100000,
+        discount_rate_pct: parseFloat(finForm.discount_rate_pct) || 8,
+        project_lifetime_yrs: parseInt(finForm.project_lifetime_yrs, 10) || 25,
+        electricity_price_usd_per_mwh: parseFloat(finForm.electricity_price_usd_per_mwh) || 45,
+        annual_energy_mwh: (intel?.solar?.expected_energy_output_mwh_yr || 1740) * (parseFloat(finForm.capacity_mw) || 10),
+      })
+      setMlInvestment(res.data)
+    } catch (err) {
+      setError('Could not compute ML investment estimate.')
+    } finally {
+      setMlInvestmentLoading(false)
+    }
   }
 
   const submitFinancialAnalysis = async (siteId) => {
@@ -409,6 +451,19 @@ export default function Sites() {
                                     <li>Peak sun hours: <b>{intel.solar.peak_sun_hours ?? '—'}</b></li>
                                   </ul>
                                 ) : <p className="text-ink-faint">Not computed yet.</p>}
+                                {intel?.solar?.ml_model_version ? (
+                                  <div className="mt-1.5 pl-2 border-l-2 border-brand/40">
+                                    <div className="text-[11px] text-ink-faint uppercase tracking-wide mb-0.5">
+                                      ML-Assisted — model {intel.solar.ml_model_version}
+                                    </div>
+                                    <ul className="space-y-0.5">
+                                      <li>ML performance ratio: <b>{intel.solar.ml_performance_ratio_pct}%</b> <span className="text-ink-faint">(physics: {intel.solar.performance_ratio_pct}%)</span></li>
+                                      <li>ML expected output: <b>{intel.solar.ml_expected_energy_output_mwh_yr} MWh/yr per MW</b></li>
+                                    </ul>
+                                  </div>
+                                ) : intel?.solar ? (
+                                  <p className="text-[11px] text-ink-faint mt-1">ML-assisted prediction unavailable — showing physics-only estimate above.</p>
+                                ) : null}
 
                                 <div className="text-ink-muted font-semibold mb-1 mt-3">Wind Potential Engine</div>
                                 {intel?.wind ? (
@@ -419,6 +474,19 @@ export default function Sites() {
                                     <li>Turbulence: <b>{intel.wind.turbulence_intensity_pct ?? '—'}%</b></li>
                                   </ul>
                                 ) : <p className="text-ink-faint">Not computed yet.</p>}
+                                {intel?.wind?.ml_model_version ? (
+                                  <div className="mt-1.5 pl-2 border-l-2 border-brand/40">
+                                    <div className="text-[11px] text-ink-faint uppercase tracking-wide mb-0.5">
+                                      ML-Assisted — model {intel.wind.ml_model_version}
+                                    </div>
+                                    <ul className="space-y-0.5">
+                                      <li>ML capacity factor: <b>{intel.wind.ml_capacity_factor_pct}%</b> <span className="text-ink-faint">(physics: {intel.wind.capacity_factor_pct}%)</span></li>
+                                      <li>ML expected AEP: <b>{intel.wind.ml_expected_aep_mwh_yr} MWh/yr per MW</b></li>
+                                    </ul>
+                                  </div>
+                                ) : intel?.wind ? (
+                                  <p className="text-[11px] text-ink-faint mt-1">ML-assisted prediction unavailable — showing physics-only estimate above.</p>
+                                ) : null}
                               </div>
 
                               <div className="sm:col-span-2 border-t border-border pt-3 mt-1">
@@ -448,6 +516,16 @@ export default function Sites() {
                                     <button className="btn-sm btn-secondary" disabled={simLoading} onClick={() => runSimulation(s.id, finForm.technology === 'wind' ? 'wind' : 'solar')}>
                                       {simLoading ? 'Simulating…' : 'Simulate 24h Output'}
                                     </button>
+                                    <button className="btn-sm btn-secondary" disabled={mlInvestmentLoading} onClick={() => runMlInvestmentEstimate(s.id)}>
+                                      {mlInvestmentLoading ? 'Estimating…' : 'ML Instant Estimate'}
+                                    </button>
+                                  </div>
+                                )}
+                                {mlInvestment && (
+                                  <div className="mt-2 pl-2 border-l-2 border-brand/40 text-[12.5px]">
+                                    <span className="text-[11px] text-ink-faint uppercase tracking-wide">ML-Assisted (model {mlInvestment.model_version})</span>
+                                    <div>NPV: <b>${mlInvestment.npv_usd?.toLocaleString?.()}</b> &nbsp; IRR: <b>{mlInvestment.irr_pct}%</b></div>
+                                    <p className="text-ink-faint text-[11px] mt-0.5">{mlInvestment.note}</p>
                                   </div>
                                 )}
                                 {simResult && (
@@ -462,6 +540,52 @@ export default function Sites() {
                                     ))}
                                   </div>
                                 )}
+
+                                {(intel?.techRec || intel?.gridContribution || intel?.riskAssessment) && (
+                                  <div className="mt-3 pt-3 border-t border-border">
+                                    <div className="text-ink-muted font-semibold mb-2">Deployment Optimization & Risk (Milestone 3)</div>
+                                    {intel?.techRec && (
+                                      <div className="mb-2">
+                                        <span className="badge mr-1.5">{intel.techRec.recommendation}</span>
+                                        <span className="text-ink-faint">{intel.techRec.reasoning}</span>
+                                        {intel.techRec.suggested_capacity_mw && Object.keys(intel.techRec.suggested_capacity_mw).length > 0 && (
+                                          <div className="mt-1">
+                                            Suggested capacity: {Object.entries(intel.techRec.suggested_capacity_mw).map(([k, v]) => `${k.replace('_mw', '')}: ${v} MW`).join(', ')}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                    {intel?.gridContribution?.homes_powered_equivalent && (
+                                      <div className="mb-2">
+                                        Grid contribution: <b>~{intel.gridContribution.homes_powered_equivalent.toLocaleString()} homes powered (equivalent)</b>
+                                        <p className="text-ink-faint text-[11px]">{intel.gridContribution.basis}</p>
+                                      </div>
+                                    )}
+                                    {intel?.riskAssessment && (
+                                      <div className="mb-2">
+                                        Risk category: <span className={`badge ${intel.riskAssessment.risk_category === 'High' ? 'badge-red' : intel.riskAssessment.risk_category === 'Medium' ? 'badge-amber' : ''}`}>{intel.riskAssessment.risk_category}</span> <span className="text-ink-faint">({intel.riskAssessment.confidence_pct}% confidence, model {intel.riskAssessment.model_version})</span>
+                                        <p className="text-ink-faint text-[11px] mt-0.5">{intel.riskAssessment.note}</p>
+                                      </div>
+                                    )}
+                                    <button className="btn-sm btn-secondary" disabled={seasonalLoading} onClick={() => loadSeasonalForecast(s.id)}>
+                                      {seasonalLoading ? 'Loading…' : 'Load Seasonal Forecast'}
+                                    </button>
+                                    {seasonalForecast && (
+                                      <div className="mt-2 flex items-end gap-1 h-14">
+                                        {Object.entries(seasonalForecast.monthly_output_mwh_per_mw).map(([month, value]) => {
+                                          const max = Math.max(...Object.values(seasonalForecast.monthly_output_mwh_per_mw))
+                                          return (
+                                            <div key={month} className="flex flex-col items-center">
+                                              <div title={`${month}: ${value} MWh`} className="bg-brand/70 w-4 rounded-t" style={{ height: `${Math.max((value / max) * 40, 2)}px` }} />
+                                              <span className="text-[9px] text-ink-faint">{month.slice(0, 1)}</span>
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
                                 {intel?.telemetry?.length > 0 && (
                                   <div className="mt-3">
                                     <div className="text-ink-muted font-semibold mb-1">Live SCADA/IoT Telemetry (most recent)</div>

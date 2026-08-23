@@ -26,6 +26,7 @@ from app.routers import users as users_router
 from app.routers import audit as audit_router
 from app.routers import gis as gis_router
 from app.routers import regions as regions_router
+from app.routers import ml as ml_router
 
 configure_logging(level="DEBUG" if settings.environment != "production" else "INFO")
 
@@ -113,6 +114,7 @@ app.include_router(users_router.router)
 app.include_router(audit_router.router)
 app.include_router(gis_router.router)
 app.include_router(regions_router.router)
+app.include_router(ml_router.router)
 
 
 @app.get("/health", tags=["System"])

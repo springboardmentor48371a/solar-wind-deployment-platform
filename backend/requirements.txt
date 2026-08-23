@@ -67,5 +67,21 @@ sentry-sdk[fastapi]==2.14.0
 # is configured, without a separate deploy step.
 boto3==1.35.36
 
+# --- ML-Assisted Prediction (Beta) ---
+# Optional: only used if a model has actually been trained via
+# scripts/ml/train_solar_model.py (see app/services/ml_solar_predictor.py).
+# Everything runs fine with none of this installed/trained.
+scikit-learn==1.5.2
+joblib==1.4.2
+
+# xgboost is what the project spec names for the Investment Prediction
+# Model — it could not be installed in the build environment this
+# project was developed in (no network access), so
+# GradientBoostingRegressor (scikit-learn, already above) was used
+# instead and is what's actually shipped/tested. Listed here so a real
+# deployment environment with network access can install it and swap
+# it in later; nothing currently imports it.
+xgboost==2.1.1
+
 # --- Data Warehouse (Parquet export) ---
 pyarrow==17.0.0

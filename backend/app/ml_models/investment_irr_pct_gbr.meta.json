@@ -1,0 +1,18 @@
+{
+  "version": "gbr_v1_2026-08-22",
+  "algorithm": "GradientBoostingRegressor (scikit-learn) \u2014 substituted for XGBoost, which could not be installed in this build environment (no network access). Same gradient-boosted-trees family.",
+  "training_data_type": "Ground truth IS the real financial.py formula (exact re-derivation), sampled across a wide synthetic range of realistic project parameters. Target: irr_pct.",
+  "trained_on_rows": 20000,
+  "test_rmse": 3.6665667521070393,
+  "test_mae": 1.2488244413726515,
+  "test_r2": 0.9051777416814495,
+  "feature_columns": [
+    "capacity_mw",
+    "capex_usd",
+    "opex_usd_per_yr",
+    "discount_rate_pct",
+    "project_lifetime_yrs",
+    "electricity_price_usd_per_mwh",
+    "annual_energy_mwh"
+  ]
+}

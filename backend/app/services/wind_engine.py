@@ -14,6 +14,7 @@ from statistics import mean, pstdev
 from sqlalchemy.orm import Session
 
 from app import models
+from app.services import ml_wind_predictor
 
 AIR_DENSITY_SEA_LEVEL_KG_M3 = 1.225
 HUB_HEIGHT_M = 80.0  # typical modern onshore turbine hub height
@@ -83,6 +84,12 @@ def compute_wind_potential(db: Session, site: models.Site) -> models.WindPotenti
     capacity_factor = round(min(max(0.087 * avg_hub_speed * 100 - 8, 5), 55), 1)
     expected_aep_per_mw = round((capacity_factor / 100) * 8760, 1)  # MWh/yr per installed MW
 
+    avg_wind_speed_50m_raw = mean(speeds_50m) if speeds_50m else 0.0
+    ml_capacity_factor = ml_wind_predictor.predict_capacity_factor_pct(avg_wind_speed_50m_raw, site.elevation_m or 0.0)
+    ml_expected_aep = None
+    if ml_capacity_factor is not None:
+        ml_expected_aep = round((ml_capacity_factor / 100) * 8760, 1)
+
     record = models.WindPotential(
         site_id=site.id,
         average_wind_speed_ms=avg_hub_speed,
@@ -92,6 +99,9 @@ def compute_wind_potential(db: Session, site: models.Site) -> models.WindPotenti
         turbine_class=turbine_class,
         expected_aep_mwh_yr=expected_aep_per_mw,
         capacity_factor_pct=capacity_factor,
+        ml_capacity_factor_pct=ml_capacity_factor,
+        ml_expected_aep_mwh_yr=ml_expected_aep,
+        ml_model_version=ml_wind_predictor.model_version(),
     )
     db.add(record)
     db.commit()

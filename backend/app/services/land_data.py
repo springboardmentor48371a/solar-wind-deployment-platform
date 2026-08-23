@@ -28,6 +28,7 @@ SEARCH_RADIUS_M = 20000
 
 WB_POP_DENSITY_INDICATOR = "EN.POP.DNST"
 WB_GDP_PER_CAPITA_INDICATOR = "NY.GDP.PCAP.CD"
+WB_ELECTRICITY_PER_CAPITA_INDICATOR = "EG.USE.ELEC.KH.PC"  # kWh per capita/year — feeds Grid Contribution Forecasting
 
 
 def _reverse_geocode_country(lat: float, lon: float) -> tuple[str | None, str | None]:
@@ -165,6 +166,7 @@ def fetch_and_store_environmental_constraints(
     country, iso3 = _reverse_geocode_country(site.latitude, site.longitude)
     pop_density = _fetch_world_bank_indicator(iso3, WB_POP_DENSITY_INDICATOR) if iso3 else None
     gdp_per_capita = _fetch_world_bank_indicator(iso3, WB_GDP_PER_CAPITA_INDICATOR) if iso3 else None
+    electricity_per_capita = _fetch_world_bank_indicator(iso3, WB_ELECTRICITY_PER_CAPITA_INDICATOR) if iso3 else None
 
     db.query(models.EnvironmentalConstraint).filter(
         models.EnvironmentalConstraint.site_id == site.id
@@ -179,6 +181,7 @@ def fetch_and_store_environmental_constraints(
         country_iso3=iso3,
         population_density_km2=pop_density,
         gdp_per_capita_usd=gdp_per_capita,
+        electricity_consumption_kwh_per_capita=electricity_per_capita,
         data_source="OpenStreetMap (Overpass) + World Bank Open Data",
     )
     db.add(record)
