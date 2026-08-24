@@ -4,7 +4,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Projects from './pages/Projects';
 import Sites from './pages/Sites';
-import SiteDetails from './pages/SiteDetails';
+import SiteDetails from './pages/Sitedetails';
 import Dashboard from './pages/Dashboard';
 import Predict from './pages/Predict';
 function App() {

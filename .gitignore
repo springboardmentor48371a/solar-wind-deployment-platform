@@ -18,3 +18,26 @@ node_modules/
 .vite/
 .env
 .DS_Store
+
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Environment
+.env
+
+# SQLite temporary files
+*.db-shm
+*.db-wal
+
+# Datasets
+backend/datasets/
+
+# Trained ML artifacts
+backend/models/*.pkl
+backend/ml/artifacts/*.pkl
+
+# Python cache
+.pytest_cache/
