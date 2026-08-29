@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { 
-  Sun, Wind, LogOut, CheckCircle2, ShieldCheck, User, Mail, Key, 
+  Sun, Wind, LogOut, CheckCircle2, User, Mail, 
   Calculator, Activity, PlusCircle, History, Landmark, Compass, AlertTriangle
 } from 'lucide-react';
 
@@ -525,32 +525,42 @@ export const PlatformDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="glass-card rounded-2xl p-6 border border-slate-800 flex items-start space-x-4">
-                <div className="p-3 rounded-xl bg-slate-900 text-emerald-400 border border-slate-800">
-                  <ShieldCheck className="w-6 h-6 animate-pulse" />
+              {/* Card 3: Total Assessed Sites */}
+              <div className="glass-card rounded-2xl p-6 border border-slate-800 flex items-start space-x-4 shadow-sm">
+                <div className="p-3 rounded-xl bg-slate-900 text-amber-500 border border-slate-800">
+                  <Activity className="w-6 h-6" />
                 </div>
                 <div>
-                  <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">Authentication Status</span>
-                  <p className="text-lg font-bold text-emerald-400 mt-1 flex items-center space-x-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping inline-block" />
-                    <span>✓ Authenticated</span>
-                  </p>
-                  <p className="text-xs text-slate-400 font-medium mt-0.5">Secure JWT Verified</p>
+                  <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">Platform Activity</span>
+                  <p className="text-lg font-bold text-white mt-1">{historyList.length} Sites</p>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">Assessed Locations</p>
                 </div>
               </div>
+
             </div>
 
-            <div className="glass-card rounded-2xl p-6 border border-slate-800 shadow-sm">
+            {/* User Profile Panel */}
+            <div className="glass-card rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-sm">
               <h3 className="text-lg font-bold text-white mb-4 flex items-center space-x-2">
-                <Key className="w-5 h-5 text-amber-500" />
-                <span>Active Session Keys</span>
+                <User className="w-5 h-5 text-amber-500" />
+                <span>User Profile</span>
               </h3>
-              <div className="bg-slate-950/80 rounded-xl p-4 border border-slate-800 font-mono text-xs text-slate-300 space-y-2.5 overflow-x-auto">
-                <div><span className="text-amber-500 font-bold">User ID:</span> {user?.id}</div>
-                <div><span className="text-amber-500 font-bold">Full Name:</span> {user?.full_name}</div>
-                <div><span className="text-amber-500 font-bold">Email:</span> {user?.email}</div>
-                <div><span className="text-amber-500 font-bold">Account Created:</span> {user?.created_at ? new Date(user.created_at).toLocaleString() : 'N/A'}</div>
-                <div><span className="text-amber-500 font-bold">JWT Token Status:</span> Active & Verified</div>
+
+              <div className="bg-slate-950/80 rounded-xl p-4 border border-slate-800 text-sm text-slate-300 space-y-4 shadow-inner">
+                <div className="flex justify-between border-b border-slate-850 pb-2.5">
+                  <span className="text-slate-400 font-bold">Full Name</span>
+                  <span className="text-white font-semibold">{user?.full_name}</span>
+                </div>
+                <div className="flex justify-between border-b border-slate-850 pb-2.5">
+                  <span className="text-slate-400 font-bold">Email Address</span>
+                  <span className="text-white font-semibold">{user?.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-bold">Member Since</span>
+                  <span className="text-white font-semibold">
+                    {user?.created_at ? new Date(user.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
