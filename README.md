@@ -122,17 +122,27 @@ solar-wind-deployment-platform/
 │   ├── app/
 │   │   ├── core/          → config, security, dependencies
 │   │   ├── models/        → SQLAlchemy database models
-│   │   ├── routers/       → API endpoint handlers
+│   │   ├── routers/       → API endpoint handlers (auth, predictions, sites, projects, users)
 │   │   ├── schemas/       → Pydantic request/response schemas
-│   │   ├── services/      → external API integrations
+│   │   ├── services/      → geocoding and NASA/Open-Meteo aggregations
 │   │   ├── database.py    → DB engine and session
 │   │   ├── main.py        → FastAPI app entry point
 │   │   └── seed.py        → database seeder
 │   ├── requirements.txt
 │   └── Dockerfile
+├── ml-service/
+│   ├── app/
+│   │   ├── models/        → trained model binaries (.pkl, .pth)
+│   │   ├── routers/       → prediction and suitability endpoints
+│   │   ├── services/      → ML prediction and suitability ranking logic
+│   │   ├── models.py      → database tables for ML records
+│   │   └── main.py        → FastAPI app entry point
+│   ├── notebooks/         → Kaggle training notebooks for models
+│   ├── requirements.txt
+│   └── Dockerfile
 ├── frontend/
 │   └── src/
-│       ├── components/    → shared UI components
+│       ├── components/    → shared UI components (MapView, EnvSummary, PredictionPanel, AnalyticsView)
 │       ├── pages/         → role-based dashboard pages
 │       ├── App.jsx        → root component with routing
 │       └── api.js         → axios API helper
@@ -145,6 +155,11 @@ solar-wind-deployment-platform/
 └── README.md
 ```
 
+### Data Visibility Rules in Environmental Viewer
+*   **Wind Sites**: Display wind-related climate metrics (Wind Speed 10m, Wind Speed 50m) but **exclude/hide** solar-related metrics (irradiance, peak sun hours), keeping the layout strictly relevant to wind deployment.
+*   **Solar Sites**: Display solar-related climate metrics (Solar Irradiance, Peak Sun Hours) but **exclude/hide** wind speed metrics, as wind is not relevant to solar generation.
+*   **Hybrid Sites**: Display all available environmental metrics (both solar and wind).
+
 ---
 
 ## Module Progress
@@ -154,14 +169,14 @@ solar-wind-deployment-platform/
 | 1. User Authentication & RBAC | ✅ Complete |
 | 2. Project & Site Management | ✅ Complete |
 | 3. Environmental Data Collection | ✅ Complete |
-| 4. Geographic Intelligence Engine | 🔜 Planned |
-| 5. Solar Potential Prediction | 🔜 Planned |
-| 6. Wind Potential Prediction | 🔜 Planned |
-| 7. Site Suitability Engine | 🔜 Planned |
-| 8. Energy Forecasting Engine | 🔜 Planned |
+| 4. Geographic Intelligence Engine | ✅ Complete |
+| 5. Solar Potential Prediction | ✅ Complete |
+| 6. Wind Potential Prediction | ✅ Complete |
+| 7. Site Suitability Engine | ✅ Complete |
+| 8. Energy Forecasting Engine | ⏸ Paused (model rewrite needed) |
 | 9. Deployment Optimization Engine | 🔜 Planned |
-| 10. Site Scoring Engine | 🔜 Planned |
-| 11. Dashboard & Analytics | 🔄 In Progress |
+| 10. Site Scoring Engine | ✅ Complete |
+| 11. Dashboard & Analytics | ✅ Complete |
 | 12. Notification & Alert System | 🔜 Planned |
 | 13. Reports & Export System | 🔜 Planned |
 | 14. Final Integration & Deployment | 🔜 Planned |

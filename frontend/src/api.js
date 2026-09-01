@@ -47,4 +47,8 @@ export const collectEnvData = (siteId, days = 30) => api.post(`/environmental/${
 export const getEnvSummary = (siteId) => api.get(`/environmental/${siteId}/summary`)
 export const getEnvData = (siteId) => api.get(`/environmental/${siteId}`)
 
+// Predictions (ML)
+export const getPrediction = (siteId) => api.get(`/predictions/${siteId}`)
+export const runPrediction = (siteId) => api.post(`/predictions/${siteId}/run`)
+
 export default api

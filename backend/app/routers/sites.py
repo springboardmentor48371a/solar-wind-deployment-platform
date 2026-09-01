@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
@@ -101,12 +102,25 @@ async def create_site(payload: SiteCreate, db: Session = Depends(get_db), curren
     try:
         from ..models.environmental import EnvironmentalData
         from ..services.environmental import collect_environmental_data
-        records = await collect_environmental_data(site.latitude, site.longitude, 30)
+        records = await collect_environmental_data(site.latitude, site.longitude, 30, site.elevation)
         for r in records:
             db.add(EnvironmentalData(site_id=site.id, **r))
         db.commit()
     except Exception:
         pass
+
+    # Trigger ML predictions
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            await client.post("http://ml-service:8001/predict/all", json={
+                "site_id": site.id,
+                "latitude": site.latitude,
+                "longitude": site.longitude,
+                "elevation": site.elevation,
+                "energy_type": site.energy_type.value,
+            })
+    except Exception:
+        pass  # ML service may not have models yet — non-blocking
 
     return site
 

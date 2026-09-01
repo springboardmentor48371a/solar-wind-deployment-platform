@@ -9,7 +9,7 @@ OPEN_TOPO_URL  = "https://api.opentopodata.org/v1/srtm30m"
 async def fetch_nasa_power(lat: float, lon: float, start: date, end: date) -> dict:
     """Fetch solar irradiance and wind data from NASA POWER API."""
     params = {
-        "parameters": "ALLSKY_SFC_SW_DWN,WS10M,WS50M,WD10M,T2M_MAX,T2M_MIN,T2M,PRECTOTCORR,CLOUD_AMT",
+        "parameters": "ALLSKY_SFC_SW_DWN,WS10M,WS50M,WD10M,T2M_MAX,T2M_MIN,T2M,PRECTOTCORR",
         "community": "RE",
         "longitude": lon,
         "latitude": lat,
@@ -22,23 +22,24 @@ async def fetch_nasa_power(lat: float, lon: float, start: date, end: date) -> di
         res.raise_for_status()
     return res.json()["properties"]["parameter"]
 
-async def fetch_open_meteo(lat: float, lon: float, start: date, end: date) -> dict:
-    """Fetch humidity and additional climate data from Open-Meteo."""
+async def fetch_open_meteo(lat: float, lon: float, start: date, end: date) -> tuple[dict, dict]:
+    """Fetch humidity and cloud cover from Open-Meteo."""
     params = {
         "latitude": lat,
         "longitude": lon,
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
-        "daily": "relative_humidity_2m_max",
+        "daily": "relative_humidity_2m_max,cloudcover_mean",
         "timezone": "auto",
     }
     async with httpx.AsyncClient(timeout=30) as client:
         res = await client.get(OPEN_METEO_URL, params=params)
         res.raise_for_status()
     data = res.json()
-    dates = data["daily"]["time"]
-    humidity = data["daily"]["relative_humidity_2m_max"]
-    return dict(zip(dates, humidity))
+    dates     = data["daily"]["time"]
+    humidity  = data["daily"]["relative_humidity_2m_max"]
+    cloud     = data["daily"]["cloudcover_mean"]
+    return dict(zip(dates, humidity)), dict(zip(dates, cloud))
 
 async def fetch_elevation(lat: float, lon: float) -> Optional[float]:
     """Fetch elevation from OpenTopoData SRTM30m dataset."""
@@ -58,7 +59,7 @@ def parse_nasa_daily(nasa_data: dict, target_date: date) -> dict:
     irradiance = get("ALLSKY_SFC_SW_DWN")
     return {
         "solar_irradiance": irradiance,
-        "peak_sun_hours": round(irradiance / 1000 * 24, 2) if irradiance else None,
+        "peak_sun_hours": round(irradiance, 2) if irradiance else None,
         "wind_speed": get("WS10M"),
         "wind_speed_50m": get("WS50M"),
         "wind_direction": get("WD10M"),
@@ -66,10 +67,10 @@ def parse_nasa_daily(nasa_data: dict, target_date: date) -> dict:
         "temperature_min": get("T2M_MIN"),
         "temperature_avg": get("T2M"),
         "rainfall": get("PRECTOTCORR"),
-        "cloud_cover": get("CLOUD_AMT"),
+        "cloud_cover": None,  # sourced from Open-Meteo instead
     }
 
-async def collect_environmental_data(lat: float, lon: float, days: int = 30) -> list[dict]:
+async def collect_environmental_data(lat: float, lon: float, days: int = 30, elevation: Optional[float] = None) -> list[dict]:
     """
     Main function — collects last N days of environmental data for a location.
     Returns list of daily records ready to be saved to DB.
@@ -78,8 +79,9 @@ async def collect_environmental_data(lat: float, lon: float, days: int = 30) -> 
     start = end - timedelta(days=days - 1)
 
     nasa_data = await fetch_nasa_power(lat, lon, start, end)
-    humidity_map = await fetch_open_meteo(lat, lon, start, end)
-    elevation = await fetch_elevation(lat, lon)
+    humidity_map, cloud_map = await fetch_open_meteo(lat, lon, start, end)
+    if elevation is None:
+        elevation = await fetch_elevation(lat, lon)
 
     records = []
     current = start
@@ -87,6 +89,7 @@ async def collect_environmental_data(lat: float, lon: float, days: int = 30) -> 
         daily = parse_nasa_daily(nasa_data, current)
         daily["date"] = current
         daily["humidity"] = humidity_map.get(current.isoformat())
+        daily["cloud_cover"] = cloud_map.get(current.isoformat())
         daily["elevation"] = elevation
         daily["source"] = "nasa_power+open_meteo"
         records.append(daily)

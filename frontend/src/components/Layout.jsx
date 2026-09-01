@@ -1,10 +1,10 @@
 import { useState } from 'react'
 
 const sidebarLinks = {
-  energy_planner:  [{ label: 'Projects & Sites', key: 'projects' }, { label: 'Map View', key: 'map' }],
-  gis_analyst:     [{ label: 'Map View', key: 'map' }, { label: 'Sites', key: 'projects' }],
-  project_manager: [{ label: 'Projects & Sites', key: 'projects' }, { label: 'Map View', key: 'map' }],
-  administrator:   [{ label: 'Projects & Sites', key: 'projects' }, { label: 'Map View', key: 'map' }, { label: 'User Management', key: 'users' }],
+  energy_planner:  [{ label: 'Projects & Sites', key: 'projects' }, { label: 'Map View', key: 'map' }, { label: 'Analytics', key: 'analytics' }],
+  gis_analyst:     [{ label: 'Map View', key: 'map' }, { label: 'Sites', key: 'projects' }, { label: 'Analytics', key: 'analytics' }],
+  project_manager: [{ label: 'Projects & Sites', key: 'projects' }, { label: 'Map View', key: 'map' }, { label: 'Analytics', key: 'analytics' }],
+  administrator:   [{ label: 'Projects & Sites', key: 'projects' }, { label: 'Map View', key: 'map' }, { label: 'Analytics', key: 'analytics' }, { label: 'User Management', key: 'users' }],
 }
 
 export default function Layout({ user, children, activePage, onNavigate, onLogout }) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { listProjects, createProject, deleteProject, listSites, createSite, updateSiteStatus, deleteSite, previewLocation } from '../api'
 import EnvSummary from './EnvSummary'
+import PredictionPanel from './PredictionPanel'
 
 const SITE_STATUSES = ['under_review', 'approved', 'rejected']
 
@@ -207,7 +208,8 @@ export default function ProjectsView({ user }) {
                   </div>
                   {selectedSite?.id === site.id && (
                     <div onClick={e => e.stopPropagation()}>
-                      <EnvSummary siteId={site.id} />
+                      <EnvSummary siteId={site.id} energyType={site.energy_type} />
+                      <PredictionPanel siteId={site.id} energyType={site.energy_type} />
                     </div>
                   )}
                 </div>

@@ -3,6 +3,7 @@ import Layout from '../components/Layout'
 import ProjectsView from '../components/ProjectsView'
 import MapView from '../components/MapView'
 import UsersView from '../components/UsersView'
+import AnalyticsView from '../components/AnalyticsView'
 import { listProjects, listSites } from '../api'
 
 export default function AdminDashboard({ user, onLogout }) {
@@ -21,6 +22,7 @@ export default function AdminDashboard({ user, onLogout }) {
     <Layout user={user} onLogout={onLogout} activePage={page} onNavigate={setPage}>
       {page === 'projects' && <ProjectsView user={user} />}
       {page === 'map' && <MapView sites={allSites} />}
+      {page === 'analytics' && <AnalyticsView />}
       {page === 'users' && <UsersView />}
     </Layout>
   )

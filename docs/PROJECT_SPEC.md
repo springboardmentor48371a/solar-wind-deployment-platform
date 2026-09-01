@@ -66,32 +66,27 @@ The platform leverages geospatial analytics, satellite imagery, weather forecast
 - Terrain analysis (OpenTopoData)
 - Climate data integration (Open-Meteo)
 
-### 4. Geographic Intelligence Engine 🔜
-- GIS data processing
-- Terrain mapping
-- Accessibility analysis
-- Infrastructure proximity analysis
-- Land suitability assessment
+### 4. Geographic Intelligence Engine ✅
+- GIS data processing (Leaflet maps integration)
+- Terrain mapping (Elevation and slope indices)
+- Land suitability assessment (distilled EuroSAT bridge model)
 
-### 5. Solar Potential Prediction Engine 🔜
-- Solar energy estimation
-- Panel efficiency prediction
-- Seasonal energy forecasting
+### 5. Solar Potential Prediction Engine ✅
+- Solar energy estimation (capacity factor prediction)
+- Panel efficiency/yield tracking
 - Solar resource mapping
 
-### 6. Wind Potential Prediction Engine 🔜
-- Wind resource assessment
+### 6. Wind Potential Prediction Engine ✅
+- Wind resource assessment (Betz fallback & SCADA power predictions)
 - Turbine suitability analysis
 - Wind power estimation
-- Seasonal wind forecasting
 
-### 7. Site Suitability Intelligence Engine 🔜
+### 7. Site Suitability Intelligence Engine ✅
 - Site ranking
 - Multi-factor suitability analysis
-- Deployment feasibility assessment
 - Environmental impact evaluation
 
-### 8. Energy Forecasting Engine 🔜
+### 8. Energy Forecasting Engine ⏸ (model rewrite needed)
 - Energy production forecasting
 - Seasonal generation prediction
 - Long-term energy estimation
@@ -103,7 +98,7 @@ The platform leverages geospatial analytics, satellite imagery, weather forecast
 - Capacity planning
 - Hybrid solar-wind recommendations
 
-### 10. Site Scoring Engine 🔜
+### 10. Site Scoring Engine ✅
 
 ```
 Deployment Suitability Score =
@@ -116,13 +111,13 @@ Deployment Suitability Score =
 
 **Suitability Categories:** Excellent · Highly Suitable · Moderately Suitable · Low Suitability · Unsuitable
 
-### 11. Dashboard & Analytics 🔄
+### 11. Dashboard & Analytics ✅
 | Dashboard | Shows |
 |---|---|
-| **Energy Planner** | Recommended sites, forecasts, suitability scores, investment recommendations |
-| **GIS Analyst** | GIS visualization, terrain maps, site comparison |
-| **Project Manager** | Project progress, feasibility reports, cost-benefit, timelines |
-| **Admin** | User management, platform analytics, system monitoring |
+| **Energy Planner** | Recommended sites, suitability scores, analytics rankings |
+| **GIS Analyst** | Leaflet Map GIS visualization, terrain metrics, site comparisons |
+| **Project Manager** | Project progress, site list, comparisons, status updates |
+| **Admin** | User management, role changes, deactivations |
 
 ### 12. Notification & Alert System 🔜
 ### 13. Reports & Export System 🔜

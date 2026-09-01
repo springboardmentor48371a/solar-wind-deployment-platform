@@ -25,16 +25,7 @@ async def collect_data(
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
 
-    # Check if we already have recent data (within 24hrs) — avoid redundant API calls
-    from datetime import datetime
-    recent = db.query(EnvironmentalData).filter(
-        EnvironmentalData.site_id == site_id,
-        EnvironmentalData.fetched_at >= datetime.utcnow() - timedelta(hours=24)
-    ).first()
-    if recent:
-        return {"message": "Data already up to date", "site_id": site_id}
-
-    records = await collect_environmental_data(site.latitude, site.longitude, days)
+    records = await collect_environmental_data(site.latitude, site.longitude, days, site.elevation)
 
     # Delete old records for this site before inserting fresh ones
     db.query(EnvironmentalData).filter(EnvironmentalData.site_id == site_id).delete()

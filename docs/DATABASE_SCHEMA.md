@@ -21,6 +21,9 @@ Complete database schema for the Solar & Wind Deployment Intelligence Platform.
 | `sites` | Module 2 | Individual deployment sites within projects |
 | `deployment_history` | Module 2 | Audit log of site status changes |
 | `environmental_data` | Module 3 | Daily climate and weather data per site |
+| `site_predictions` | Modules 4-7, 10 | Stores ML predictions (solar, wind, land cover) and suitability scores |
+| `energy_forecasts` | Module 8 | Stores 30-day forecast projections for energy output |
+| `land_cover` | Module 4 | Detailed land cover probability percentages for site regions |
 
 ---
 
@@ -147,6 +150,74 @@ Daily environmental readings per site fetched from external APIs. One row per si
 
 ---
 
+### `site_predictions`
+
+Stores machine learning-predicted metrics and overall suitability ratings calculated for each site. Updates automatically when predictions are executed or manually rerun.
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | Integer | No | Primary key |
+| `site_id` | Integer (Index) | No | Target site identifier (logical one-to-one mapping) |
+| `solar_yield_kwh` | Float | Yes | Predicted daily solar yield per kWp (kWh/day) |
+| `solar_capacity_factor` | Float | Yes | Solar capacity factor rating (0.0 to 1.0) |
+| `solar_score` | Float | Yes | Solar suitability score (0 to 100) |
+| `wind_power_kw` | Float | Yes | Estimated wind turbine power output in kW |
+| `wind_capacity_factor` | Float | Yes | Wind capacity factor rating (0.0 to 1.0) |
+| `wind_score` | Float | Yes | Wind suitability score (0 to 100) |
+| `land_cover_class` | String(50) | Yes | Dominant predicted cover class (e.g., vegetation, cropland) |
+| `vegetation_index` | Float | Yes | Site average NDVI value (-1.0 to 1.0) |
+| `land_slope` | Float | Yes | Derived terrain slope in degrees |
+| `land_cover_score` | Float | Yes | Final environment suitability score (0 to 100) |
+| `suitability_score` | Float | Yes | Final weighted deployment suitability score (0 to 100) |
+| `suitability_category` | String(50) | Yes | Rating category (Excellent, Highly Suitable, etc.) |
+| `resource_score` | Float | Yes | Weighted Resource score (35% weight) |
+| `geographic_score` | Float | Yes | Weighted Geographic score (25% weight) |
+| `infrastructure_score` | Float | Yes | Weighted Infrastructure score (15% weight - default 50.0) |
+| `environmental_score` | Float | Yes | Weighted Environmental score (15% weight) |
+| `economic_score` | Float | Yes | Weighted Economic score (10% weight - default 50.0) |
+| `predicted_at` | DateTime | No | Timestamp of initial prediction |
+| `updated_at` | DateTime | No | Timestamp of last prediction update |
+
+---
+
+### `energy_forecasts`
+
+Stores PyTorch LSTM model forecast projections for future daily energy outputs. Contains 30 daily forecast entries per site.
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | Integer | No | Primary key |
+| `site_id` | Integer (Index) | No | Target site identifier |
+| `forecast_date` | Date | No | Future calendar date for the prediction |
+| `predicted_solar_kwh` | Float | Yes | Forecasted solar generation on this date in kWh |
+| `predicted_wind_kwh` | Float | Yes | Forecasted wind generation on this date in kWh |
+| `predicted_total_kwh` | Float | Yes | Combined forecasted generation on this date in kWh |
+| `confidence` | Float | Yes | Forecast accuracy confidence score (e.g., 0.85) |
+| `created_at` | DateTime | No | Timestamp of forecast creation |
+
+---
+
+### `land_cover`
+
+Stores raw classification probability percentages mapped from satellite image processing.
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | Integer | No | Primary key |
+| `site_id` | Integer (Index) | No | Target site identifier |
+| `cover_class` | String(50) | Yes | Predicted dominant class name |
+| `vegetation_pct` | Float | Yes | Probability percentage of vegetation coverage |
+| `urban_pct` | Float | Yes | Probability percentage of urban coverage |
+| `water_pct` | Float | Yes | Probability percentage of water body coverage |
+| `barren_pct` | Float | Yes | Probability percentage of barren land coverage |
+| `ndvi` | Float | Yes | Processed NDVI value |
+| `slope_deg` | Float | Yes | Derived terrain slope in degrees |
+| `aspect_deg` | Float | Yes | Terrain orientation / aspect in degrees |
+| `notes` | Text | Yes | Optional analyst notes |
+| `analyzed_at` | DateTime | No | Timestamp of geographic analysis |
+
+---
+
 ## Relationships
 
 ```
@@ -163,7 +234,10 @@ projects
 
 sites
  ├── deployment_history (one site → many history records)
- └── environmental_data (one site → many daily records)
+ ├── environmental_data (one site → many daily records)
+ ├── site_predictions (one site → one prediction record)
+ ├── energy_forecasts (one site → many daily forecasts)
+ └── land_cover (one site → one detailed land cover assessment)
 ```
 
 **Entity Relationship Summary:**
@@ -173,6 +247,9 @@ users ──< projects >── regions
 users ──< sites >── projects
 users ──< deployment_history >── sites
 sites ──< environmental_data
+sites ─── site_predictions
+sites ──< energy_forecasts
+sites ─── land_cover
 ```
 
 ---

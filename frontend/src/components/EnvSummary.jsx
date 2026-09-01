@@ -9,7 +9,7 @@ const Card = ({ label, value, unit, color }) => (
   </div>
 )
 
-export default function EnvSummary({ siteId }) {
+export default function EnvSummary({ siteId, energyType }) {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -70,10 +70,18 @@ export default function EnvSummary({ siteId }) {
 
       {summary && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <Card label="Solar Irradiance" value={summary.avg_solar_irradiance} unit="W/m²" color={solarColor(summary.avg_peak_sun_hours)} />
-          <Card label="Peak Sun Hours" value={summary.avg_peak_sun_hours} unit="hrs/day" color={solarColor(summary.avg_peak_sun_hours)} />
-          <Card label="Wind Speed 10m" value={summary.avg_wind_speed} unit="m/s" color={windColor(summary.avg_wind_speed)} />
-          <Card label="Wind Speed 50m" value={summary.avg_wind_speed_50m} unit="m/s" color={windColor(summary.avg_wind_speed_50m)} />
+          {(energyType === 'solar' || energyType === 'hybrid') && (
+            <>
+              <Card label="Solar Irradiance" value={summary.avg_solar_irradiance} unit="W/m²" color={solarColor(summary.avg_peak_sun_hours)} />
+              <Card label="Peak Sun Hours" value={summary.avg_peak_sun_hours} unit="hrs/day" color={solarColor(summary.avg_peak_sun_hours)} />
+            </>
+          )}
+          {(energyType === 'wind' || energyType === 'hybrid') && (
+            <>
+              <Card label="Wind Speed 10m" value={summary.avg_wind_speed} unit="m/s" color={windColor(summary.avg_wind_speed)} />
+              <Card label="Wind Speed 50m" value={summary.avg_wind_speed_50m} unit="m/s" color={windColor(summary.avg_wind_speed_50m)} />
+            </>
+          )}
           <Card label="Avg Temperature" value={summary.avg_temperature} unit="°C" />
           <Card label="Total Rainfall" value={summary.total_rainfall} unit="mm" />
           <Card label="Cloud Cover" value={summary.avg_cloud_cover} unit="%" />

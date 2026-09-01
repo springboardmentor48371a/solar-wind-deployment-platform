@@ -12,8 +12,9 @@ Key workflows and processes implemented in the Solar & Wind Deployment Intellige
 4. [Project & Site Creation](#4-project--site-creation)
 5. [Site Status Update & Audit Trail](#5-site-status-update--audit-trail)
 6. [Environmental Data Collection](#6-environmental-data-collection)
-7. [API Endpoints Reference](#api-endpoints-reference)
-8. [Role-Based Access Control](#role-based-access-control)
+7. [ML Prediction Pipeline](#7-ml-prediction-pipeline)
+8. [API Endpoints Reference](#api-endpoints-reference)
+9. [Role-Based Access Control](#role-based-access-control)
 
 ---
 
@@ -215,6 +216,33 @@ GET /environmental/{site_id}/summary returns:
 
 ---
 
+## 7. ML Prediction Pipeline
+
+```
+User triggers ML predictions (manually or on site creation)
+        ↓
+POST /predictions/{site_id}/run proxy endpoint called
+        ↓
+Backend queries database for site details (coordinates, elevation, type)
+        ↓
+Backend forwards request to the ml-service: POST /predict/all
+        ↓
+ml-service averages 30 days of site's environmental_data
+        ↓
+ml-service executes 3 prediction modules:
+  - Solar Model: predicts capacity factor & daily solar yield (10 features)
+  - Wind Model: predicts power output with Betz-limit low speed fallback (10 features)
+  - Land Cover Model: predicts dominant cover class & vegetation index (3 features)
+        ↓
+ml-service calculates final deployment suitability score & rating category
+        ↓
+ml-service writes/updates record in `site_predictions` table
+        ↓
+Frontend displays scores, sub-scores, and recommendations in real-time
+```
+
+---
+
 ## API Endpoints Reference
 
 ### Authentication — `/auth`
@@ -271,6 +299,13 @@ GET /environmental/{site_id}/summary returns:
 | GET | `/sites/{id}/history` | Any | Get full deployment history for a site |
 | DELETE | `/sites/{id}` | Creator or Admin | Delete a site |
 
+### Predictions — `/predictions`
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | `/predictions/{site_id}` | Any | Retrieve calculated ML predictions & suitability scores |
+| POST | `/predictions/{site_id}/run` | Any | Manually trigger/re-run all ML models for a site |
+
 ### Environmental Data — `/environmental`
 
 | Method | Endpoint | Auth | Description |
@@ -311,6 +346,8 @@ GET /environmental/{site_id}/summary returns:
 | View sites | ✅ | ✅ | ✅ | ✅ |
 | Collect environmental data | ✅ | ✅ | ✅ | ✅ |
 | View environmental data | ✅ | ✅ | ✅ | ✅ |
+| Run ML predictions | ✅ | ❌ | ✅ | ✅ |
+| View ML predictions | ✅ | ✅ | ✅ | ✅ |
 
 ### Frontend UI visibility by role
 

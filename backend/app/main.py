@@ -5,7 +5,7 @@ from .database import engine, Base
 # import models so SQLAlchemy registers them before create_all
 from .models import user, project, site, environmental
 
-from .routers import auth, users, projects, sites, environmental
+from .routers import auth, users, projects, sites, environmental, predictions
 
 Base.metadata.create_all(bind=engine)
 
@@ -25,6 +25,7 @@ app.include_router(projects.router)
 app.include_router(projects.region_router)
 app.include_router(sites.router)
 app.include_router(environmental.router)
+app.include_router(predictions.router)
 
 @app.get("/health")
 def health():
