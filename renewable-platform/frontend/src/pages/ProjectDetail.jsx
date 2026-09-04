@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../api.js'
 import SiteCard from '../components/SiteCard.jsx'
+import LocationPickerMap from '../components/LocationPickerMap.jsx'
+import ProjectMap from '../components/ProjectMap.jsx'
 
 const SITE_TYPES = ['solar', 'wind', 'hybrid']
 
@@ -13,8 +15,7 @@ export default function ProjectDetail() {
   const [showForm, setShowForm] = useState(false)
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState({
-    name: '', latitude: '', longitude: '', region: '',
-    land_area_hectares: '', elevation_m: '', site_type: 'hybrid',
+    name: '', latitude: 28.6139, longitude: 77.2090, site_type: 'hybrid',
   })
 
   const load = () => {
@@ -27,6 +28,10 @@ export default function ProjectDetail() {
 
   const update = (field) => (e) => setForm({ ...form, [field]: e.target.value })
 
+  const handleLocationSelect = (lat, lon) => {
+    setForm(prev => ({ ...prev, latitude: lat, longitude: lon }))
+  }
+
   const handleCreate = async (e) => {
     e.preventDefault()
     setCreating(true)
@@ -35,10 +40,8 @@ export default function ProjectDetail() {
         ...form,
         latitude: parseFloat(form.latitude),
         longitude: parseFloat(form.longitude),
-        land_area_hectares: form.land_area_hectares ? parseFloat(form.land_area_hectares) : null,
-        elevation_m: form.elevation_m ? parseFloat(form.elevation_m) : null,
       })
-      setForm({ name: '', latitude: '', longitude: '', region: '', land_area_hectares: '', elevation_m: '', site_type: 'hybrid' })
+      setForm({ name: '', latitude: 28.6139, longitude: 77.2090, site_type: 'hybrid' })
       setShowForm(false)
       load()
     } finally {
@@ -58,77 +61,114 @@ export default function ProjectDetail() {
           <h1>{project.name}</h1>
           <p className="page-subtitle">{project.objective || project.description || 'No objective set'}</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancel' : '+ Register Site'}
-        </button>
+        <div className="action-button-group">
+          {sites.length > 1 && (
+            <Link to={`/projects/${projectId}/compare`} className="btn-secondary">
+              📊 Compare Sites
+            </Link>
+          )}
+          <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Cancel' : '+ Register Site'}
+          </button>
+        </div>
       </div>
 
       {showForm && (
-        <form className="inline-form" onSubmit={handleCreate}>
+        <form className="inline-form site-registration-modal" onSubmit={handleCreate}>
+          <h2>📍 Site Registration & Location Search</h2>
           <div className="form-row">
             <div>
-              <label>Site name</label>
-              <input value={form.name} onChange={update('name')} required />
+              <label>Site Name</label>
+              <input
+                value={form.name}
+                onChange={update('name')}
+                placeholder="e.g. Delhi Site 1, Bawana Substation Site..."
+                required
+              />
             </div>
             <div>
-              <label>Region</label>
-              <input value={form.region} onChange={update('region')} />
+              <label>Preferred Technology</label>
+              <select value={form.site_type} onChange={update('site_type')}>
+                {SITE_TYPES.map(t => <option key={t} value={t}>{t.toUpperCase()}</option>)}
+              </select>
             </div>
           </div>
-          <div className="form-row">
+
+          <div className="map-picker-section">
+            <label>Interactive Map & Location Search</label>
+            <LocationPickerMap
+              initialLat={form.latitude}
+              initialLon={form.longitude}
+              onLocationSelect={handleLocationSelect}
+            />
+          </div>
+
+          <div className="form-row" style={{ marginTop: '12px' }}>
             <div>
-              <label>Latitude</label>
-              <input type="number" step="any" value={form.latitude} onChange={update('latitude')} required />
+              <label>Captured Latitude</label>
+              <input
+                type="number"
+                step="any"
+                value={form.latitude}
+                onChange={update('latitude')}
+                required
+              />
             </div>
             <div>
-              <label>Longitude</label>
-              <input type="number" step="any" value={form.longitude} onChange={update('longitude')} required />
+              <label>Captured Longitude</label>
+              <input
+                type="number"
+                step="any"
+                value={form.longitude}
+                onChange={update('longitude')}
+                required
+              />
             </div>
           </div>
-          <div className="form-row">
-            <div>
-              <label>Land area (hectares)</label>
-              <input type="number" step="any" value={form.land_area_hectares} onChange={update('land_area_hectares')} />
-            </div>
-            <div>
-              <label>Elevation (m)</label>
-              <input type="number" step="any" value={form.elevation_m} onChange={update('elevation_m')} />
-            </div>
-          </div>
-          <label>Preferred technology</label>
-          <select value={form.site_type} onChange={update('site_type')}>
-            {SITE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <button className="btn-primary" type="submit" disabled={creating}>
-            {creating ? 'Analyzing site…' : 'Register & Analyze Site'}
+
+          <button className="btn-primary" type="submit" disabled={creating} style={{ marginTop: '12px' }}>
+            {creating ? 'Fetching Datasets & Analyzing Site…' : 'Register & Run Full Analysis'}
           </button>
-          <p className="hint">This runs the full pipeline: environmental data → solar/wind prediction → suitability scoring → energy forecasting.</p>
+          <p className="hint">
+            Latitude and longitude identify the location. Remaining environmental factors are automatically fetched
+            from datasets/live APIs and processed through solar, wind, suitability, and energy forecasting engines.
+          </p>
         </form>
       )}
 
+      {sites.length > 0 && (
+        <ProjectMap sites={sites} ranking={ranking} />
+      )}
+
       {ranking.length > 0 && (
-        <>
-          <h2>Site Ranking</h2>
+        <div className="card" style={{ marginTop: '20px' }}>
+          <div className="section-header-compact">
+            <h2>🏆 Site Ranking & Recommendations</h2>
+            {sites.length > 1 && (
+              <Link to={`/projects/${projectId}/compare`} className="btn-link">View Side-by-Side Comparison →</Link>
+            )}
+          </div>
           <table className="ranking-table">
             <thead>
-              <tr><th>#</th><th>Site</th><th>Score</th><th>Category</th><th>Recommended</th></tr>
+              <tr><th>#</th><th>Site Name</th><th>Overall Score</th><th>Suitability Category</th><th>Recommendation</th><th>Details</th></tr>
             </thead>
             <tbody>
               {ranking.map((r, i) => (
                 <tr key={r.site_id}>
                   <td>{i + 1}</td>
-                  <td><Link to={`/projects/${projectId}/sites/${r.site_id}`}>{r.site_name}</Link></td>
-                  <td>{r.overall_score.toFixed(1)}</td>
-                  <td>{r.category}</td>
-                  <td>{r.recommended_technology}</td>
+                  <td><Link to={`/projects/${projectId}/sites/${r.site_id}`}><strong>{r.site_name}</strong></Link></td>
+                  <td><strong>{r.overall_score.toFixed(1)}</strong> / 100</td>
+                  <td><span className="badge-cat">{r.category}</span></td>
+                  <td><span className="badge-tech">{r.recommended_technology.toUpperCase()}</span></td>
+                  <td><Link to={`/projects/${projectId}/sites/${r.site_id}`} className="btn-sm">View Analysis →</Link></td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </>
+        </div>
       )}
 
-      <h2>All Sites</h2>
+      <h2>All Project Sites ({sites.length})</h2>
       {sites.length === 0 ? (
         <div className="empty-state">
           <p>No sites registered yet for this project.</p>

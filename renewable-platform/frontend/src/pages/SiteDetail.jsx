@@ -1,16 +1,65 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, LineChart, Line, CartesianGrid, Legend } from 'recharts'
+import L from 'leaflet'
 import api from '../api.js'
 import ScoreBadge from '../components/ScoreBadge.jsx'
 
 export default function SiteDetail() {
   const { projectId, siteId } = useParams()
   const [detail, setDetail] = useState(null)
+  const [recomputing, setRecomputing] = useState(false)
+  const miniMapRef = useRef(null)
+  const mapInstance = useRef(null)
+
+  const load = () => {
+    api.get(`/projects/${projectId}/sites/${siteId}`).then(({ data }) => setDetail(data))
+  }
+
+  useEffect(() => { load() }, [projectId, siteId])
 
   useEffect(() => {
-    api.get(`/projects/${projectId}/sites/${siteId}`).then(({ data }) => setDetail(data))
-  }, [projectId, siteId])
+    if (!detail || !miniMapRef.current) return
+    if (mapInstance.current) {
+      mapInstance.current.remove()
+      mapInstance.current = null
+    }
+
+    const { latitude, longitude } = detail.site
+    const map = L.map(miniMapRef.current).setView([latitude, longitude], 13)
+    mapInstance.current = map
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map)
+
+    L.marker([latitude, longitude]).addTo(map).bindPopup(detail.site.name).openPopup()
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove()
+        mapInstance.current = null
+      }
+    }
+  }, [detail])
+
+  const handleRecompute = async () => {
+    setRecomputing(true)
+    try {
+      await api.post(`/projects/${projectId}/sites/${siteId}/recompute`)
+      load()
+    } finally {
+      setRecomputing(false)
+    }
+  }
+
+  const handleDownloadPdf = () => {
+    window.open(`/api/reports/site/${siteId}/pdf`, '_blank')
+  }
+
+  const handleDownloadExcel = () => {
+    window.open(`/api/reports/site/${siteId}/excel`, '_blank')
+  }
 
   if (!detail) return <div className="page"><p>Loading…</p></div>
 
@@ -42,16 +91,55 @@ export default function SiteDetail() {
       <div className="section-header">
         <div>
           <h1>{site.name}</h1>
-          <p className="page-subtitle">{site.latitude.toFixed(4)}, {site.longitude.toFixed(4)} · {site.region || 'Region not set'}</p>
+          <p className="page-subtitle">{site.latitude.toFixed(4)}°N, {site.longitude.toFixed(4)}°E · {site.region || 'Region resolved'}</p>
         </div>
-        {score && <ScoreBadge category={score.category} score={score.overall_score} />}
+        <div className="action-button-group">
+          <button className="btn-secondary" onClick={handleDownloadPdf}>📄 PDF Report</button>
+          <button className="btn-secondary" onClick={handleDownloadExcel}>📊 Excel Report</button>
+          {score && <ScoreBadge category={score.category} score={score.overall_score} />}
+        </div>
+      </div>
+
+      <div className="two-col">
+        <div className="card">
+          <h2>📍 Site Information & Attributes</h2>
+          <p className="muted">
+            Site parameters auto-derived from live datasets:
+            {' '}
+            <button className="btn-link" onClick={handleRecompute} disabled={recomputing}>
+              {recomputing ? 'Recomputing…' : 'Recompute Live Data'}
+            </button>
+          </p>
+          <dl className="metric-list">
+            <div><dt>Land Area</dt><dd>{site.land_area_hectares} ha</dd></div>
+            <div><dt>Elevation</dt><dd>{site.elevation_m != null ? `${site.elevation_m} m` : '—'}</dd></div>
+            <div><dt>Region</dt><dd>{site.region || '—'}</dd></div>
+            <div><dt>Land Ownership</dt><dd>{site.land_ownership || '—'}</dd></div>
+            <div><dt>Existing Infra</dt><dd>{site.existing_infrastructure || '—'}</dd></div>
+          </dl>
+        </div>
+
+        <div className="card">
+          <h2>🗺️ Location Map View</h2>
+          <div ref={miniMapRef} style={{ height: '220px', borderRadius: '8px', marginTop: '8px' }} />
+        </div>
       </div>
 
       {score && (
         <div className="card">
-          <h2>Deployment Suitability</h2>
-          <p className="muted">Recommended technology: <strong>{score.recommended_technology}</strong></p>
-          <ResponsiveContainer width="100%" height={280}>
+          <h2>🎯 Technology Recommendation & Suitability</h2>
+          <div className="recommendation-hero-banner">
+            <div>
+              <span className="hero-label">RECOMMENDED DEPLOYMENT</span>
+              <h3 className="hero-tech">{score.recommended_technology.toUpperCase()}</h3>
+            </div>
+            <div className="hero-stats">
+              <div><span>Solar CF:</span> <strong>{solar?.capacity_factor_pct}%</strong></div>
+              <div><span>Wind CF:</span> <strong>{wind?.capacity_factor_pct}%</strong></div>
+            </div>
+          </div>
+
+          <ResponsiveContainer width="100%" height={280} style={{ marginTop: '16px' }}>
             <RadarChart data={scoreBreakdown}>
               <PolarGrid />
               <PolarAngleAxis dataKey="name" />
@@ -66,27 +154,28 @@ export default function SiteDetail() {
       <div className="two-col">
         {solar && (
           <div className="card">
-            <h2>☀️ Solar Potential</h2>
+            <h2>☀️ Solar Potential Analysis</h2>
             <dl className="metric-list">
               <div><dt>Annual Irradiance</dt><dd>{solar.annual_irradiance_kwh_m2} kWh/m²</dd></div>
               <div><dt>Peak Sun Hours</dt><dd>{solar.peak_sun_hours} hrs/day</dd></div>
               <div><dt>Panel Efficiency</dt><dd>{solar.panel_efficiency_pct}%</dd></div>
+              <div><dt>Shading Loss</dt><dd>{solar.shading_loss_pct}%</dd></div>
               <div><dt>Performance Ratio</dt><dd>{solar.performance_ratio}</dd></div>
               <div><dt>Capacity Factor</dt><dd>{solar.capacity_factor_pct}%</dd></div>
-              <div><dt>Expected Output</dt><dd>{solar.expected_energy_output_mwh_year} MWh/yr</dd></div>
+              <div><dt>Expected Annual Output</dt><dd>{solar.expected_energy_output_mwh_year} MWh/yr</dd></div>
             </dl>
           </div>
         )}
         {wind && (
           <div className="card">
-            <h2>🌬️ Wind Potential</h2>
+            <h2>🌬️ Wind Potential Analysis</h2>
             <dl className="metric-list">
               <div><dt>Avg Wind Speed</dt><dd>{wind.avg_wind_speed_ms} m/s</dd></div>
               <div><dt>Power Density</dt><dd>{wind.wind_power_density_w_m2} W/m²</dd></div>
               <div><dt>Turbulence Intensity</dt><dd>{wind.turbulence_intensity_pct}%</dd></div>
               <div><dt>Turbine Suitability</dt><dd>{wind.turbine_suitability}</dd></div>
               <div><dt>Capacity Factor</dt><dd>{wind.capacity_factor_pct}%</dd></div>
-              <div><dt>Expected Output</dt><dd>{wind.expected_annual_energy_mwh} MWh/yr</dd></div>
+              <div><dt>Expected Annual Output</dt><dd>{wind.expected_annual_energy_mwh} MWh/yr</dd></div>
             </dl>
           </div>
         )}
@@ -94,7 +183,7 @@ export default function SiteDetail() {
 
       {energyComparison.length > 0 && (
         <div className="card">
-          <h2>Solar vs Wind Comparison</h2>
+          <h2>Solar vs Wind Resource Comparison</h2>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={energyComparison}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -111,14 +200,14 @@ export default function SiteDetail() {
 
       {forecast && (
         <div className="card">
-          <h2>📈 Energy Generation Forecast</h2>
+          <h2>📈 25-Year Energy & Financial Forecast</h2>
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={forecastSeries}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="year" />
               <YAxis />
               <Tooltip />
-              <Line type="monotone" dataKey="mwh" name="MWh" stroke="#0f9d58" strokeWidth={2} />
+              <Line type="monotone" dataKey="mwh" name="MWh Output" stroke="#0f9d58" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
           <dl className="metric-list">
@@ -131,7 +220,7 @@ export default function SiteDetail() {
 
       {environmental && (
         <div className="card">
-          <h2>🌍 Environmental & Site Factors</h2>
+          <h2>🌍 Environmental & GIS Constraint Factors</h2>
           <dl className="metric-list">
             <div><dt>Solar Irradiance</dt><dd>{environmental.solar_irradiance_kwh_m2_day} kWh/m²/day</dd></div>
             <div><dt>Wind Speed</dt><dd>{environmental.wind_speed_avg_ms} m/s</dd></div>

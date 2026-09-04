@@ -81,6 +81,7 @@ class Site(Base):
     elevation_m = Column(Float, nullable=True)
     existing_infrastructure = Column(String, nullable=True)
     land_ownership = Column(String, nullable=True)
+    attributes_source = Column(String, default="live")  # "live" or "synthetic_fallback" -- how region/land_area/elevation/etc were derived
     site_type = Column(Enum(SiteTypeEnum), default=SiteTypeEnum.hybrid)
     created_at = Column(DateTime, default=dt.datetime.utcnow)
 
@@ -113,6 +114,7 @@ class EnvironmentalData(Base):
     distance_to_urban_km = Column(Float)
     distance_to_water_km = Column(Float)
     in_protected_zone = Column(Boolean, default=False)
+    data_source = Column(String, default="live")  # "live" or "synthetic_fallback"
 
     fetched_at = Column(DateTime, default=dt.datetime.utcnow)
 
@@ -132,6 +134,7 @@ class SolarPrediction(Base):
     capacity_factor_pct = Column(Float)
     expected_energy_output_mwh_year = Column(Float)
     shading_loss_pct = Column(Float)
+    model_used = Column(String, default="random_forest_regressor")  # "random_forest_regressor" or "physics_baseline"
     computed_at = Column(DateTime, default=dt.datetime.utcnow)
 
     site = relationship("Site", back_populates="solar_prediction")
@@ -149,6 +152,7 @@ class WindPrediction(Base):
     turbine_suitability = Column(String)
     capacity_factor_pct = Column(Float)
     expected_annual_energy_mwh = Column(Float)
+    model_used = Column(String, default="random_forest_regressor")
     computed_at = Column(DateTime, default=dt.datetime.utcnow)
 
     site = relationship("Site", back_populates="wind_prediction")
@@ -168,6 +172,7 @@ class SiteScore(Base):
     overall_score = Column(Float)
     category = Column(Enum(SuitabilityCategory))
     recommended_technology = Column(Enum(SiteTypeEnum))
+    model_used = Column(String, default="random_forest")
     computed_at = Column(DateTime, default=dt.datetime.utcnow)
 
     site = relationship("Site", back_populates="score")

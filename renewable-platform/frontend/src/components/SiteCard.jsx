@@ -17,6 +17,14 @@ export default function SiteCard({ projectId, site, score }) {
           <span className="dot">•</span>
           <span>{site.land_area_hectares} ha</span>
         </>}
+        {site.attributes_source && (
+          <>
+            <span className="dot">•</span>
+            <span className={site.attributes_source === 'live' ? 'tag-live' : 'tag-fallback'}>
+              {site.attributes_source === 'live' ? 'Live data' : 'Estimated'}
+            </span>
+          </>
+        )}
       </div>
     </Link>
   )

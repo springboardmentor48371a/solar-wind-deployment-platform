@@ -14,10 +14,13 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      window.location.href = '/login'
+      if (typeof window !== 'undefined' && !['/login', '/register'].includes(window.location.pathname)) {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(err)
   }
 )
 
 export default api
+

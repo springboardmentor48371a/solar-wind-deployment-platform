@@ -8,12 +8,15 @@ export default function Navbar({ user, onLogout }) {
   return (
     <header className="navbar">
       <div className="navbar-brand">
-        <span className="brand-icon">☀️</span>
-        <span>Solar &amp; Wind Deployment Intelligence</span>
+        <span className="brand-icon">⚡</span>
+        <span>Solar &amp; Wind Intelligence</span>
       </div>
       <nav className="navbar-links">
         <Link className={isActive('/') ? 'active' : ''} to="/">Dashboard</Link>
         <Link className={isActive('/projects') ? 'active' : ''} to="/projects">Projects</Link>
+        {user.role === 'administrator' && (
+          <Link className={isActive('/admin') ? 'active' : ''} to="/admin">Admin Panel</Link>
+        )}
       </nav>
       <div className="navbar-user">
         <div className="user-chip">

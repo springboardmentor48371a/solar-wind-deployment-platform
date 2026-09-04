@@ -32,10 +32,11 @@ export default function Login({ setUser }) {
         <h1>☀️ Deployment Intelligence</h1>
         <p className="subtitle">Sign in to your renewable energy workspace</p>
         {error && <div className="error-banner">{error}</div>}
+
         <label>Email</label>
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="Enter your email" />
         <label>Password</label>
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" />
         <button className="btn-primary" type="submit" disabled={loading}>
           {loading ? 'Signing in…' : 'Sign in'}
         </button>

@@ -55,6 +55,11 @@ class ProjectOut(BaseModel):
 
 # ---------- Sites ----------
 class SiteCreate(BaseModel):
+    """Only name, latitude, longitude (and optionally site_type) are
+    required. region / land_area_hectares / elevation_m /
+    existing_infrastructure / land_ownership are all auto-derived from live
+    geospatial datasets (see services/site_intelligence.py) -- set one
+    explicitly here only if you want to override the derived value."""
     name: str
     latitude: float
     longitude: float
@@ -76,6 +81,9 @@ class SiteOut(BaseModel):
     region: Optional[str]
     land_area_hectares: Optional[float]
     elevation_m: Optional[float]
+    existing_infrastructure: Optional[str] = None
+    land_ownership: Optional[str] = None
+    attributes_source: Optional[str] = None
     site_type: SiteTypeEnum
     created_at: dt.datetime
 
@@ -97,6 +105,7 @@ class EnvironmentalDataOut(BaseModel):
     distance_to_urban_km: float
     distance_to_water_km: float
     in_protected_zone: bool
+    data_source: Optional[str] = None
 
 
 # ---------- Solar / Wind ----------
@@ -109,6 +118,7 @@ class SolarPredictionOut(BaseModel):
     capacity_factor_pct: float
     expected_energy_output_mwh_year: float
     shading_loss_pct: float
+    model_used: Optional[str] = None
 
 
 class WindPredictionOut(BaseModel):
@@ -119,6 +129,7 @@ class WindPredictionOut(BaseModel):
     turbine_suitability: str
     capacity_factor_pct: float
     expected_annual_energy_mwh: float
+    model_used: Optional[str] = None
 
 
 # ---------- Scoring ----------
@@ -132,6 +143,7 @@ class SiteScoreOut(BaseModel):
     overall_score: float
     category: SuitabilityCategory
     recommended_technology: SiteTypeEnum
+    model_used: Optional[str] = None
 
 
 # ---------- Forecast ----------
