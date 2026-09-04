@@ -59,7 +59,13 @@ Paste the output as your `SECRET_KEY` in `.env`. Leave everything else as is.
 docker compose up --build
 ```
 
-This starts PostgreSQL, the FastAPI backend, and the React frontend all at once. Wait until you see:
+This starts PostgreSQL, the FastAPI backend, the ML prediction service, and the React frontend all at once. The services are available at:
+
+- Frontend: **http://localhost:5173**
+- Backend API: **http://localhost:8000**
+- ML service: **http://localhost:8001**
+
+Wait until the backend and frontend are ready:
 
 ```
 backend-1   | INFO:     Application startup complete.
@@ -133,11 +139,12 @@ solar-wind-deployment-platform/
 ├── ml-service/
 │   ├── app/
 │   │   ├── models/        → trained model binaries (.pkl, .pth)
-│   │   ├── routers/       → prediction and suitability endpoints
-│   │   ├── services/      → ML prediction and suitability ranking logic
-│   │   ├── models.py      → database tables for ML records
-│   │   └── main.py        → FastAPI app entry point
-│   ├── notebooks/         → Kaggle training notebooks for models
+│   │   ├── routers/       → prediction endpoints
+│   │   ├── schemas/       → prediction request/response schemas
+│   │   ├── services/      → solar, wind, land-cover, suitability, and forecast logic
+│   │   ├── models.py      → ML-service database tables
+│   │   └── main.py        → FastAPI ML-service entry point
+│   ├── notebooks/         → model training notebooks
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
@@ -154,6 +161,8 @@ solar-wind-deployment-platform/
 ├── .env.example
 └── README.md
 ```
+
+Docker Compose runs four application services: PostgreSQL, the backend API, the ML service, and the frontend.
 
 ### Data Visibility Rules in Environmental Viewer
 *   **Wind Sites**: Display wind-related climate metrics (Wind Speed 10m, Wind Speed 50m) but **exclude/hide** solar-related metrics (irradiance, peak sun hours), keeping the layout strictly relevant to wind deployment.
