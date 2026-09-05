@@ -32,6 +32,7 @@ class EnvironmentalData(Base):
     # Terrain (static, fetched once)
     elevation = Column(Float, nullable=True)              # meters
     land_slope = Column(Float, nullable=True)             # degrees
+    aspect_deg = Column(Float, nullable=True)             # degrees 0-360, 180=south-facing
 
     # Vegetation
     vegetation_index = Column(Float, nullable=True)       # NDVI -1 to 1

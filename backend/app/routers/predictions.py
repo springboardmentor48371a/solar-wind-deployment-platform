@@ -2,6 +2,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from ..models.user import User
 from ..core.dependencies import get_current_user
+from ..services.infrastructure import fetch_infrastructure_score
 
 ML_SERVICE = "http://ml-service:8001"
 
@@ -19,7 +20,6 @@ async def get_prediction(site_id: int, _: User = Depends(get_current_user)):
 
 @router.post("/{site_id}/run")
 async def run_prediction(site_id: int, _: User = Depends(get_current_user)):
-    """Manually trigger predictions for a site (re-runs all models)."""
     from ..database import SessionLocal
     from ..models.site import Site
     db = SessionLocal()
@@ -27,15 +27,22 @@ async def run_prediction(site_id: int, _: User = Depends(get_current_user)):
         site = db.query(Site).filter(Site.id == site_id).first()
         if not site:
             raise HTTPException(status_code=404, detail="Site not found")
-        payload = {
-            "site_id": site.id,
-            "latitude": site.latitude,
-            "longitude": site.longitude,
-            "elevation": site.elevation,
-            "energy_type": site.energy_type.value,
-        }
+        lat, lon = site.latitude, site.longitude
+        land_ownership = site.land_ownership.value if site.land_ownership else None
     finally:
         db.close()
+
+    infra = await fetch_infrastructure_score(lat, lon)
+
+    payload = {
+        "site_id": site_id,
+        "latitude": lat,
+        "longitude": lon,
+        "elevation": site.elevation,
+        "energy_type": site.energy_type.value,
+        "land_ownership": land_ownership,
+        "infrastructure_score": infra["infrastructure_score"],
+    }
 
     async with httpx.AsyncClient(timeout=60) as client:
         r = await client.post(f"{ML_SERVICE}/predict/all", json=payload)

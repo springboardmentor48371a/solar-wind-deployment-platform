@@ -51,7 +51,7 @@ def predict_wind(wind_speed: float, wind_direction: float, temperature_avg: floa
         # P = 0.5 * Cp * rho * A * v^3, Cp=0.35 (realistic), rotor radius=41m
         power_kw = max(0.0, 0.35 * 0.5 * 1.225 * (np.pi * 41.0**2) * wind_speed**3 / 1000)
     capacity_factor = min(power_kw / 2000.0, 1.0)
-    score           = min(round(capacity_factor / 0.45 * 100, 2), 100.0)
+    score           = min(round(capacity_factor / 0.35 * 100, 2), 100.0)
 
     return {
         "wind_power_kw":       round(power_kw, 2),

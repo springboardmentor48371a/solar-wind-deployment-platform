@@ -8,6 +8,10 @@ class PredictRequest(BaseModel):
     longitude: float
     elevation: Optional[float] = None
     energy_type: str
+    land_ownership: Optional[str] = None
+    slope_deg: Optional[float] = None
+    aspect_deg: Optional[float] = None
+    infrastructure_score: Optional[float] = None
 
 class SitePredictionResponse(BaseModel):
     site_id: int

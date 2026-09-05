@@ -111,6 +111,8 @@ async def create_site(payload: SiteCreate, db: Session = Depends(get_db), curren
 
     # Trigger ML predictions
     try:
+        from ..services.infrastructure import fetch_infrastructure_score
+        infra = await fetch_infrastructure_score(site.latitude, site.longitude)
         async with httpx.AsyncClient(timeout=60) as client:
             await client.post("http://ml-service:8001/predict/all", json={
                 "site_id": site.id,
@@ -118,6 +120,8 @@ async def create_site(payload: SiteCreate, db: Session = Depends(get_db), curren
                 "longitude": site.longitude,
                 "elevation": site.elevation,
                 "energy_type": site.energy_type.value,
+                "land_ownership": site.land_ownership.value if site.land_ownership else None,
+                "infrastructure_score": infra["infrastructure_score"],
             })
     except Exception:
         pass  # ML service may not have models yet — non-blocking
@@ -186,10 +190,17 @@ def get_site_history(site_id: int, db: Session = Depends(get_db), _: User = Depe
 
 @router.delete("/{site_id}", status_code=204)
 def delete_site(site_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from sqlalchemy import text
     site = db.query(Site).filter(Site.id == site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     if site.created_by != current_user.id and current_user.role != UserRole.administrator:
         raise HTTPException(status_code=403, detail="Not authorized")
+    # Delete all related data across both backend and ml-service tables
+    db.execute(text("DELETE FROM energy_forecasts WHERE site_id = :id"), {"id": site_id})
+    db.execute(text("DELETE FROM site_predictions WHERE site_id = :id"), {"id": site_id})
+    db.execute(text("DELETE FROM land_cover WHERE site_id = :id"), {"id": site_id})
+    db.execute(text("DELETE FROM environmental_data WHERE site_id = :id"), {"id": site_id})
+    db.execute(text("DELETE FROM deployment_history WHERE site_id = :id"), {"id": site_id})
     db.delete(site)
     db.commit()

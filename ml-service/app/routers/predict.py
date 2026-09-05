@@ -14,15 +14,18 @@ def get_env_summary(db: Session, site_id: int) -> dict:
     """Fetch averaged environmental data for a site from the shared DB."""
     row = db.execute(text("""
         SELECT
-            AVG(solar_irradiance)  AS solar_irradiance,
-            AVG(peak_sun_hours)    AS peak_sun_hours,
-            AVG(wind_speed)        AS wind_speed,
-            AVG(wind_speed_50m)    AS wind_speed_50m,
-            AVG(wind_direction)    AS wind_direction,
-            AVG(temperature_avg)   AS temperature_avg,
-            AVG(cloud_cover)       AS cloud_cover,
-            AVG(humidity)          AS humidity,
-            AVG(elevation)         AS elevation
+            AVG(solar_irradiance)   AS solar_irradiance,
+            AVG(peak_sun_hours)     AS peak_sun_hours,
+            AVG(wind_speed)         AS wind_speed,
+            AVG(wind_speed_50m)     AS wind_speed_50m,
+            AVG(wind_direction)     AS wind_direction,
+            AVG(temperature_avg)    AS temperature_avg,
+            AVG(cloud_cover)        AS cloud_cover,
+            AVG(humidity)           AS humidity,
+            AVG(elevation)          AS elevation,
+            AVG(vegetation_index)   AS vegetation_index,
+            AVG(land_slope)         AS land_slope,
+            AVG(aspect_deg)         AS aspect_deg
         FROM environmental_data
         WHERE site_id = :site_id
     """), {"site_id": site_id}).fetchone()
@@ -62,10 +65,12 @@ def predict_all(payload: PredictRequest, db: Session = Depends(get_db)):
         temperature_avg=env.get("temperature_avg") or 25.0,
     )
 
-    # Land cover
+    # Land cover — use real NDVI and slope from environmental_data
+    ndvi      = env.get("vegetation_index") or 0.3
+    slope_deg = env.get("land_slope") or 2.0
     lc_result = land_cover.predict_land_cover(
-        ndvi=0.3,  # placeholder until Sentinel-2 integration
-        slope_deg=env.get("elevation") and 2.0 or 0.0,
+        ndvi=ndvi,
+        slope_deg=slope_deg,
         elevation=env.get("elevation") or 0.0,
     )
 
@@ -78,6 +83,9 @@ def predict_all(payload: PredictRequest, db: Session = Depends(get_db)):
     else:
         db.add(LandCover(site_id=payload.site_id, **{k: v for k, v in lc_result.items() if k != "land_cover_score"}))
 
+    # Infrastructure score — computed in backend (has internet), passed in payload
+    infra_score = payload.infrastructure_score
+
     # Suitability
     suit_result = suitability.predict_suitability(
         solar_score=solar_result.get("solar_score"),
@@ -85,6 +93,10 @@ def predict_all(payload: PredictRequest, db: Session = Depends(get_db)):
         land_cover_score=lc_result.get("land_cover_score"),
         elevation=env.get("elevation"),
         energy_type=payload.energy_type,
+        infrastructure_score=infra_score,
+        land_ownership=payload.land_ownership,
+        slope_deg=env.get("land_slope"),
+        aspect_deg=env.get("aspect_deg"),
     )
 
     # Upsert site prediction
