@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../../lib/AuthContext'
+import { getErrorMessage } from '../../lib/errorMessage'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -22,7 +23,7 @@ export default function Login() {
       await login(email, password, remember)
       router.push('/dashboard')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed. Check your credentials and try again.')
+      setError(getErrorMessage(err, 'Login failed. Check your credentials and try again.'))
     } finally {
       setLoading(false)
     }

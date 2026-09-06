@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../../lib/AuthContext'
+import { getErrorMessage } from '../../lib/errorMessage'
 
 // All 6 roles from the spec, self-service — no staff PIN gate.
 // (Deliberately simplified; see backend/app/routers/auth.py's ALL_ROLES
@@ -42,7 +43,7 @@ export default function Register() {
       await registerAndLogin(payload, form.password, remember)
       router.push('/dashboard')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed')
+      setError(getErrorMessage(err, 'Registration failed'))
     } finally {
       setLoading(false)
     }

@@ -18,3 +18,11 @@ dist/
 
 # OS
 .DS_Store
+
+# Defensive: raw ML training datasets (Kaggle CSVs, Kelmarsh SCADA zips,
+# etc.) should never be committed — they're multi-hundred-MB and are
+# only ever needed locally, once, when running
+# backend/scripts/ml/train_*.py. If you download one, keep it outside
+# this repo folder, or it'll get caught here if you don't.
+backend/scripts/ml/data/
+*.csv

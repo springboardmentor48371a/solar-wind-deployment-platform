@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import api from '../../../lib/api'
 import AppShell from '../../../components/AppShell'
+import { useToast } from '../../../lib/ToastContext'
+import { getErrorMessage } from '../../../lib/errorMessage'
 
 const TYPES = [
   { value: 'financial_modeling', label: 'Financial Modeling Tools' },
@@ -21,6 +23,7 @@ const emptyForm = {
 }
 
 export default function AdminIntegrations() {
+  const { showToast } = useToast()
   const [items, setItems] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
@@ -49,15 +52,20 @@ export default function AdminIntegrations() {
       setForm(emptyForm)
       load()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not create integration connection')
+      showToast(getErrorMessage(err, 'Could not create integration connection'), 'error')
     } finally {
       setSubmitting(false)
     }
   }
 
   const handleDelete = async (id) => {
-    await api.delete(`/integrations/${id}`)
-    load()
+    try {
+      await api.delete(`/integrations/${id}`)
+      load()
+      showToast('Integration removed.', 'success')
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Could not remove integration'), 'error')
+    }
   }
 
   const handleTest = async (id) => {
@@ -65,6 +73,9 @@ export default function AdminIntegrations() {
     try {
       await api.post(`/integrations/${id}/test`)
       load()
+      showToast('Test event sent.', 'success')
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Test failed — check the endpoint URL and try again.'), 'error')
     } finally {
       setTestingId(null)
     }

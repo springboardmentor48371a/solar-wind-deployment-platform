@@ -24,6 +24,7 @@ _FIELD_BOUNDS = {
     "solar_irradiance": (0, 15),      # kWh/m^2/day — 0 to ~15 covers even the most extreme real-world sites
     "wind_speed": (0, 120),            # m/s — generously covers even extreme storm readings
     "wind_speed_50m": (0, 120),
+    "wind_direction_deg": (0, 360),
     "temperature": (-90, 60),          # deg C — widest recorded surface temps on Earth
     "rainfall": (0, 1000),             # mm/day — generous upper bound for extreme storm days
     "cloud_cover_pct": (0, 100),
@@ -67,15 +68,43 @@ def fetch_and_store_weather_data(db: Session, site: models.Site, days_back: int 
       WS50M             -> wind speed at 50m — the Wind Potential Service's
                             real input, since that's much closer to actual
                             turbine hub height than a 10m surface reading
+      WD50M             -> wind direction at 50m (degrees, 0-360) — a named
+                            Environmental Factor in the project spec that
+                            was missing entirely until this pass, even
+                            though it's the same free API call already
+                            being made for every other wind parameter
       T2M               -> temperature at 2m (deg C)
       PRECTOTCORR       -> precipitation (mm/day)
       CLOUD_AMT         -> cloud cover (%)
     """
-    end_date = datetime.date.today()
+    from app.services.data_source_overrides import is_disabled
+    if is_disabled(db, "NASA POWER"):
+        print(f"Info: NASA POWER is manually paused by an administrator — skipping weather fetch for site {site.id}")
+        return
+
+    # Real bug found via live testing and confirmed against NASA's own
+    # documentation: solar irradiance (ALLSKY_SFC_SW_DWN) comes from a
+    # completely different processing pipeline (CERES/FLASHFlux) than
+    # the meteorological parameters below it (T2M/PRECTOTCORR/CLOUD_AMT,
+    # from MERRA-2) — and NASA's own docs state the solar "low latency"
+    # product has a 5-7 day processing lag under normal conditions, with
+    # NASA's own forum confirming an additional active delay beyond
+    # that as of this writing. Querying all the way up to today (the
+    # old behavior) meant the most recent several days were requested
+    # before irradiance had actually been computed for them, while the
+    # much-faster meteorological parameters for those same recent days
+    # were already available — explaining exactly the reported pattern
+    # (temperature/rainfall/cloud always populate, irradiance never
+    # does, for the same site, every time). Shifting the whole window
+    # back by a safety buffer keeps it well within NASA's confirmed
+    # processing latency for every parameter requested, not just the
+    # fast ones.
+    IRRADIANCE_PROCESSING_LAG_DAYS = 10
+    end_date = datetime.date.today() - datetime.timedelta(days=IRRADIANCE_PROCESSING_LAG_DAYS)
     start_date = end_date - datetime.timedelta(days=days_back)
 
     params = {
-        "parameters": "ALLSKY_SFC_SW_DWN,WS10M,WS50M,T2M,PRECTOTCORR,CLOUD_AMT",
+        "parameters": "ALLSKY_SFC_SW_DWN,WS10M,WS50M,WD50M,T2M,PRECTOTCORR,CLOUD_AMT",
         "community": "RE",
         "longitude": site.longitude,
         "latitude": site.latitude,
@@ -109,19 +138,31 @@ def fetch_and_store_weather_data(db: Session, site: models.Site, days_back: int 
     irradiance = daily.get("ALLSKY_SFC_SW_DWN", {})
     wind = daily.get("WS10M", {})
     wind_50m = daily.get("WS50M", {})
+    wind_direction = daily.get("WD50M", {})
     temp = daily.get("T2M", {})
     rain = daily.get("PRECTOTCORR", {})
     cloud = daily.get("CLOUD_AMT", {})
 
     fetched_count = 0
     repaired_count = 0
-    for date_str in irradiance.keys():
+    # Real, significant bug found via live testing: this used to
+    # iterate over irradiance.keys() specifically, meaning if
+    # irradiance had zero data for the entire requested window (a real,
+    # recurring issue — see the processing-lag fix and comment above),
+    # the loop ran zero times and NOTHING got stored at all, not just
+    # missing irradiance — even if NASA had perfectly good temperature/
+    # rainfall/cloud/wind data for those same dates. Iterating over the
+    # union of every parameter's own dates means a gap in any one
+    # parameter can never block the others from being stored.
+    all_dates = set(irradiance.keys()) | set(wind.keys()) | set(wind_50m.keys()) | set(wind_direction.keys()) | set(temp.keys()) | set(rain.keys()) | set(cloud.keys())
+    for date_str in sorted(all_dates):
         reading_date = datetime.datetime.strptime(date_str, "%Y%m%d")
 
         fresh_values = {
             "solar_irradiance": _valid_reading(irradiance.get(date_str), 0, 15),
             "wind_speed": _valid_reading(wind.get(date_str), 0, 120),
             "wind_speed_50m": _valid_reading(wind_50m.get(date_str), 0, 120),
+            "wind_direction_deg": _valid_reading(wind_direction.get(date_str), 0, 360),
             "temperature": _valid_reading(temp.get(date_str), -90, 60),
             "rainfall": _valid_reading(rain.get(date_str), 0, 1000),
             "cloud_cover_pct": _valid_reading(cloud.get(date_str), 0, 100),

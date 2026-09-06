@@ -10,6 +10,7 @@ const links = [
   { href: '/gis', label: 'GIS View', icon: '🗺️' },
   { href: '/alerts', label: 'Alerts', icon: '🔔' },
   { href: '/reports', label: 'Report Builder', icon: '📄' },
+  { href: '/financial-analysis', label: 'Financial Analysis', icon: '💰' },
 ]
 
 const adminLinks = [

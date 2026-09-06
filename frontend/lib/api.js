@@ -7,7 +7,17 @@ import { getToken, getRefreshToken, updateAccessToken, clearTokens } from './tok
 // build time when deploying the frontend against a non-local backend.
 const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
 
-const api = axios.create({ baseURL })
+// A request with NO timeout at all (axios's default) will wait forever
+// for a response — if the backend ever hangs for any reason (a slow
+// query, a network blip, anything), the UI shows a spinner/"Computing…"
+// literally forever with zero error, indistinguishable from "broken."
+// 60s is generous enough to not falsely trip on legitimately slow
+// operations (site registration triggers a whole external-API
+// pipeline — NASA POWER, OSM, satellite imagery, World Bank,
+// sequentially) while still guaranteeing every hung request eventually
+// surfaces as a real, visible, catchable error instead of an infinite
+// silent wait.
+const api = axios.create({ baseURL, timeout: 60000 })
 
 api.interceptors.request.use((config) => {
   const token = getToken()

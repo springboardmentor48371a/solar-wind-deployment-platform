@@ -121,15 +121,25 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       # All optional — blank by default, connector reports "not_configured"
       # until you add real values to the root .env file. See .env.example
-      # for how to get each one.
-      SENTINEL_HUB_CLIENT_ID: ${SENTINEL_HUB_CLIENT_ID:-}
-      SENTINEL_HUB_CLIENT_SECRET: ${SENTINEL_HUB_CLIENT_SECRET:-}
+      # for how to get each one. (Satellite imagery via AWS Earth Search
+      # needs no env vars at all — it's a genuinely public API.)
       OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
       DATA_LAKE_BUCKET: ${DATA_LAKE_BUCKET:-}
       DATA_LAKE_ACCESS_KEY_ID: ${DATA_LAKE_ACCESS_KEY_ID:-}
       DATA_LAKE_SECRET_ACCESS_KEY: ${DATA_LAKE_SECRET_ACCESS_KEY:-}
       DATA_LAKE_S3_ENDPOINT_URL: ${DATA_LAKE_S3_ENDPOINT_URL:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
+    # Added after live testing traced a real Docker networking issue:
+    # confirmed via a direct curl test that this container's network
+    # couldn't reach Overpass's servers at all (a ~42s connection
+    # timeout), while the host machine reached the same server
+    # instantly — a classic symptom of Docker's default embedded DNS
+    # resolver failing for a specific domain even though outbound
+    # connectivity itself is fine. Explicit public DNS servers are a
+    # well-known real fix for exactly this failure mode.
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     ports:
       - "8000:8000"
 
@@ -150,3 +160,24 @@ volumes:
   swdip_postgres_data:
   swdip_mongo_data:
   swdip_backups:
+
+networks:
+  default:
+    driver_opts:
+      # Real fix attempt for the confirmed Docker<->Overpass network
+      # issue: `docker network inspect` on this project showed no
+      # explicit MTU set at all, meaning Docker used its default
+      # (1500). This exact symptom — an instant response from the host
+      # machine's real network adapter, but a long (~42s) hang then a
+      # hard connection failure from inside Docker specifically — is a
+      # well-documented Docker Desktop on Windows issue: Docker's
+      # virtual network can advertise an MTU that's too large for
+      # whatever network path actually reaches the internet (a VPN,
+      # certain corporate/campus network adapters, some antivirus/
+      # firewall software), causing larger packets to be silently
+      # dropped rather than cleanly rejected — hence the long timeout
+      # rather than an instant failure. 1400 is a conservative, safe
+      # value that works even when the real path's true MTU is
+      # somewhat smaller than standard, without needing to know the
+      # exact real number.
+      com.docker.network.driver.mtu: "1400"

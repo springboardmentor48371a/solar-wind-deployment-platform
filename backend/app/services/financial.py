@@ -24,7 +24,20 @@ def _irr(cashflows: list[float]) -> float | None:
         if not real_roots:
             return None
         rate = (1 / min(real_roots)) - 1
-        return round(rate * 100, 2)
+        # Real, significant bug found via live testing against a real
+        # PostgreSQL database: numpy scalar types (np.float64 here)
+        # propagate straight through Python arithmetic and even through
+        # round() itself — round(numpy_float, 2) still returns a numpy
+        # float64, not a plain Python float. psycopg2 has no idea how
+        # to serialize that type for a SQL INSERT and fails with a
+        # bizarre "schema np does not exist" error, since it
+        # misinterprets the numpy repr as a qualified SQL name. This
+        # was invisible until a real, non-zero IRR was ever actually
+        # computed and needed to be saved — while a different bug
+        # elsewhere kept forcing IRR to None, this path was never hit.
+        # Explicit float() cast guarantees a plain Python type reaches
+        # the database regardless of what numpy operation produced it.
+        return float(round(rate * 100, 2))
     except Exception:  # noqa: BLE001
         return None
 

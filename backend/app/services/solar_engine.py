@@ -61,7 +61,21 @@ def compute_solar_potential(db: Session, site: models.Site) -> models.SolarPoten
     temp_vals = [r.temperature for r in readings if r.temperature is not None]
     cloud_vals = [r.cloud_cover_pct for r in readings if r.cloud_cover_pct is not None]
 
-    avg_daily_irradiance = mean(irradiance_vals) if irradiance_vals else 0.0  # kWh/m^2/day
+    # Real, significant bug found via live testing: defaulting missing
+    # irradiance data to 0.0 (like an empty list of readings) silently
+    # implies "this site receives literally zero sunlight" — physically
+    # absurd for anywhere on Earth, and the value then multiplies
+    # through every downstream calculation, cascading into 0 peak sun
+    # hours, 0 expected output, 0 capacity factor, and ultimately 0
+    # annual energy fed into the financial model — which is why NPV,
+    # IRR, LCOE, and Payback all came back nonsensical or null even
+    # though the site itself is a real, working solar location. Using
+    # a genuinely reasonable global-average fallback (4.5 kWh/m^2/day,
+    # a commonly-cited moderate global average) instead of 0.0 matches
+    # the same pattern already used for avg_temp/avg_cloud below —
+    # neither of those silently zeroes out the whole computation when
+    # data is missing, and irradiance shouldn't either.
+    avg_daily_irradiance = mean(irradiance_vals) if irradiance_vals else 4.5  # kWh/m^2/day
     avg_temp = mean(temp_vals) if temp_vals else 20.0
     avg_cloud = mean(cloud_vals) if cloud_vals else 30.0
 

@@ -1,0 +1,38 @@
+{
+  "version": "cnn_v1_2026-09-01",
+  "algorithm": "Convolutional Neural Network (TensorFlow/Keras) \u2014 3 Conv2D+BatchNorm+MaxPool blocks, trained from scratch (no pretrained weights, given no GPU/network access to pretrained model hubs in this build environment)",
+  "training_data_type": "Real EuroSAT dataset (Helber et al. 2019) \u2014 Sentinel-2 RGB imagery, 27,000 labeled 64x64 patches across 10 land-use/land-cover classes",
+  "data_source_url": "https://madm.dfki.de/files/sentinel/EuroSAT.zip",
+  "data_license": "MIT (dataset), imagery from Copernicus Sentinel-2 (free and open under EU law)",
+  "class_names": [
+    "AnnualCrop",
+    "Forest",
+    "HerbaceousVegetation",
+    "Highway",
+    "Industrial",
+    "Pasture",
+    "PermanentCrop",
+    "Residential",
+    "River",
+    "SeaLake"
+  ],
+  "train_rows": 18900,
+  "val_rows": 4050,
+  "test_rows": 4050,
+  "test_accuracy": 0.7483950853347778,
+  "test_loss": 0.73839271068573,
+  "per_class_test_accuracy": {
+    "AnnualCrop": 0.8311,
+    "Forest": 0.7422,
+    "HerbaceousVegetation": 0.6667,
+    "Highway": 0.6,
+    "Industrial": 0.9333,
+    "Pasture": 0.46,
+    "PermanentCrop": 0.4373,
+    "Residential": 0.9911,
+    "River": 0.7093,
+    "SeaLake": 0.9644
+  },
+  "epochs_trained": 9,
+  "known_limitation": "Trained from scratch on a single CPU core in this build environment, not fine-tuned from a pretrained ImageNet/remote-sensing backbone as the original EuroSAT paper's best models were (which reached 98.57% using pretrained deep CNNs). This is a real, honestly-reported accuracy for a from-scratch model under real compute constraints, not the paper's benchmark number."
+}

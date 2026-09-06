@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional, List
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 
 from app.models import RoleEnum, AlertSeverity, IntegrationTypeEnum
 
@@ -47,6 +47,15 @@ class LoginRequest(BaseModel):
 # ---------- Projects ----------
 
 class ProjectCreate(BaseModel):
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "name": "Andhra Pradesh Solar Expansion",
+            "objective": "Identify and evaluate candidate sites for a new 500MW utility-scale solar deployment.",
+            "region": "Andhra Pradesh, India",
+            "region_id": None,
+        }
+    })
+
     name: str = Field(..., min_length=1, max_length=200)
     objective: Optional[str] = Field(None, max_length=2000)
     # Legacy free-text label. Prefer region_id where the region is a
@@ -122,13 +131,27 @@ class RegionOut(BaseModel):
 # ---------- Sites ----------
 
 class SiteCreate(BaseModel):
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "name": "Kurnool Solar Park",
+            "latitude": 15.68,
+            "longitude": 78.28,
+            "land_area_hectares": 2400,
+            "elevation_m": None,
+            "land_slope_pct": None,
+            "distance_to_substation_km": None,
+            "existing_infrastructure": "220/33kV pooling substations on-site",
+            "land_ownership": "Government",
+        }
+    })
+
     name: str = Field(..., min_length=1, max_length=200)
-    latitude: float = Field(..., ge=-90, le=90)
-    longitude: float = Field(..., ge=-180, le=180)
+    latitude: float = Field(..., ge=-90, le=90, description="Decimal degrees, e.g. 15.68 for Kurnool, India")
+    longitude: float = Field(..., ge=-180, le=180, description="Decimal degrees, e.g. 78.28 for Kurnool, India")
     land_area_hectares: Optional[float] = Field(None, ge=0, le=1_000_000)
-    elevation_m: Optional[float] = Field(None, ge=-500, le=9000)
-    land_slope_pct: Optional[float] = Field(None, ge=0, le=100)
-    distance_to_substation_km: Optional[float] = Field(None, ge=0, le=10000)
+    elevation_m: Optional[float] = Field(None, ge=-500, le=9000, description="Leave blank/null to auto-fetch from Open-Elevation")
+    land_slope_pct: Optional[float] = Field(None, ge=0, le=100, description="Leave blank/null to auto-estimate")
+    distance_to_substation_km: Optional[float] = Field(None, ge=0, le=10000, description="Leave blank/null to auto-fetch from OpenStreetMap")
     existing_infrastructure: Optional[str] = Field(None, max_length=1000)
     land_ownership: Optional[str] = Field(None, max_length=200)
 
@@ -145,7 +168,33 @@ class SiteOut(BaseModel):
     distance_to_substation_km: Optional[float]
     existing_infrastructure: Optional[str]
     land_ownership: Optional[str]
+    deployment_status: str
     created_at: datetime.datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---------- Deployment History Management ----------
+
+VALID_DEPLOYMENT_STATUSES = [
+    "Prospecting", "Under Review", "Approved", "Deployment Planned", "Deployed", "Operational", "Cancelled",
+]
+
+
+class DeploymentStatusUpdateRequest(BaseModel):
+    new_status: str = Field(..., description=f"One of: {', '.join(VALID_DEPLOYMENT_STATUSES)}")
+    note: Optional[str] = None
+
+
+class DeploymentStatusHistoryOut(BaseModel):
+    id: int
+    site_id: int
+    previous_status: Optional[str]
+    new_status: str
+    changed_by_user_id: Optional[int]
+    note: Optional[str]
+    changed_at: datetime.datetime
 
     class Config:
         from_attributes = True
@@ -160,6 +209,7 @@ class WeatherReadingOut(BaseModel):
     solar_irradiance: Optional[float]
     wind_speed: Optional[float]
     wind_speed_50m: Optional[float]
+    wind_direction_deg: Optional[float]
     temperature: Optional[float]
     rainfall: Optional[float]
     cloud_cover_pct: Optional[float]
@@ -252,9 +302,14 @@ class AlertCreate(BaseModel):
 
 class DataSourceStatusOut(BaseModel):
     name: str
-    status: str  # operational / degraded / down
+    status: str  # operational / degraded / down / not_configured / manually_disabled
     latency_ms: Optional[int] = None
     detail: Optional[str] = None
+
+
+class DataSourceOverrideRequest(BaseModel):
+    manually_disabled: bool
+    reason: Optional[str] = None
 
 
 # ---------- Dashboard / Analytics ----------
@@ -296,6 +351,9 @@ class SiteImageOut(BaseModel):
     cloud_cover_pct: Optional[float]
     ndvi_mean: Optional[float]
     land_cover_summary: Optional[str]
+    ml_land_cover_class: Optional[str]
+    ml_confidence_pct: Optional[float]
+    ml_model_version: Optional[str]
     thumbnail_url: Optional[str]
     source_status: str
     fetched_at: datetime.datetime
@@ -367,6 +425,19 @@ class WindPotentialOut(BaseModel):
 # ---------- Financial / Investment Analytics ----------
 
 class FinancialAnalysisCreate(BaseModel):
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "technology": "solar",
+            "capacity_mw": 10,
+            "capex_usd": 8000000,
+            "opex_usd_per_yr": 100000,
+            "discount_rate_pct": 8,
+            "project_lifetime_yrs": 25,
+            "electricity_price_usd_per_mwh": 45,
+            "annual_energy_mwh": None,
+        }
+    })
+
     technology: str = Field(..., pattern="^(solar|wind|hybrid)$")
     capacity_mw: float = Field(..., gt=0)
     capex_usd: float = Field(..., ge=0)
@@ -503,6 +574,7 @@ class SiteRollupOut(BaseModel):
     financial_lcoe_usd_per_mwh: Optional[float]
     protected_area_distance_km: Optional[float]
     substation_distance_km: Optional[float]
+    deployment_status: Optional[str]
     refreshed_at: datetime.datetime
 
     class Config:
@@ -565,6 +637,8 @@ class MLInvestmentEstimateRequest(BaseModel):
 
 
 class MLInvestmentEstimateOut(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())  # "model_version" is an intentional field name, not a conflict — silences the pydantic warning correctly rather than renaming a field used consistently across this whole ML layer
+
     npv_usd: float
     irr_pct: float
     model_version: str
@@ -572,6 +646,8 @@ class MLInvestmentEstimateOut(BaseModel):
 
 
 class MLRiskAssessmentOut(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     risk_category: str
     confidence_pct: float
     model_version: str

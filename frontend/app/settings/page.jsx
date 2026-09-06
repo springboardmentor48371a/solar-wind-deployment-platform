@@ -4,17 +4,41 @@ import { useState } from 'react'
 import api from '../../lib/api'
 import AppShell from '../../components/AppShell'
 import { useAuth } from '../../lib/AuthContext'
+import { useToast } from '../../lib/ToastContext'
+import { getErrorMessage } from '../../lib/errorMessage'
 
 const initials = (name = '') =>
   name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || '?'
 
 export default function Settings() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
+  const { showToast } = useToast()
+  const [fullName, setFullName] = useState(user?.full_name || '')
+  const [email, setEmail] = useState(user?.email || '')
+  const [profileError, setProfileError] = useState('')
+  const [savingProfile, setSavingProfile] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault()
+    setProfileError('')
+    setSavingProfile(true)
+    try {
+      await api.patch('/auth/me', { full_name: fullName, email })
+      await refreshUser()
+      showToast('Profile updated.', 'success')
+    } catch (err) {
+      const msg = getErrorMessage(err, 'Could not update profile')
+      setProfileError(msg)
+      showToast(msg, 'error')
+    } finally {
+      setSavingProfile(false)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -30,7 +54,7 @@ export default function Settings() {
       setCurrentPassword('')
       setNewPassword('')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not change password')
+      setError(getErrorMessage(err, 'Could not change password'))
     } finally {
       setSaving(false)
     }
@@ -41,16 +65,25 @@ export default function Settings() {
       <div className="max-w-[560px]">
         <div className="card mb-4">
           <h3 className="mb-3">Account</h3>
-          <div className="flex items-center gap-3.5">
+          <div className="flex items-center gap-3.5 mb-4">
             <div className="w-[46px] h-[46px] rounded-full bg-brand-light text-brand-dark flex items-center justify-center font-bold text-[15px] flex-shrink-0">
               {initials(user?.full_name)}
             </div>
-            <div>
-              <div className="font-bold">{user?.full_name}</div>
-              <div className="text-ink-faint text-[13px]">{user?.email}</div>
-              <span className="badge mt-1.5 inline-flex">{user?.role}</span>
-            </div>
+            <span className="badge">{user?.role}</span>
           </div>
+          {profileError && <div className="error-banner">{profileError}</div>}
+          <form onSubmit={handleProfileSubmit}>
+            <label className="label">Full Name</label>
+            <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+            <label className="label">Email</label>
+            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <div className="mt-4">
+              <button type="submit" disabled={savingProfile} className="btn">
+                {savingProfile && <span className="spinner" />}
+                {savingProfile ? 'Saving…' : 'Save Profile'}
+              </button>
+            </div>
+          </form>
         </div>
 
         <div className="card">

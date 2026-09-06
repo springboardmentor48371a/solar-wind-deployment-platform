@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import api from '../../../lib/api'
 import AppShell from '../../../components/AppShell'
 import { useAuth } from '../../../lib/AuthContext'
+import { useToast } from '../../../lib/ToastContext'
+import { getErrorMessage } from '../../../lib/errorMessage'
 
 // Unlike the public Register page, this admin-only screen is allowed to
 // grant every role — an Administrator promoting someone is the intended,
@@ -20,6 +22,7 @@ const ROLES = [
 
 export default function AdminUsers() {
   const { user: currentUser, impersonate } = useAuth()
+  const { showToast } = useToast()
   const router = useRouter()
   const [users, setUsers] = useState([])
   const [error, setError] = useState('')
@@ -39,7 +42,7 @@ export default function AdminUsers() {
       await api.patch(`/admin/users/${id}/role`, { role })
       load()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not update role')
+      showToast(getErrorMessage(err, 'Could not update role'), 'error')
     } finally {
       setBusyId(null)
     }
@@ -52,7 +55,7 @@ export default function AdminUsers() {
       await api.patch(`/admin/users/${id}/active`, { is_active: !isActive })
       load()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not update status')
+      showToast(getErrorMessage(err, 'Could not update status'), 'error')
     } finally {
       setBusyId(null)
     }
@@ -65,7 +68,7 @@ export default function AdminUsers() {
       await impersonate(id)
       router.push('/dashboard')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not switch to that user')
+      showToast(getErrorMessage(err, 'Could not switch to that user'), 'error')
       setBusyId(null)
     }
   }

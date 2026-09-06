@@ -27,6 +27,32 @@ from app.security import log_action
 
 router = APIRouter(tags=["Report Builder"])
 
+
+def _latest_by_site(db: Session, model, site_ids: list[int], order_col) -> dict:
+    """
+    Shared N+1 fix for this whole file — every report section builder
+    below used to run one query per site to get "the latest row for
+    this site" (7 separate occurrences of the identical pattern, found
+    during a live-testing performance pass — a "portfolio loading slow"
+    complaint traced back to exactly this). Batches into one query per
+    section instead of one query per site per section, then reduces to
+    "latest per site" in Python.
+    """
+    if not site_ids:
+        return {}
+    rows = (
+        db.query(model)
+        .filter(model.site_id.in_(site_ids))
+        .order_by(order_col.desc())
+        .all()
+    )
+    latest = {}
+    for row in rows:
+        if row.site_id not in latest:
+            latest[row.site_id] = row
+    return latest
+
+
 HEADER_STYLE = TableStyle(
     [
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e6f4c")),
@@ -93,18 +119,23 @@ def delete_report_template(
 
 def _section_summary(styles, project, sites, db):
     elements = [Paragraph("Executive Summary", styles["Heading2"])]
-    scored = 0
-    total_score = 0.0
-    for site in sites:
-        latest = (
-            db.query(models.SuitabilityScore)
-            .filter(models.SuitabilityScore.site_id == site.id)
-            .order_by(models.SuitabilityScore.computed_at.desc())
-            .first()
-        )
-        if latest:
-            scored += 1
-            total_score += latest.overall_score
+    # Same N+1 fix as analytics.py's dashboard_summary — one batched
+    # query for every site in this report instead of one query per site.
+    site_ids = [s.id for s in sites]
+    all_scores = (
+        db.query(models.SuitabilityScore)
+        .filter(models.SuitabilityScore.site_id.in_(site_ids))
+        .order_by(models.SuitabilityScore.computed_at.desc())
+        .all()
+        if site_ids else []
+    )
+    latest_by_site = {}
+    for score in all_scores:
+        if score.site_id not in latest_by_site:
+            latest_by_site[score.site_id] = score
+
+    scored = len(latest_by_site)
+    total_score = sum(s.overall_score for s in latest_by_site.values())
     avg = round(total_score / scored, 1) if scored else None
     elements.append(
         Paragraph(
@@ -121,14 +152,12 @@ def _section_summary(styles, project, sites, db):
 
 def _section_suitability(styles, project, sites, db):
     elements = [Paragraph("Site Suitability", styles["Heading2"])]
+    site_ids = [s.id for s in sites]
+    latest_by_site = _latest_by_site(db, models.SuitabilityScore, site_ids, models.SuitabilityScore.computed_at)
+
     data = [["Site", "Overall Score", "Category"]]
     for site in sites:
-        latest = (
-            db.query(models.SuitabilityScore)
-            .filter(models.SuitabilityScore.site_id == site.id)
-            .order_by(models.SuitabilityScore.computed_at.desc())
-            .first()
-        )
+        latest = latest_by_site.get(site.id)
         data.append([site.name, str(latest.overall_score) if latest else "\u2014", latest.category if latest else "Unscored"])
     table = Table(data, hAlign="LEFT")
     table.setStyle(HEADER_STYLE)
@@ -136,14 +165,10 @@ def _section_suitability(styles, project, sites, db):
 
     # Reasoning per site — same explanation logic the fixed-format PDF
     # export uses, so "why did this site score this way" is answered
-    # consistently across both report formats.
+    # consistently across both report formats. Reuses the same batched
+    # lookup above instead of querying again.
     for site in sites:
-        latest = (
-            db.query(models.SuitabilityScore)
-            .filter(models.SuitabilityScore.site_id == site.id)
-            .order_by(models.SuitabilityScore.computed_at.desc())
-            .first()
-        )
+        latest = latest_by_site.get(site.id)
         if not latest:
             continue
         elements.append(Paragraph(f"Why {site.name} scored {latest.overall_score} ({latest.category})", styles["Heading3"]))
@@ -156,13 +181,10 @@ def _section_suitability(styles, project, sites, db):
 def _section_solar(styles, project, sites, db):
     elements = [Paragraph("Solar Potential", styles["Heading2"])]
     data = [["Site", "Annual Output (MWh/MW)", "Capacity Factor %", "Panel Efficiency %"]]
+    site_ids = [s.id for s in sites]
+    latest_by_site = _latest_by_site(db, models.SolarPotential, site_ids, models.SolarPotential.computed_at)
     for site in sites:
-        latest = (
-            db.query(models.SolarPotential)
-            .filter(models.SolarPotential.site_id == site.id)
-            .order_by(models.SolarPotential.computed_at.desc())
-            .first()
-        )
+        latest = latest_by_site.get(site.id)
         if latest:
             data.append([
                 site.name,
@@ -183,13 +205,10 @@ def _section_solar(styles, project, sites, db):
 def _section_wind(styles, project, sites, db):
     elements = [Paragraph("Wind Potential", styles["Heading2"])]
     data = [["Site", "Expected AEP (MWh/MW)", "Capacity Factor %", "Turbine Class"]]
+    site_ids = [s.id for s in sites]
+    latest_by_site = _latest_by_site(db, models.WindPotential, site_ids, models.WindPotential.computed_at)
     for site in sites:
-        latest = (
-            db.query(models.WindPotential)
-            .filter(models.WindPotential.site_id == site.id)
-            .order_by(models.WindPotential.computed_at.desc())
-            .first()
-        )
+        latest = latest_by_site.get(site.id)
         if latest:
             data.append([
                 site.name,
@@ -210,13 +229,10 @@ def _section_wind(styles, project, sites, db):
 def _section_financial(styles, project, sites, db):
     elements = [Paragraph("Investment Analytics", styles["Heading2"])]
     data = [["Site", "NPV (USD)", "IRR %", "LCOE ($/MWh)", "Payback (yrs)"]]
+    site_ids = [s.id for s in sites]
+    latest_by_site = _latest_by_site(db, models.FinancialAnalysis, site_ids, models.FinancialAnalysis.computed_at)
     for site in sites:
-        latest = (
-            db.query(models.FinancialAnalysis)
-            .filter(models.FinancialAnalysis.site_id == site.id)
-            .order_by(models.FinancialAnalysis.computed_at.desc())
-            .first()
-        )
+        latest = latest_by_site.get(site.id)
         if latest:
             data.append([
                 site.name,
@@ -238,13 +254,10 @@ def _section_financial(styles, project, sites, db):
 def _section_environmental(styles, project, sites, db):
     elements = [Paragraph("Environmental & Demographic Constraints", styles["Heading2"])]
     data = [["Site", "Protected Area (km)", "Water Body (km)", "Country", "Pop. Density"]]
+    site_ids = [s.id for s in sites]
+    latest_by_site = _latest_by_site(db, models.EnvironmentalConstraint, site_ids, models.EnvironmentalConstraint.fetched_at)
     for site in sites:
-        latest = (
-            db.query(models.EnvironmentalConstraint)
-            .filter(models.EnvironmentalConstraint.site_id == site.id)
-            .order_by(models.EnvironmentalConstraint.fetched_at.desc())
-            .first()
-        )
+        latest = latest_by_site.get(site.id)
         if latest:
             data.append([
                 site.name,
@@ -281,7 +294,7 @@ def _section_infrastructure(styles, project, sites, db):
 
 def _section_weather(styles, project, sites, db):
     elements = [Paragraph("Recent Weather / Climate", styles["Heading2"])]
-    data = [["Site", "Date", "Irradiance (kWh/m2/day)", "Wind Speed (m/s)"]]
+    data = [["Site", "Date", "Irradiance (kWh/m2/day)", "Wind Speed (m/s)", "Wind Direction (°)"]]
     for site in sites:
         for reading in sorted(site.weather_readings, key=lambda r: r.reading_date, reverse=True)[:3]:
             data.append([
@@ -289,6 +302,7 @@ def _section_weather(styles, project, sites, db):
                 str(reading.reading_date),
                 str(reading.solar_irradiance if reading.solar_irradiance is not None else "\u2014"),
                 str(reading.wind_speed if reading.wind_speed is not None else "\u2014"),
+                str(reading.wind_direction_deg if reading.wind_direction_deg is not None else "\u2014"),
             ])
     if len(data) > 1:
         table = Table(data, hAlign="LEFT")
@@ -303,13 +317,10 @@ def _section_weather(styles, project, sites, db):
 def _section_satellite(styles, project, sites, db):
     elements = [Paragraph("Satellite Imagery Summary", styles["Heading2"])]
     data = [["Site", "Provider", "Scene Date", "Cloud Cover %", "Land Cover"]]
+    site_ids = [s.id for s in sites]
+    latest_by_site = _latest_by_site(db, models.SiteImage, site_ids, models.SiteImage.fetched_at)
     for site in sites:
-        latest = (
-            db.query(models.SiteImage)
-            .filter(models.SiteImage.site_id == site.id)
-            .order_by(models.SiteImage.fetched_at.desc())
-            .first()
-        )
+        latest = latest_by_site.get(site.id)
         if latest:
             data.append([
                 site.name,

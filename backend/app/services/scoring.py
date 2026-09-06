@@ -108,6 +108,29 @@ def _score_environmental_impact(db: Session, site: models.Site) -> float:
         avg_cloud = mean(cloud_vals) if cloud_vals else 0
         return round(max(100 - (avg_cloud * 0.5), 0), 1)
 
+    # Real, significant bug found via live testing: when Overpass fails
+    # entirely, land_data.py correctly stores None for
+    # protected_area_distance_km/water_body_distance_km (an honest "we
+    # don't know") — but this function's scoring below only applies a
+    # penalty when those fields are NOT None, meaning a genuine fetch
+    # failure and a genuine "checked, nothing found nearby" result
+    # produced the exact same 100/100 "no constraints detected" score.
+    # That silently inflated suitability for any site where Overpass
+    # simply failed to respond, which is a real scoring-integrity
+    # problem, not just a cosmetic blank field — "no constraints
+    # detected" and "we were never able to check" are very different
+    # claims to make about a site. Overpass-failure is recorded in
+    # data_source (see land_data.py); use the same neutral fallback as
+    # the "no EnvironmentalConstraint row at all" case above rather
+    # than a false, unearned perfect score.
+    if constraint.data_source and "unreachable" in constraint.data_source.lower():
+        readings = site.weather_readings
+        if not readings:
+            return 70.0
+        cloud_vals = [r.cloud_cover_pct for r in readings if r.cloud_cover_pct is not None]
+        avg_cloud = mean(cloud_vals) if cloud_vals else 0
+        return round(max(100 - (avg_cloud * 0.5), 0), 1)
+
     score = 100.0
     # Under 2km from a protected area is a serious siting/permitting risk;
     # scales back to no penalty by 10km out.
@@ -178,11 +201,13 @@ def compute_site_suitability(db: Session, site: models.Site) -> models.Suitabili
     economic = _score_economic_feasibility(db, site)
 
     overall = round(
-        resource * 0.35
-        + geographic * 0.25
-        + infrastructure * 0.15
-        + environmental * 0.15
-        + economic * 0.10,
+        min(max(
+            resource * 0.35
+            + geographic * 0.25
+            + infrastructure * 0.15
+            + environmental * 0.15
+            + economic * 0.10,
+            0), 100),
         1,
     )
 

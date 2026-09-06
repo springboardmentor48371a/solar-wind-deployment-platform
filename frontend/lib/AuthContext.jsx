@@ -101,6 +101,7 @@ export function AuthProvider({ children }) {
         returnToAdmin,
         isImpersonating,
         adminStashUser,
+        refreshUser: loadUser,
       }}
     >
       {children}

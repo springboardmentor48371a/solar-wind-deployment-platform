@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import api from '../../lib/api'
 import AppShell from '../../components/AppShell'
+import { useToast } from '../../lib/ToastContext'
+import { getErrorMessage } from '../../lib/errorMessage'
 
 const SECTIONS = [
   { key: 'summary', label: 'Executive Summary' },
@@ -16,7 +18,21 @@ const SECTIONS = [
   { key: 'satellite', label: 'Satellite Imagery Summary' },
 ]
 
+// Named quick-generate presets matching the project spec's exact 5
+// report categories ("Reports & Export System"). These don't need any
+// backend changes — they just pre-select the section combination each
+// named report type implies, using the same /reports/custom endpoint
+// as the manual builder below.
+const PRESETS = [
+  { key: 'site_assessment', label: 'Site Assessment Report', sections: ['summary', 'suitability', 'environmental', 'infrastructure'] },
+  { key: 'solar_potential', label: 'Solar Potential Report', sections: ['solar', 'weather'] },
+  { key: 'wind_potential', label: 'Wind Potential Report', sections: ['wind', 'weather'] },
+  { key: 'feasibility', label: 'Feasibility Report', sections: ['summary', 'suitability', 'infrastructure', 'environmental', 'financial'] },
+  { key: 'investment', label: 'Investment Report', sections: ['financial', 'summary'] },
+]
+
 export default function ReportBuilder() {
+  const { showToast } = useToast()
   const [projects, setProjects] = useState([])
   const [projectId, setProjectId] = useState('')
   const [selected, setSelected] = useState(['summary', 'suitability'])
@@ -54,7 +70,7 @@ export default function ReportBuilder() {
       link.remove()
       window.URL.revokeObjectURL(blobUrl)
     } catch (err) {
-      setError('Could not generate that report — make sure the project has at least one site.')
+      showToast('Could not generate that report — make sure the project has at least one site.', 'error')
     }
   }
 
@@ -75,6 +91,16 @@ export default function ReportBuilder() {
     setDownloading('')
   }
 
+  const generatePreset = async (preset) => {
+    if (!projectId) return
+    setDownloading(preset.key)
+    await downloadBlob(
+      `/projects/${projectId}/reports/custom?sections=${preset.sections.join(',')}`,
+      `${preset.key}_${projectId}.pdf`
+    )
+    setDownloading('')
+  }
+
   const generateFromTemplate = async (templateId, name) => {
     if (!projectId) return
     setDownloading(`t${templateId}`)
@@ -91,15 +117,20 @@ export default function ReportBuilder() {
       setTemplates((prev) => [res.data, ...prev])
       setTemplateName('')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not save template')
+      showToast(getErrorMessage(err, 'Could not save template'), 'error')
     } finally {
       setSaving(false)
     }
   }
 
   const deleteTemplate = async (id) => {
-    await api.delete(`/report-templates/${id}`)
-    setTemplates((prev) => prev.filter((t) => t.id !== id))
+    try {
+      await api.delete(`/report-templates/${id}`)
+      setTemplates((prev) => prev.filter((t) => t.id !== id))
+      showToast('Template deleted.', 'success')
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Could not delete template'), 'error')
+    }
   }
 
   return (
@@ -117,6 +148,23 @@ export default function ReportBuilder() {
             <select className="input" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
+          </div>
+
+          <div className="card mb-4">
+            <h3 className="mb-1">Quick Reports</h3>
+            <p className="text-ink-muted text-[13px] mb-3">One-click reports for the most common needs — or build a custom one below.</p>
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+              {PRESETS.map((preset) => (
+                <button
+                  key={preset.key}
+                  className="btn-secondary text-left justify-start"
+                  disabled={downloading === preset.key}
+                  onClick={() => generatePreset(preset)}
+                >
+                  {downloading === preset.key ? 'Generating…' : preset.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="card mb-4">

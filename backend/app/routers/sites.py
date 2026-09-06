@@ -11,7 +11,7 @@ from app.services.terrain import fetch_elevation, estimate_slope_pct
 from app.services.infrastructure import fetch_and_store_infrastructure
 from app.services.geo_utils import site_point_wkt
 from app.services.scoring import compute_site_suitability
-from app.services.alerting import generate_weather_alerts, generate_suitability_alert
+from app.services.alerting import generate_weather_alerts, generate_suitability_alert, generate_environmental_risk_alert, generate_forecast_update_alert, generate_project_notification
 from app.services.satellite import fetch_and_store_satellite_summary
 from app.services.land_data import fetch_and_store_environmental_constraints
 from app.services.supplemental_weather import fetch_and_store_supplemental_weather
@@ -39,43 +39,91 @@ def _run_full_intelligence_pipeline(db: Session, site: models.Site) -> None:
     refresh_site_data so a fresh site and a re-analyzed site go through
     the identical pipeline.
     """
+    # Real gap found via live testing: elevation/slope used to only be
+    # estimated once, inside register_site itself, and never touched
+    # again on refresh. Terrain genuinely doesn't change, so this was a
+    # reasonable design — but it also meant a site whose slope came
+    # back None from a transient API hiccup at creation time, or was
+    # computed with an older, buggier version of the estimation logic,
+    # stayed permanently stuck that way forever, with "Refresh" giving
+    # the false impression that trying again would help. Moving this
+    # here — attempted on every refresh too, but ONLY when the value is
+    # still missing — makes it self-healing without needlessly
+    # re-querying Open-Elevation for sites that already have a good
+    # value.
+    try:
+        if site.elevation_m is None:
+            elevation = fetch_elevation(site.latitude, site.longitude)
+            if elevation is not None:
+                site.elevation_m = elevation
+        if site.land_slope_pct is None:
+            slope = estimate_slope_pct(site.latitude, site.longitude)
+            if slope is not None:
+                site.land_slope_pct = slope
+        db.commit()
+        db.refresh(site)
+    except Exception as exc:  # noqa: BLE001
+        print(f"Warning: elevation/slope lookup failed for site {site.id}: {exc}")
+        db.rollback()
+
     try:
         fetch_and_store_weather_data(db, site)
         generate_weather_alerts(db, site)
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: weather data fetch failed for site {site.id}: {exc}")
+        db.rollback()
 
     try:
         fetch_and_store_infrastructure(db, site)
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: infrastructure data fetch failed for site {site.id}: {exc}")
+        db.rollback()
 
     try:
         fetch_and_store_satellite_summary(db, site)
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: satellite imagery fetch failed for site {site.id}: {exc}")
+        db.rollback()
 
     try:
         fetch_and_store_environmental_constraints(db, site)
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: environmental/demographic data fetch failed for site {site.id}: {exc}")
+        db.rollback()
 
     try:
         fetch_and_store_supplemental_weather(db, site)
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: supplemental weather (OpenWeather/NOAA) fetch failed for site {site.id}: {exc}")
+        db.rollback()
 
     db.refresh(site)
 
+    # Capture the pre-refresh solar output so a meaningful Forecast
+    # Update alert can be raised if the new computation shifts it —
+    # must be read BEFORE compute_solar_potential runs, since that call
+    # inserts a new row rather than updating in place.
+    previous_solar = (
+        db.query(models.SolarPotential)
+        .filter(models.SolarPotential.site_id == site.id)
+        .order_by(models.SolarPotential.computed_at.desc())
+        .first()
+    )
+    previous_output = previous_solar.expected_energy_output_mwh_yr if previous_solar else None
+
     try:
-        compute_solar_potential(db, site)
+        new_solar = compute_solar_potential(db, site)
+        generate_forecast_update_alert(db, site, previous_output, new_solar.expected_energy_output_mwh_yr)
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: solar potential computation failed for site {site.id}: {exc}")
+        db.rollback()
 
     try:
         compute_wind_potential(db, site)
+        generate_environmental_risk_alert(db, site)
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: wind potential computation failed for site {site.id}: {exc}")
+        db.rollback()
 
     try:
         db.refresh(site)
@@ -83,6 +131,7 @@ def _run_full_intelligence_pipeline(db: Session, site: models.Site) -> None:
         generate_suitability_alert(db, site, score)
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: suitability scoring failed for site {site.id}: {exc}")
+        db.rollback()
 
 
 def _get_project_or_404(project_id: int, db: Session) -> models.Project:
@@ -122,35 +171,38 @@ def register_site(
         site.geom = site_point_wkt(site_in.latitude, site_in.longitude)
     except Exception as exc:  # noqa: BLE001
         print(f"Warning: could not set PostGIS geometry (non-Postgres backend?): {exc}")
+        db.rollback()
     db.add(site)
     db.commit()
     db.refresh(site)
+
+    # First row in the deployment history timeline — previous_status is
+    # null since there's nothing before site creation.
+    db.add(models.DeploymentStatusHistory(
+        site_id=site.id, previous_status=None, new_status=site.deployment_status,
+        changed_by_user_id=current_user.id, note="Site registered",
+    ))
+    db.commit()
+
+    try:
+        generate_project_notification(
+            db, project.id,
+            title=f"New site added: {site.name}",
+            message=f"{current_user.full_name} registered a new site in {project.name}.",
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"Warning: project notification failed for new site {site.id}: {exc}")
+        db.rollback()
 
     # Step 4 of the User Workflow: system fetches weather/terrain/infra data
     # in the background. Kept synchronous here for simplicity — swap for a
     # background task queue (Celery/RQ) before production scale.
     #
-    # Wrapped in try/except like every other stage of this pipeline (see
-    # _run_full_intelligence_pipeline below) — this was a real bug found
-    # via live testing: it was the one external call in this whole
-    # endpoint NOT protected this way, so an Open-Elevation hiccup
-    # (rate-limit, gateway error, malformed response) could raise all
-    # the way up to an unhandled 500, surfacing to the user as a bare
-    # "Could not register site" with zero indication why.
-    try:
-        if site.elevation_m is None:
-            elevation = fetch_elevation(site.latitude, site.longitude)
-            if elevation is not None:
-                site.elevation_m = elevation
-        if site.land_slope_pct is None:
-            slope = estimate_slope_pct(site.latitude, site.longitude)
-            if slope is not None:
-                site.land_slope_pct = slope
-    except Exception as exc:  # noqa: BLE001
-        print(f"Warning: elevation/slope lookup failed for site {site.id}: {exc}")
-    db.commit()
-    db.refresh(site)
-
+    # Elevation/slope estimation now lives inside
+    # _run_full_intelligence_pipeline itself (see that function's own
+    # comment) so the same self-healing behavior applies to both a
+    # brand-new site and a "Refresh" on an existing one, instead of
+    # being locked in permanently the moment a site is first created.
     _run_full_intelligence_pipeline(db, site)
 
     log_action(db, current_user.id, "register_site", f"site:{site.id}", request.client.host)
@@ -202,14 +254,28 @@ def compare_sites(
     authz.require_project_read(project, current_user)
 
     sites = db.query(models.Site).filter(models.Site.project_id == project_id).all()
+
+    # Same N+1 fix as analytics.py/gis.py/report_templates.py — this was
+    # the 4th spot with the identical bug, and the one most directly
+    # responsible for "portfolio loading slow" complaints, since this is
+    # the exact endpoint behind the Site Comparison widget shown on every
+    # project's Sites page.
+    site_ids = [s.id for s in sites]
+    all_scores = (
+        db.query(models.SuitabilityScore)
+        .filter(models.SuitabilityScore.site_id.in_(site_ids))
+        .order_by(models.SuitabilityScore.computed_at.desc())
+        .all()
+        if site_ids else []
+    )
+    latest_by_site = {}
+    for score in all_scores:
+        if score.site_id not in latest_by_site:
+            latest_by_site[score.site_id] = score
+
     results = []
     for site in sites:
-        latest_score = (
-            db.query(models.SuitabilityScore)
-            .filter(models.SuitabilityScore.site_id == site.id)
-            .order_by(models.SuitabilityScore.computed_at.desc())
-            .first()
-        )
+        latest_score = latest_by_site.get(site.id)
         results.append(
             {
                 "site_id": site.id,
@@ -463,22 +529,44 @@ def create_site_financial_analysis(
 
     annual_energy_mwh = body.annual_energy_mwh
     if annual_energy_mwh is None:
+        latest_solar = (
+            db.query(models.SolarPotential)
+            .filter(models.SolarPotential.site_id == site.id)
+            .order_by(models.SolarPotential.computed_at.desc())
+            .first()
+        )
+        latest_wind = (
+            db.query(models.WindPotential)
+            .filter(models.WindPotential.site_id == site.id)
+            .order_by(models.WindPotential.computed_at.desc())
+            .first()
+        )
+        solar_per_mw = latest_solar.expected_energy_output_mwh_yr if latest_solar else None
+        wind_per_mw = latest_wind.expected_aep_mwh_yr if latest_wind else None
+
+        # Real bug found on review: "hybrid" is a valid, documented
+        # technology option (FinancialAnalysisCreate's own pattern
+        # allows solar|wind|hybrid), but this used to fall into a plain
+        # if/else that only checked for "wind" — meaning hybrid was
+        # silently computed as if it were 100% solar, with no wind
+        # contribution at all, understating a hybrid project's real
+        # energy output and giving a misleadingly pessimistic
+        # NPV/IRR/LCOE. Using a straight average of the two
+        # technologies' per-MW yields — NOT the 70/30 land-allocation
+        # split deployment_optimizer.py uses elsewhere, since that
+        # figure answers a different question (how much of each
+        # technology's capacity fits on the site's land) and doesn't
+        # transfer to blending an already-chosen total capacity's
+        # energy yield.
         if body.technology == "wind":
-            latest = (
-                db.query(models.WindPotential)
-                .filter(models.WindPotential.site_id == site.id)
-                .order_by(models.WindPotential.computed_at.desc())
-                .first()
-            )
-            per_mw = latest.expected_aep_mwh_yr if latest else None
+            per_mw = wind_per_mw
+        elif body.technology == "hybrid":
+            if solar_per_mw is not None and wind_per_mw is not None:
+                per_mw = (solar_per_mw + wind_per_mw) / 2
+            else:
+                per_mw = None
         else:
-            latest = (
-                db.query(models.SolarPotential)
-                .filter(models.SolarPotential.site_id == site.id)
-                .order_by(models.SolarPotential.computed_at.desc())
-                .first()
-            )
-            per_mw = latest.expected_energy_output_mwh_yr if latest else None
+            per_mw = solar_per_mw
         if per_mw is None:
             raise HTTPException(
                 status_code=422,
@@ -817,4 +905,73 @@ def get_ml_risk_assessment(
         confidence_pct=result["confidence_pct"],
         model_version=_mv() or "unknown",
         note="Currently driven almost entirely by wind speed (99%+ of the model's decision weight, verified via feature importance) \u2014 not yet a meaningful environmental/permitting risk assessment despite accepting those inputs. See the model's metadata for the full honest limitation.",
+    )
+
+
+# ---------- Deployment History Management ----------
+
+@router.patch("/{site_id}/deployment-status", response_model=schemas.SiteOut)
+def update_deployment_status(
+    project_id: int,
+    site_id: int,
+    body: schemas.DeploymentStatusUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    Deployment History Management (project spec, Module 2). Updates a
+    site's lifecycle stage and records the change as an immutable row in
+    DeploymentStatusHistory, so the full timeline is always queryable via
+    GET .../deployment-history, not just the current status.
+    """
+    project = _get_project_or_404(project_id, db)
+    authz.require_project_write(project, current_user)
+    site = _get_site_or_404(project_id, site_id, db)
+
+    if body.new_status not in schemas.VALID_DEPLOYMENT_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid status. Must be one of: {', '.join(schemas.VALID_DEPLOYMENT_STATUSES)}",
+        )
+
+    previous_status = site.deployment_status
+    if previous_status == body.new_status:
+        raise HTTPException(status_code=422, detail=f"Site is already in status '{previous_status}'.")
+
+    site.deployment_status = body.new_status
+    db.add(models.DeploymentStatusHistory(
+        site_id=site.id, previous_status=previous_status, new_status=body.new_status,
+        changed_by_user_id=current_user.id, note=body.note,
+    ))
+    db.commit()
+    db.refresh(site)
+
+    try:
+        generate_project_notification(
+            db, project.id,
+            title=f"Deployment status changed: {site.name}",
+            message=f"{current_user.full_name} moved {site.name} from '{previous_status}' to '{body.new_status}'" + (f" \u2014 {body.note}" if body.note else "."),
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"Warning: project notification failed for status change on site {site.id}: {exc}")
+
+    return site
+
+
+@router.get("/{site_id}/deployment-history", response_model=list[schemas.DeploymentStatusHistoryOut])
+def get_deployment_history(
+    project_id: int,
+    site_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    project = _get_project_or_404(project_id, db)
+    authz.require_project_read(project, current_user)
+    site = _get_site_or_404(project_id, site_id, db)
+
+    return (
+        db.query(models.DeploymentStatusHistory)
+        .filter(models.DeploymentStatusHistory.site_id == site.id)
+        .order_by(models.DeploymentStatusHistory.changed_at.asc())
+        .all()
     )

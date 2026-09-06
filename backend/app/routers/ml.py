@@ -3,31 +3,36 @@ AI/ML Prediction Layer — the platform's ML-Assisted predictions surfaced
 as first-class endpoints, distinct from the physics engines (solar_engine.py,
 wind_engine.py, scoring.py) they run alongside.
 
-Three real, trained scikit-learn models ship with this platform:
-  1. Solar performance-ratio predictor (surfaced via SolarPotentialOut's
-     ml_* fields, computed automatically alongside the physics engine —
-     see sites.py's pipeline, not duplicated here)
-  2. Wind capacity-factor predictor (same — WindPotentialOut's ml_* fields)
-  3. Suitability quick-classifier — THIS router's one real endpoint,
-     since unlike 1/2 it doesn't need a registered site with collected
-     data first; it's meant for triage before that.
-
-See app/services/ml_*.py and app/ml_models/*.meta.json for training-data
-provenance on each. Honesty note: models 1/2 are trained on
-physics-informed synthetic data calibrated against published real-world
-literature (not raw measured plant telemetry — every attempt to
-download a real dataset in this build environment was blocked by
-robots.txt). Model 3's ground truth genuinely is the real, validated
-scoring.py formula. Each model's metadata file states this precisely —
-this router doesn't hide it.
+Six real, trained models ship with this platform (see app/services/ml_*.py
+and app/ml_models/*.meta.json for full training-data provenance on each):
+  1. Solar performance-ratio predictor (Random Forest, real Kaggle plant
+     data) — surfaced via SolarPotentialOut's ml_* fields, computed
+     automatically alongside the physics engine, not duplicated here
+  2. Wind capacity-factor predictor (Random Forest, real Kelmarsh SCADA
+     data) — same, via WindPotentialOut's ml_* fields
+  3. Suitability quick-classifier — THIS router's endpoint, since unlike
+     1/2 it doesn't need a registered site with collected data first;
+     it's meant for triage before that. Ground truth is the real,
+     validated scoring.py formula.
+  4. Investment prediction (Gradient Boosting) — surfaced via sites.py's
+     ml-investment-estimate endpoint
+  5. Risk assessment (Random Forest) — surfaced via sites.py's
+     ml-risk-assessment endpoint
+  6. Land cover classification (CNN, trained on real EuroSAT imagery) —
+     surfaced automatically via satellite.py using AWS Earth Search's
+     public Sentinel-2 archive (no account/API key needed). The
+     standalone image-upload testing endpoint that used to live here
+     was removed once the Sentinel Hub registration issue it worked
+     around was fixed by the AWS Earth Search replacement — the model
+     itself is unaffected, only that separate manual-testing tool.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 
 from app import models, auth
-from app.services import ml_solar_predictor, ml_wind_predictor, ml_suitability_predictor, ml_investment_predictor, ml_risk_predictor
+from app.services import ml_solar_predictor, ml_wind_predictor, ml_suitability_predictor, ml_investment_predictor, ml_risk_predictor, ml_landcover_predictor
 
 router = APIRouter(prefix="/ml", tags=["AI/ML Prediction Layer"])
 
@@ -73,6 +78,12 @@ def ml_model_status(current_user: models.User = Depends(auth.get_current_user)):
             version=ml_risk_predictor.model_version(),
             purpose="Point-in-time risk category from wind speed and siting factors \u2014 see model metadata for an important honest limitation on what it actually uses.",
         ),
+        ModelStatusOut(
+            name="Land Cover Classification Model (CNN, trained on real EuroSAT imagery)",
+            available=ml_landcover_predictor.is_model_available(),
+            version=ml_landcover_predictor.model_version(),
+            purpose="Classifies a real Sentinel-2 RGB image tile into one of 10 land-use/land-cover classes \u2014 trained from scratch, 74.8% held-out test accuracy (see model metadata for the honest per-class breakdown).",
+        ),
     ]
 
 
@@ -90,6 +101,8 @@ class QuickSuitabilityRequest(BaseModel):
 
 
 class QuickSuitabilityResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())  # "model_version" is intentional, not a real conflict
+
     category: str
     confidence_pct: float
     model_version: str
@@ -133,3 +146,4 @@ def quick_suitability_estimate(
         model_version=ml_suitability_predictor.model_version() or "unknown",
         note="Rough estimate from provided inputs only. Register the site and run the full pipeline for the real, authoritative suitability score.",
     )
+

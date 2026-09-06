@@ -141,19 +141,27 @@ def _parse_noaa_wind_speed(wind_speed_str: str | None) -> float | None:
 
 def fetch_and_store_supplemental_weather(db: Session, site: models.Site) -> list[models.SupplementalWeatherReading]:
     """Runs both connectors best-effort and returns whichever succeeded."""
-    results = []
-    try:
-        ow = fetch_openweather_current(db, site)
-        if ow:
-            results.append(ow)
-    except Exception as exc:  # noqa: BLE001
-        print(f"Warning: OpenWeather fetch failed for site {site.id}: {exc}")
+    from app.services.data_source_overrides import is_disabled
 
-    try:
-        noaa = fetch_noaa_forecast(db, site)
-        if noaa:
-            results.append(noaa)
-    except Exception as exc:  # noqa: BLE001
-        print(f"Warning: NOAA forecast fetch failed for site {site.id}: {exc}")
+    results = []
+    if is_disabled(db, "OpenWeather"):
+        print(f"Info: OpenWeather is manually paused by an administrator — skipping for site {site.id}")
+    else:
+        try:
+            ow = fetch_openweather_current(db, site)
+            if ow:
+                results.append(ow)
+        except Exception as exc:  # noqa: BLE001
+            print(f"Warning: OpenWeather fetch failed for site {site.id}: {exc}")
+
+    if is_disabled(db, "NOAA / National Weather Service"):
+        print(f"Info: NOAA is manually paused by an administrator — skipping for site {site.id}")
+    else:
+        try:
+            noaa = fetch_noaa_forecast(db, site)
+            if noaa:
+                results.append(noaa)
+        except Exception as exc:  # noqa: BLE001
+            print(f"Warning: NOAA forecast fetch failed for site {site.id}: {exc}")
 
     return results

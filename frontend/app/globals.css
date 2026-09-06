@@ -86,3 +86,60 @@
   tbody tr:hover { @apply bg-surface-2; }
   tbody tr:last-child td { @apply border-b-0; }
 }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-toast-in {
+  animation: toast-in 0.2s ease-out;
+}
+
+/* Deployment status select — colored by lifecycle stage */
+.status-select {
+  @apply text-[11.5px] font-semibold rounded-full border px-2.5 py-1 cursor-pointer transition;
+}
+.status-select:disabled { @apply cursor-default opacity-80; }
+.status-select.status-prospecting { @apply bg-gray-100 border-gray-300 text-gray-600; }
+.status-select.status-under-review { @apply bg-amber-50 border-amber-200 text-amber-700; }
+.status-select.status-approved { @apply bg-blue-50 border-blue-200 text-blue-700; }
+.status-select.status-deployment-planned { @apply bg-indigo-50 border-indigo-200 text-indigo-700; }
+.status-select.status-deployed { @apply bg-teal-50 border-teal-200 text-teal-700; }
+.status-select.status-operational { @apply bg-[#f0faf4] border-[#bfe8cf] text-[#1e6f4c]; }
+.status-select.status-cancelled { @apply bg-red-50 border-red-200 text-red-600; }
+
+/* Smooth entrance for expandable panels (intelligence, ingestion log,
+   deployment history) — previously these snapped into existence
+   instantly since conditionally-rendered table rows can't be
+   height-animated reliably across browsers with pure CSS. Applying
+   this to the inner div (not the <tr> itself) gives a smooth fade +
+   subtle rise instead. */
+@keyframes panel-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-panel-in {
+  animation: panel-fade-in 0.18s ease-out;
+}
+
+/* Smoother, slightly springier button press feedback */
+.btn, .btn-secondary, .btn-ghost {
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.15s ease, opacity 0.15s ease;
+}
+.btn:active:not(:disabled), .btn-secondary:active:not(:disabled), .btn-ghost:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Status select — smooth color transition when the value changes */
+.status-select {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+/* Sidebar active-link indicator slides in smoothly rather than
+   snapping between pages */
+.sidebar-link {
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.12s ease;
+}
+.sidebar-link:active {
+  transform: scale(0.98);
+}

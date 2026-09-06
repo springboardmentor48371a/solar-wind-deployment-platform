@@ -71,7 +71,7 @@ boto3==1.35.36
 # Optional: only used if a model has actually been trained via
 # scripts/ml/train_solar_model.py (see app/services/ml_solar_predictor.py).
 # Everything runs fine with none of this installed/trained.
-scikit-learn==1.5.2
+scikit-learn==1.8.0
 joblib==1.4.2
 
 # xgboost is what the project spec names for the Investment Prediction
@@ -82,6 +82,14 @@ joblib==1.4.2
 # deployment environment with network access can install it and swap
 # it in later; nothing currently imports it.
 xgboost==2.1.1
+
+# --- Land Cover Classification CNN ---
+# A real Convolutional Neural Network (see ml_landcover_predictor.py),
+# trained from scratch on the actual EuroSAT dataset — the platform's
+# 6th real trained AI/ML model. Pillow decodes the real RGB image tiles
+# fetched from Sentinel Hub before classification.
+tensorflow-cpu==2.21.0
+Pillow==11.0.0
 
 # --- Data Warehouse (Parquet export) ---
 pyarrow==17.0.0

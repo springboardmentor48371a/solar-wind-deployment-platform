@@ -34,16 +34,21 @@ class Settings(BaseSettings):
     nasa_power_base_url: str = "https://power.larc.nasa.gov/api/temporal/daily/point"
     elevation_api_base_url: str = "https://api.open-elevation.com/api/v1/lookup"
     overpass_api_base_url: str = "https://overpass-api.de/api/interpreter"
+    # A real fallback mirror, not our own guess — confirmed via current
+    # OSM community documentation as a genuine, currently-recommended
+    # public Overpass instance. Tried automatically if the primary
+    # above times out, rate-limits, or errors, since public Overpass
+    # servers are known to be flaky and this exact class of issue
+    # ("0 infrastructure features found", environmental data stuck on
+    # "not fetched") was traced back to this earlier in the project.
+    overpass_api_fallback_url: str = "https://overpass.kumi.systems/api/interpreter"
 
-    # --- Satellite imagery: Copernicus Data Space Ecosystem / Sentinel Hub ---
-    # OAuth2 client-credentials flow. Leave blank to run without live
-    # imagery — the satellite service then returns a clearly-labeled
-    # "unavailable_no_credentials" result instead of failing the request.
-    sentinel_hub_client_id: str = ""
-    sentinel_hub_client_secret: str = ""
-    sentinel_hub_token_url: str = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
-    sentinel_hub_stats_url: str = "https://sh.dataspace.copernicus.eu/api/v1/statistics"
-    sentinel_hub_catalog_url: str = "https://sh.dataspace.copernicus.eu/api/v1/catalog/1.0.0/search"
+    # --- Satellite imagery: AWS Open Data / Element84 Earth Search ---
+    # No settings needed here at all — this is a genuinely public API,
+    # no account, no API key. Replaced an earlier Copernicus Sentinel
+    # Hub integration (removed entirely, not just deprecated) after a
+    # user got stuck on that provider's broken OAuth-client-registration
+    # CAPTCHA with no workaround found. See app/services/satellite.py.
 
     # --- Supplemental weather sources ---
     openweather_api_key: str = ""

@@ -18,26 +18,42 @@ from app import models
 from app.config import settings
 
 
-def _latest(db: Session, model, site_id: int, order_col):
-    return (
-        db.query(model)
-        .filter(model.site_id == site_id)
-        .order_by(order_col.desc())
-        .first()
-    )
-
-
 def refresh_warehouse(db: Session) -> int:
     """Recomputes the SiteRollup table for every site. Returns row count."""
     sites = db.query(models.Site).all()
     now = datetime.datetime.utcnow()
 
+    # Was 6 queries PER SITE (5 "latest row" lookups + 1 existing-rollup
+    # check) — the worst N+1 pattern found in a full cross-check of the
+    # codebase (600 queries for a 100-site portfolio just to refresh the
+    # warehouse). Batched into 6 queries total for the whole portfolio.
+    site_ids = [s.id for s in sites]
+
+    def _batch_latest(model, order_col):
+        if not site_ids:
+            return {}
+        rows = db.query(model).filter(model.site_id.in_(site_ids)).order_by(order_col.desc()).all()
+        latest = {}
+        for row in rows:
+            if row.site_id not in latest:
+                latest[row.site_id] = row
+        return latest
+
+    scores_by_site = _batch_latest(models.SuitabilityScore, models.SuitabilityScore.computed_at)
+    solar_by_site = _batch_latest(models.SolarPotential, models.SolarPotential.computed_at)
+    wind_by_site = _batch_latest(models.WindPotential, models.WindPotential.computed_at)
+    fin_by_site = _batch_latest(models.FinancialAnalysis, models.FinancialAnalysis.computed_at)
+    env_by_site = _batch_latest(models.EnvironmentalConstraint, models.EnvironmentalConstraint.fetched_at)
+    existing_rollups_by_site = {
+        r.site_id: r for r in (db.query(models.SiteRollup).filter(models.SiteRollup.site_id.in_(site_ids)).all() if site_ids else [])
+    }
+
     for site in sites:
-        score = _latest(db, models.SuitabilityScore, site.id, models.SuitabilityScore.computed_at)
-        solar = _latest(db, models.SolarPotential, site.id, models.SolarPotential.computed_at)
-        wind = _latest(db, models.WindPotential, site.id, models.WindPotential.computed_at)
-        fin = _latest(db, models.FinancialAnalysis, site.id, models.FinancialAnalysis.computed_at)
-        env = _latest(db, models.EnvironmentalConstraint, site.id, models.EnvironmentalConstraint.fetched_at)
+        score = scores_by_site.get(site.id)
+        solar = solar_by_site.get(site.id)
+        wind = wind_by_site.get(site.id)
+        fin = fin_by_site.get(site.id)
+        env = env_by_site.get(site.id)
 
         substation = next(
             (f.distance_km for f in site.infrastructure_features if f.feature_type == "substation"),
@@ -48,7 +64,7 @@ def refresh_warehouse(db: Session) -> int:
             else (site.project.region if site.project else None)
         )
 
-        row = db.query(models.SiteRollup).filter(models.SiteRollup.site_id == site.id).first()
+        row = existing_rollups_by_site.get(site.id)
         if row is None:
             row = models.SiteRollup(site_id=site.id)
             db.add(row)
@@ -67,6 +83,7 @@ def refresh_warehouse(db: Session) -> int:
         row.financial_lcoe_usd_per_mwh = fin.lcoe_usd_per_mwh if fin else None
         row.protected_area_distance_km = env.protected_area_distance_km if env else None
         row.substation_distance_km = substation
+        row.deployment_status = site.deployment_status
         row.refreshed_at = now
 
     db.commit()

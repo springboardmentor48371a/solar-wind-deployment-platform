@@ -32,6 +32,11 @@ def fetch_and_store_infrastructure(db: Session, site: models.Site) -> None:
     transmission line around a site's coordinates, and stores the
     distances in InfrastructureFeature rows.
     """
+    from app.services.data_source_overrides import is_disabled
+    if is_disabled(db, "OpenStreetMap (Overpass)"):
+        print(f"Info: OpenStreetMap (Overpass) is manually paused by an administrator — skipping infrastructure fetch for site {site.id}")
+        return
+
     query = f"""
     [out:json][timeout:20];
     (
@@ -50,11 +55,8 @@ def fetch_and_store_infrastructure(db: Session, site: models.Site) -> None:
     )
     payload = cache_get(cache_key)
     if payload is None:
-        response = requests.post(
-            settings.overpass_api_base_url, data={"data": query}, timeout=25
-        )
-        response.raise_for_status()
-        payload = response.json()
+        from app.services.overpass_client import query_overpass
+        payload = query_overpass(query, timeout=8)
         cache_set(cache_key, payload, ttl_seconds=60 * 60 * 24)
 
     elements = payload.get("elements", [])

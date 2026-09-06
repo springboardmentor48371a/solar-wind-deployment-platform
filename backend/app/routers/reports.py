@@ -18,14 +18,28 @@ router = APIRouter(prefix="/projects/{project_id}/reports", tags=["Reports"])
 
 def _gather_report_rows(db: Session, project_id: int):
     sites = db.query(models.Site).filter(models.Site.project_id == project_id).all()
+
+    # Same N+1 fix as gis.py, sites.py's /compare, and report_templates.py
+    # — this function (the main fixed-format PDF/Excel "Download" report,
+    # distinct from the custom Report Builder) had the identical bug and
+    # was missed in the earlier cleanup pass, since only its per-site
+    # reasoning text had been fixed before, not this query.
+    site_ids = [s.id for s in sites]
+    latest_scores = (
+        db.query(models.SuitabilityScore)
+        .filter(models.SuitabilityScore.site_id.in_(site_ids))
+        .order_by(models.SuitabilityScore.computed_at.desc())
+        .all()
+        if site_ids else []
+    )
+    latest_by_site = {}
+    for score in latest_scores:
+        if score.site_id not in latest_by_site:
+            latest_by_site[score.site_id] = score
+
     rows = []
     for site in sites:
-        latest = (
-            db.query(models.SuitabilityScore)
-            .filter(models.SuitabilityScore.site_id == site.id)
-            .order_by(models.SuitabilityScore.computed_at.desc())
-            .first()
-        )
+        latest = latest_by_site.get(site.id)
         rows.append(
             {
                 "site": site,

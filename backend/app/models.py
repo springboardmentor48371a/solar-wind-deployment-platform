@@ -126,6 +126,12 @@ class Site(Base):
     existing_infrastructure = Column(Text, nullable=True)
     land_ownership = Column(String, nullable=True)
 
+    # Deployment History Management (project spec, Module 2) — tracks
+    # the site's lifecycle stage. Every change is also recorded as a row
+    # in DeploymentStatusHistory below, so the full history is queryable,
+    # not just the current value.
+    deployment_status = Column(String, nullable=False, default="Prospecting")
+
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     project = relationship("Project", back_populates="sites")
@@ -155,6 +161,7 @@ class Site(Base):
     financial_analyses = relationship("FinancialAnalysis", back_populates="site", cascade="all, delete-orphan")
     telemetry_readings = relationship("TelemetryReading", back_populates="site", cascade="all, delete-orphan")
     rollup = relationship("SiteRollup", cascade="all, delete-orphan")
+    status_history = relationship("DeploymentStatusHistory", back_populates="site", cascade="all, delete-orphan", order_by="DeploymentStatusHistory.changed_at")
 
 
 class WeatherReading(Base):
@@ -168,6 +175,7 @@ class WeatherReading(Base):
     solar_irradiance = Column(Float, nullable=True)  # kWh/m^2/day
     wind_speed = Column(Float, nullable=True)         # m/s at 10m (surface)
     wind_speed_50m = Column(Float, nullable=True)      # m/s at 50m — closer to real turbine hub height
+    wind_direction_deg = Column(Float, nullable=True)   # degrees, 0-360 — named Environmental Factor, previously missing entirely
     temperature = Column(Float, nullable=True)         # deg C
     rainfall = Column(Float, nullable=True)             # mm
     cloud_cover_pct = Column(Float, nullable=True)
@@ -271,20 +279,25 @@ class Alert(Base):
 
 class SiteImage(Base):
     """
-    Satellite imagery/metadata for a site — Copernicus Sentinel Hub (or
-    compatible Copernicus Data Space) per the "Satellite image processing"
-    module. Full scene metadata/raw response is archived to MongoDB; this
-    row holds the structured summary the rest of the app queries against.
+    Satellite imagery/metadata for a site — real Sentinel-2 imagery via
+    AWS Open Data Registry's public COG archive (searched through
+    Element84's Earth Search STAC API, no account or API key needed),
+    per the "Satellite image processing" module. Full scene
+    metadata/raw response is archived to MongoDB; this row holds the
+    structured summary the rest of the app queries against.
     """
     __tablename__ = "site_images"
 
     id = Column(Integer, primary_key=True, index=True)
     site_id = Column(Integer, ForeignKey("sites.id"), nullable=False)
-    provider = Column(String, nullable=False, default="copernicus_sentinel_hub")
+    provider = Column(String, nullable=False, default="aws_earth_search_sentinel2")
     scene_date = Column(DateTime, nullable=True)
     cloud_cover_pct = Column(Float, nullable=True)
     ndvi_mean = Column(Float, nullable=True)  # vegetation index, feeds land-cover/environmental scoring
-    land_cover_summary = Column(String, nullable=True)  # e.g. "bare_soil", "cropland", "urban"
+    land_cover_summary = Column(String, nullable=True)  # e.g. "bare_soil", "cropland", "urban" — simple NDVI-threshold rule, not ML
+    ml_land_cover_class = Column(String, nullable=True)  # one of EuroSAT's 10 real classes, from the trained CNN
+    ml_confidence_pct = Column(Float, nullable=True)
+    ml_model_version = Column(String, nullable=True)
     thumbnail_url = Column(String, nullable=True)
     source_status = Column(String, nullable=False, default="live")  # "live" or "unavailable_no_credentials"
     fetched_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -423,6 +436,26 @@ class IntegrationTypeEnum(str, enum.Enum):
     third_party_analytics = "third_party_analytics"
 
 
+class DataSourceOverride(Base):
+    """
+    Admin Dashboard's "Data source management" sub-item — genuine
+    management, not just read-only status. Storing API keys/credentials
+    in the database was deliberately avoided (a real security tradeoff,
+    not just missing UI — see this project's README for the reasoning);
+    this instead gives an Administrator real control: manually pause a
+    connector regardless of whether its credentials are configured, e.g.
+    during a vendor outage or to avoid a rate limit, without editing
+    environment variables and restarting the server.
+    """
+    __tablename__ = "data_source_overrides"
+
+    source_name = Column(String, primary_key=True)  # matches the "name" field in /data-sources/status
+    manually_disabled = Column(Integer, nullable=False, default=0)  # 1=disabled, 0=enabled — matches this codebase's boolean convention (see User.is_active)
+    disabled_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    disabled_reason = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
 class IntegrationConnection(Base):
     """
     Outbound/inbound connector registration for the platform's five
@@ -522,4 +555,32 @@ class SiteRollup(Base):
     protected_area_distance_km = Column(Float, nullable=True)
     substation_distance_km = Column(Float, nullable=True)
 
+    # Project Manager Dashboard's "Project progress" and "Deployment
+    # timelines" sub-items were missing entirely until this pass — the
+    # rollup was built before deployment_status existed on Site.
+    deployment_status = Column(String, nullable=True)
+
     refreshed_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+class DeploymentStatusHistory(Base):
+    """
+    Deployment History Management (project spec, Module 2 — "Site &
+    Project Management"). Every change to a Site's deployment_status is
+    recorded here as an immutable row, so a Project Manager can see the
+    full lifecycle timeline (Prospecting -> Under Review -> Approved ->
+    Deployment Planned -> Deployed -> Operational, or Cancelled at any
+    stage) rather than only the current status.
+    """
+    __tablename__ = "deployment_status_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    site_id = Column(Integer, ForeignKey("sites.id"), nullable=False)
+    previous_status = Column(String, nullable=True)  # null for the very first row (site creation)
+    new_status = Column(String, nullable=False)
+    changed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    note = Column(Text, nullable=True)
+    changed_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    site = relationship("Site", back_populates="status_history")
+    changed_by = relationship("User")

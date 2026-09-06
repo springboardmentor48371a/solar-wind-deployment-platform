@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Optional
 
 from app import models, schemas, auth
 from app.database import get_db
@@ -135,6 +136,36 @@ def refresh_access_token(
 
 @router.get("/me", response_model=schemas.UserOut)
 def read_me(current_user: models.User = Depends(auth.get_current_user)):
+    return current_user
+
+
+class UpdateProfileRequest(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=1, max_length=120)
+    email: Optional[str] = None
+
+
+@router.patch("/me", response_model=schemas.UserOut)
+def update_profile(
+    body: UpdateProfileRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    User Profile Management (project spec, Module 1) — was only a
+    change-password endpoint until this pass; a user had no way to
+    update their own name or email at all.
+    """
+    if body.full_name is not None:
+        current_user.full_name = body.full_name
+
+    if body.email is not None and body.email != current_user.email:
+        existing = db.query(models.User).filter(models.User.email == body.email).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="That email is already in use by another account.")
+        current_user.email = body.email
+
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

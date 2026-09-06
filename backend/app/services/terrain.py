@@ -48,22 +48,58 @@ def fetch_elevation(latitude: float, longitude: float) -> float | None:
     return None
 
 
-def estimate_slope_pct(latitude: float, longitude: float, delta_deg: float = 0.001) -> float | None:
+def estimate_slope_pct(latitude: float, longitude: float, delta_deg: float = 0.01) -> float | None:
     """
-    Rough slope estimate: samples elevation at a nearby point and computes
-    percent grade over the sampled distance. This is a simplification —
-    production-grade slope analysis should use a proper DEM (digital
-    elevation model) raster with GDAL, as listed in the GIS & Remote
-    Sensing tech stack.
+    Rough slope estimate: samples elevation at 2 diagonal points (NE and
+    SW) and returns the steeper of the 2, as percent grade over the
+    sampled distance. This is a simplification — production-grade slope
+    analysis should use a proper DEM (digital elevation model) raster
+    with GDAL, as listed in the GIS & Remote Sensing tech stack.
+
+    delta_deg was originally 0.001 (~111m) — a real, significant bug
+    found via live testing: a genuinely mountainous real site
+    (Mawsynram, in India's steep Khasi Hills) came back with an
+    estimated slope of exactly 0%, which gave it a perfect Geographic
+    sub-score and masked what should have been a much lower overall
+    suitability result. Root cause: Open-Elevation's underlying SRTM
+    data is typically 30-90m resolution, so two sample points only 111m
+    apart can easily land on the same or adjacent pixels with
+    near-identical elevation. 0.01 degrees (~1.1km) samples far enough
+    apart to reliably clear DEM resolution artifacts.
+
+    Originally sampled all 4 cardinal directions (5 total elevation
+    calls) — a second real issue found via live testing: this
+    meaningfully increased load on Open-Elevation's free public API,
+    and elevation itself started coming back blank on sites that had
+    worked fine before, consistent with hitting a burst rate limit.
+    Reduced to 2 diagonal points (3 total calls) — still catches slope
+    in both the north-south and east-west directions simultaneously
+    (a diagonal isn't purely one axis), while keeping the same total
+    load as the original single-direction version plus one extra call,
+    not more than double it.
     """
     center = fetch_elevation(latitude, longitude)
-    north = fetch_elevation(latitude + delta_deg, longitude)
-    if center is None or north is None:
+    if center is None:
         return None
 
-    # ~111km per degree of latitude
-    horizontal_distance_m = delta_deg * 111_000
-    rise_m = abs(north - center)
+    # ~111km per degree of latitude; longitude scales down by cos(latitude),
+    # but for a rough same-order-of-magnitude slope estimate this is a
+    # reasonable simplification rather than requiring a full projection.
+    horizontal_distance_m = (delta_deg * 111_000) * (2 ** 0.5)  # diagonal distance
     if horizontal_distance_m == 0:
         return None
-    return round((rise_m / horizontal_distance_m) * 100, 2)
+
+    directions = [
+        (latitude + delta_deg, longitude + delta_deg),  # NE
+        (latitude - delta_deg, longitude - delta_deg),  # SW
+    ]
+    slopes = []
+    for lat, lon in directions:
+        elevation = fetch_elevation(lat, lon)
+        if elevation is not None:
+            rise_m = abs(elevation - center)
+            slopes.append(round((rise_m / horizontal_distance_m) * 100, 2))
+
+    if not slopes:
+        return None
+    return max(slopes)

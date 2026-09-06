@@ -25,6 +25,17 @@ from app import mongo
 from app import data_lake
 
 SEARCH_RADIUS_M = 20000
+# Protected areas and major water bodies are naturally much sparser,
+# larger features spread further apart than farmland/residential land —
+# a site can be genuinely, correctly far from the nearest one even in
+# a real, well-mapped region. Found via live testing: real sites
+# consistently showed blank protected area/water body distances while
+# farmland/residential (using the same 20km radius) populated
+# correctly, which looked like a bug but is actually a real
+# geographic result at that radius — these two specifically get a
+# wider search to reduce (not eliminate) genuinely-nothing-found cases
+# without changing the search for the denser feature types.
+WIDE_SEARCH_RADIUS_M = 75000
 
 WB_POP_DENSITY_INDICATOR = "EN.POP.DNST"
 WB_GDP_PER_CAPITA_INDICATOR = "NY.GDP.PCAP.CD"
@@ -117,27 +128,54 @@ def fetch_and_store_environmental_constraints(
     land, urban areas) with World Bank country-level demographic context
     into one EnvironmentalConstraint row per site.
     """
+    from app.services.data_source_overrides import is_disabled
+    if is_disabled(db, "OpenStreetMap (Overpass)"):
+        print(f"Info: OpenStreetMap (Overpass) is manually paused by an administrator — skipping environmental/demographic fetch for site {site.id}")
+        db.query(models.EnvironmentalConstraint).filter(
+            models.EnvironmentalConstraint.site_id == site.id
+        ).delete()
+        record = models.EnvironmentalConstraint(site_id=site.id, data_source="manually_disabled")
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return record
+
     query = f"""
     [out:json][timeout:25];
     (
-      way["boundary"="protected_area"](around:{SEARCH_RADIUS_M},{site.latitude},{site.longitude});
-      way["leisure"="nature_reserve"](around:{SEARCH_RADIUS_M},{site.latitude},{site.longitude});
-      way["natural"="water"](around:{SEARCH_RADIUS_M},{site.latitude},{site.longitude});
+      way["boundary"="protected_area"](around:{WIDE_SEARCH_RADIUS_M},{site.latitude},{site.longitude});
+      way["leisure"="nature_reserve"](around:{WIDE_SEARCH_RADIUS_M},{site.latitude},{site.longitude});
+      way["natural"="water"](around:{WIDE_SEARCH_RADIUS_M},{site.latitude},{site.longitude});
       way["landuse"="farmland"](around:{SEARCH_RADIUS_M},{site.latitude},{site.longitude});
       way["landuse"="residential"](around:{SEARCH_RADIUS_M},{site.latitude},{site.longitude});
     );
     out center 20;
     """
-    cache_key = f"environmental:overpass:{round(site.latitude,3)}:{round(site.longitude,3)}"
+    cache_key = f"environmental:overpass:v2:{round(site.latitude,3)}:{round(site.longitude,3)}"
     payload = cache_get(cache_key)
+    overpass_failed = False
     if payload is None:
-        response = requests.post(settings.overpass_api_base_url, data={"data": query}, timeout=30)
-        response.raise_for_status()
-        payload = response.json()
-        cache_set(cache_key, payload, ttl_seconds=7 * 24 * 60 * 60)
+        from app.services.overpass_client import query_overpass
+        try:
+            payload = query_overpass(query)
+            cache_set(cache_key, payload, ttl_seconds=7 * 24 * 60 * 60)
+        except Exception as exc:  # noqa: BLE001
+            # Real bug found via live testing: this used to return early
+            # here on Overpass failure, which ALSO skipped the country/
+            # World Bank lookup below — even though that lookup has
+            # nothing to do with Overpass at all and works completely
+            # independently. A user's real site showed Country/
+            # Population/GDP all blank purely because Overpass failed,
+            # even though World Bank itself was never even attempted.
+            # Now Overpass and World Bank are fully independent: one
+            # failing never blocks the other from being tried.
+            print(f"Warning: Overpass fetch failed for site {site.id}, proceeding with World Bank data only: {exc}")
+            overpass_failed = True
+            payload = {"elements": []}
 
-    mongo.store_raw_payload("environmental_raw", site.id, "OVERPASS_ENVIRONMENTAL", payload)
-    data_lake.archive_payload("environmental_raw", site.id, "OVERPASS_ENVIRONMENTAL", payload)
+    if not overpass_failed:
+        mongo.store_raw_payload("environmental_raw", site.id, "OVERPASS_ENVIRONMENTAL", payload)
+        data_lake.archive_payload("environmental_raw", site.id, "OVERPASS_ENVIRONMENTAL", payload)
 
     elements = payload.get("elements", [])
     buckets = {"protected": [], "water": [], "farmland": [], "residential": []}
@@ -163,6 +201,8 @@ def fetch_and_store_environmental_constraints(
         scored = nearest_features_km(site.latitude, site.longitude, candidates)
         return round(float(scored["distance_km"].min()), 2)
 
+    # Independent of Overpass entirely — always attempted regardless of
+    # whether the block above succeeded or failed.
     country, iso3 = _reverse_geocode_country(site.latitude, site.longitude)
     pop_density = _fetch_world_bank_indicator(iso3, WB_POP_DENSITY_INDICATOR) if iso3 else None
     gdp_per_capita = _fetch_world_bank_indicator(iso3, WB_GDP_PER_CAPITA_INDICATOR) if iso3 else None
@@ -174,15 +214,15 @@ def fetch_and_store_environmental_constraints(
 
     record = models.EnvironmentalConstraint(
         site_id=site.id,
-        protected_area_distance_km=nearest_km(buckets["protected"]),
-        water_body_distance_km=nearest_km(buckets["water"]),
-        agricultural_land_nearby=1 if buckets["farmland"] else 0,
-        urban_area_distance_km=nearest_km(buckets["residential"]),
+        protected_area_distance_km=nearest_km(buckets["protected"]) if not overpass_failed else None,
+        water_body_distance_km=nearest_km(buckets["water"]) if not overpass_failed else None,
+        agricultural_land_nearby=(1 if buckets["farmland"] else 0) if not overpass_failed else 0,
+        urban_area_distance_km=nearest_km(buckets["residential"]) if not overpass_failed else None,
         country_iso3=iso3,
         population_density_km2=pop_density,
         gdp_per_capita_usd=gdp_per_capita,
         electricity_consumption_kwh_per_capita=electricity_per_capita,
-        data_source="OpenStreetMap (Overpass) + World Bank Open Data",
+        data_source="World Bank Open Data only (Overpass unreachable)" if overpass_failed else "OpenStreetMap (Overpass) + World Bank Open Data",
     )
     db.add(record)
     db.commit()

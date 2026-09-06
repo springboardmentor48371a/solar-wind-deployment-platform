@@ -6,9 +6,12 @@ import api from '../../lib/api'
 import AppShell from '../../components/AppShell'
 import { useAuth } from '../../lib/AuthContext'
 import { canCreate, canWriteProject } from '../../lib/roles'
+import { useToast } from '../../lib/ToastContext'
+import { getErrorMessage } from '../../lib/errorMessage'
 
 export default function Projects() {
   const { user } = useAuth()
+  const { showToast } = useToast()
   const [projects, setProjects] = useState([])
   const [form, setForm] = useState({ name: '', objective: '', region: '' })
   const [error, setError] = useState('')
@@ -35,8 +38,11 @@ export default function Projects() {
       await api.post('/projects/', form)
       setForm({ name: '', objective: '', region: '' })
       loadProjects()
+      showToast(`Project "${form.name}" created.`, 'success')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not create project')
+      const msg = getErrorMessage(err, 'Could not create project')
+      setError(msg)
+      showToast(msg, 'error')
     } finally {
       setCreating(false)
     }
@@ -49,8 +55,11 @@ export default function Projects() {
       await api.delete(`/projects/${id}`)
       setConfirmId(null)
       loadProjects()
+      showToast('Project deleted.', 'success')
     } catch (err) {
-      setError(err.response?.data?.detail || 'Could not delete project')
+      const msg = getErrorMessage(err, 'Could not delete project')
+      setError(msg)
+      showToast(msg, 'error')
     } finally {
       setDeletingId(null)
     }

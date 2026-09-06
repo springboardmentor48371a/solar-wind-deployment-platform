@@ -50,14 +50,26 @@ ensure_timescaledb()
 app = FastAPI(
     title="Solstice OS — Solar & Wind Deployment Intelligence Platform API",
     description=(
-        "Auth, RBAC, Project & Site Management, Environmental/Terrain/Infrastructure/"
-        "Satellite/Demographic data integration, Solar & Wind Potential Engines, "
-        "rule-based Site Suitability Scoring, Investment Analytics, Power Simulation, "
-        "SCADA/IoT Telemetry, Integrations, Custom Report Builder, Analytics, Alerts, "
-        "User Administration, and Audit Logging. AI/ML prediction models are "
-        "intentionally excluded — planned for the next phase."
+        "## How to use this page\n\n"
+        "1. Open **POST /auth/login** below, click \"Try it out\", enter your real email/password, click Execute.\n"
+        "2. Copy the `access_token` value from the response.\n"
+        "3. Click the green **Authorize** button at the top-right of this page, paste `Bearer <your token>` "
+        "(the word Bearer, a space, then the token), click Authorize.\n"
+        "4. Every endpoint below will now use your login automatically — expand any endpoint, click "
+        "\"Try it out\", fill in the fields, click Execute.\n\n"
+        "Endpoints are grouped by section in the list below (Auth, Sites, Analytics, ML, Reports, etc.) — "
+        "use the tag headers to find what you need instead of scrolling through everything.\n\n"
+        "## What this API actually does\n\n"
+        "Auth, RBAC, Project & Site Management, Environmental/Terrain/Infrastructure/Satellite/Demographic "
+        "data integration, Solar & Wind Potential Engines, rule-based Site Suitability Scoring, Investment "
+        "Analytics, Power Simulation, SCADA/IoT Telemetry, Integrations, Custom Report Builder, Analytics, "
+        "Alerts, User Administration, Audit Logging, and a real AI/ML Prediction Layer — 6 trained models "
+        "(Solar, Wind, Suitability, Investment, Risk, and a Land Cover CNN trained on real EuroSAT satellite "
+        "imagery), each shown alongside its equivalent physics/rule-based calculation for comparison, never "
+        "silently replacing it. See the **AI/ML Prediction Layer** section below for the standalone endpoints, "
+        "or **GET /ml/status** for a live readout of which models are currently loaded."
     ),
-    version="0.4.0",
+    version="1.0.0",
     docs_url="/docs" if settings.environment != "production" else None,
     redoc_url="/redoc" if settings.environment != "production" else None,
     openapi_url="/openapi.json" if settings.environment != "production" else None,
