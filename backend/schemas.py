@@ -42,3 +42,10 @@ class SiteResponse(SiteCreate):
 
     class Config:
         from_attributes = True
+
+class SitePreview(BaseModel):
+    name: str
+    region: str
+    elevation: str
+    lat: float
+    long: float

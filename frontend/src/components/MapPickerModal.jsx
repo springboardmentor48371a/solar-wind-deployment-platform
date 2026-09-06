@@ -65,7 +65,6 @@ export default function MapPickerModal({ isOpen, onClose, onConfirmSite }) {
     const defaultRegion = `Coordinates: ${latFormatted}, ${lngFormatted}`;
 
     // 2. Instantly update UI cards (Zero lag)
-    setSiteCustomName(defaultSiteTitle);
     setSearchQuery(defaultRegion);
     setSiteDetails({
       name: defaultSiteTitle,
@@ -83,47 +82,22 @@ export default function MapPickerModal({ isOpen, onClose, onConfirmSite }) {
       mapRef.current.flyTo([lat, lng], 8, { duration: 1.0 });
     }
 
-    // 3. Fetch Place Name (English) & Elevation in background
+    // Fetch verified place and terrain metadata through the backend preview API.
     setLoading(true);
     try {
-      // Nominatim Reverse Geocoding
-      const geoPromise = fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=en`
-      ).then((res) => res.json()).catch(() => null);
-
-      // Open-Meteo DEM Elevation Lookup
-      const elevPromise = fetch(
-        `https://elevation-api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`
-      ).then((res) => res.json()).catch(() => null);
-
-      const [geoData, elevData] = await Promise.all([geoPromise, elevPromise]);
-
-      let detectedName = defaultSiteTitle;
-      let regionName = defaultRegion;
-      let elevationVal = '310 m';
-
-      if (geoData && geoData.address) {
-        const addr = geoData.address;
-        detectedName = geoData.name || addr.city || addr.town || addr.village || addr.county || addr.suburb || defaultSiteTitle;
-        regionName = [
-          addr.city || addr.town || addr.county || addr.state_district,
-          addr.state,
-          addr.country
-        ].filter(Boolean).join(', ') || defaultRegion;
-      }
-
-      if (elevData && elevData.elevation && elevData.elevation[0] !== undefined) {
-        elevationVal = `${elevData.elevation[0]} m`;
-      }
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/sites/preview?lat=${lat}&long=${lng}`
+      );
+      if (!response.ok) throw new Error('Preview request failed');
+      const preview = await response.json();
 
       // Update with verified geographical names
-      setSiteCustomName(detectedName);
-      setSearchQuery(regionName);
+      setSearchQuery(preview.region || defaultRegion);
       setSiteDetails((prev) => ({
         ...prev,
-        name: detectedName,
-        region: regionName,
-        elevation: elevationVal,
+        name: prev.name,
+        region: preview.region || defaultRegion,
+        elevation: preview.elevation || 'Unavailable',
       }));
     } catch (err) {
       console.warn('Metadata lookup timed out; using coordinate values.', err);
@@ -172,9 +146,14 @@ export default function MapPickerModal({ isOpen, onClose, onConfirmSite }) {
   };
 
   const handleFinalSubmit = () => {
+    if (!siteCustomName.trim()) {
+      setSearchError('Enter a site or project name before confirming.');
+      return;
+    }
+
     onConfirmSite({
       ...siteDetails,
-      name: siteCustomName.trim() || siteDetails.name || 'Candidate Energy Zone'
+      name: siteCustomName.trim()
     });
   };
 

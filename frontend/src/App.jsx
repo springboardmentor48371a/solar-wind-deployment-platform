@@ -10,9 +10,6 @@ import {
   EyeOff, 
   MapPin, 
   Compass, 
-  Layers, 
-  Zap, 
-  ArrowRight, 
   LogOut, 
   AlertCircle, 
   PlusCircle, 
@@ -26,7 +23,8 @@ import {
   TrendingUp,
   FileText,
   FolderGit2,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 import MapPickerModal from './components/MapPickerModal';
 
@@ -90,6 +88,9 @@ export default function App() {
 
   // Sidebar navigation state: 'select-site' | 'stored-sites' | 'compare-sites' | 'view-report'
   const [activeTab, setActiveTab] = useState('select-site');
+
+  // Stored sites category filter state: 'all' | 'active' | 'completed'
+  const [siteCategoryTab, setSiteCategoryTab] = useState('all');
 
   // Map Modal & User Dropdown States
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
@@ -290,6 +291,38 @@ export default function App() {
       setActiveTab('select-site');
     }
   };
+
+  // Delete site handler
+  const handleDeleteSite = async (e, siteId) => {
+    e.stopPropagation();
+    const confirmDelete = window.confirm("Are you sure you want to delete this site?");
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/sites/${siteId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setSites((prev) => prev.filter((s) => String(s.id) !== String(siteId)));
+        if (String(selectedSiteId) === String(siteId)) {
+          const remaining = sites.filter((s) => String(s.id) !== String(siteId));
+          if (remaining.length > 0) setSelectedSiteId(remaining[0].id);
+        }
+      } else {
+        setSites((prev) => prev.filter((s) => String(s.id) !== String(siteId)));
+      }
+    } catch (err) {
+      setSites((prev) => prev.filter((s) => String(s.id) !== String(siteId)));
+    }
+  };
+
+  // Filter sites across All, Active, and Completed
+  const filteredSites = sites.filter((s) => {
+    const isCurrentActive = String(s.id) === String(selectedSiteId);
+    if (siteCategoryTab === 'active') return isCurrentActive;
+    if (siteCategoryTab === 'completed') return !isCurrentActive;
+    return true; // 'all'
+  });
 
   const formatCoord = (val, dirPos, dirNeg) => {
     if (typeof val === 'number') {
@@ -607,135 +640,159 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Action Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 hover:border-emerald-500/40 transition">
-                    <div className="w-11 h-11 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mb-4">
-                      <Layers className="w-5 h-5" />
-                    </div>
-                    <h3 className="text-base font-bold text-white">GIS Elevation & Terrain</h3>
-                    <p className="text-xs text-slate-400 mt-1.5 mb-5 leading-relaxed">
-                      Analyze digital elevation models (DEM), slope gradients, and infrastructure proximity buffers.
-                    </p>
-                    <button 
-                      onClick={() => setIsMapModalOpen(true)}
-                      className="flex items-center space-x-1.5 text-xs font-bold text-emerald-400 hover:text-emerald-300 cursor-pointer"
-                    >
-                      <span>Open Map Picker</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 hover:border-amber-500/40 transition">
-                    <div className="w-11 h-11 bg-amber-500/10 text-amber-400 rounded-2xl flex items-center justify-center mb-4">
-                      <Zap className="w-5 h-5" />
-                    </div>
-                    <h3 className="text-base font-bold text-white">Yield Prediction Engine</h3>
-                    <p className="text-xs text-slate-400 mt-1.5 mb-5 leading-relaxed">
-                      Simulate annual generation (MWh) and Capacity Utilization Factor (CUF) with ML algorithms.
-                    </p>
-                    <button 
-                      onClick={() => setActiveTab('view-report')}
-                      className="flex items-center space-x-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 cursor-pointer"
-                    >
-                      <span>Simulate Yield</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="bg-slate-900/60 p-6 rounded-3xl border border-slate-800/80 hover:border-sky-500/40 transition">
-                    <div className="w-11 h-11 bg-sky-500/10 text-sky-400 rounded-2xl flex items-center justify-center mb-4">
-                      <TrendingUp className="w-5 h-5" />
-                    </div>
-                    <h3 className="text-base font-bold text-white">Multi-Site Comparison</h3>
-                    <p className="text-xs text-slate-400 mt-1.5 mb-5 leading-relaxed">
-                      Benchmark candidate sites across irradiance, wind speed, CAPEX, and grid connectivity.
-                    </p>
-                    <button 
-                      onClick={() => setActiveTab('compare-sites')}
-                      className="flex items-center space-x-1.5 text-xs font-bold text-sky-400 hover:text-sky-300 cursor-pointer"
-                    >
-                      <span>Compare Sites</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
               </div>
             )}
 
             {/* VIEW 2: VIEW STORED SITES */}
             {activeTab === 'stored-sites' && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-bold text-white">Stored Candidate Sites</h2>
-                    <p className="text-xs text-slate-400 mt-1">All persistent geographic boundaries and project corridors in your database.</p>
+                    <p className="text-xs text-slate-400 mt-1">Manage, inspect suitability scores, and delete unused registered project zones.</p>
                   </div>
-                  <button 
-                    onClick={() => setIsMapModalOpen(true)}
-                    className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition cursor-pointer"
-                  >
-                    <PlusCircle className="w-4 h-4" />
-                    <span>Register Another Site</span>
-                  </button>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {sites.map((s) => (
-                    <div 
-                      key={s.id} 
-                      className={`bg-slate-900/80 p-5 rounded-3xl border transition duration-200 ${
-                        String(s.id) === String(selectedSiteId) ? 'border-emerald-500 shadow-lg shadow-emerald-500/10' : 'border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                          {s.site_type || s.type || 'Hybrid'}
-                        </span>
-                        <span className="text-xs font-extrabold text-emerald-300">
-                          {s.suitability_score || s.suitabilityScore || 90}/100 Score
-                        </span>
-                      </div>
-
-                      <h3 className="text-base font-bold text-white">{s.name}</h3>
-                      <p className="text-xs text-slate-400 mb-4">{s.region}</p>
-
-                      <div className="space-y-2 text-xs text-slate-300 border-t border-slate-800/80 pt-3 mb-4">
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Coordinates:</span>
-                          <span className="font-mono text-slate-200">{formatCoord(s.lat, 'N', 'S')}, {formatCoord(s.long, 'E', 'W')}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Solar (GHI):</span>
-                          <span className="text-amber-400 font-semibold">{s.solar_potential || s.solarPotential}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Wind (100m):</span>
-                          <span className="text-sky-400 font-semibold">{s.wind_speed || s.windSpeed}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Grid Distance:</span>
-                          <span className="text-slate-300 font-semibold">{s.grid_proximity || s.gridProximity}</span>
-                        </div>
-                      </div>
-
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Category Tabs: All, Active, Completed */}
+                    <div className="flex items-center space-x-1.5 bg-slate-900 border border-slate-800 p-1 rounded-2xl">
                       <button
-                        onClick={() => {
-                          setSelectedSiteId(s.id);
-                          setActiveTab('select-site');
-                        }}
-                        className={`w-full py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
-                          String(s.id) === String(selectedSiteId) 
-                            ? 'bg-emerald-500 text-slate-950' 
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                        type="button"
+                        onClick={() => setSiteCategoryTab('all')}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer ${
+                          siteCategoryTab === 'all'
+                            ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                            : 'text-slate-400 hover:text-white'
                         }`}
                       >
-                        {String(s.id) === String(selectedSiteId) ? 'Currently Active Target' : 'Set as Active Target'}
+                        All ({sites.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSiteCategoryTab('active')}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer ${
+                          siteCategoryTab === 'active'
+                            ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Active ({sites.filter((s) => String(s.id) === String(selectedSiteId)).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSiteCategoryTab('completed')}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer ${
+                          siteCategoryTab === 'completed'
+                            ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Completed ({sites.filter((s) => String(s.id) !== String(selectedSiteId)).length})
                       </button>
                     </div>
-                  ))}
+
+                    <button 
+                      onClick={() => setIsMapModalOpen(true)}
+                      className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition cursor-pointer"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>Register Another Site</span>
+                    </button>
+                  </div>
                 </div>
+
+                {/* Filtered Candidate Sites Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {filteredSites.map((s) => {
+                    const isActive = String(s.id) === String(selectedSiteId);
+                    const score = s.suitability_score || s.suitabilityScore || 90;
+
+                    return (
+                      <div 
+                        key={s.id} 
+                        className={`bg-slate-900/80 p-5 rounded-3xl border transition duration-200 flex flex-col justify-between ${
+                          isActive ? 'border-emerald-500 shadow-lg shadow-emerald-500/10' : 'border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-start justify-between mb-3">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                              {s.site_type || s.type || 'Hybrid'}
+                            </span>
+                            
+                            {/* Delete Unused Site Button */}
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteSite(e, s.id)}
+                              title="Delete site"
+                              className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <h3 className="text-base font-bold text-white">{s.name}</h3>
+                          <p className="text-xs text-slate-400 mb-4">{s.region}</p>
+
+                          <div className="space-y-2 text-xs text-slate-300 border-t border-slate-800/80 pt-3 mb-4">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Coordinates:</span>
+                              <span className="font-mono text-slate-200">{formatCoord(s.lat, 'N', 'S')}, {formatCoord(s.long, 'E', 'W')}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Solar (GHI):</span>
+                              <span className="text-amber-400 font-semibold">{s.solar_potential || s.solarPotential}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Wind (100m):</span>
+                              <span className="text-sky-400 font-semibold">{s.wind_speed || s.windSpeed}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Grid Distance:</span>
+                              <span className="text-slate-300 font-semibold">{s.grid_proximity || s.gridProximity}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Suitability Score Section & Action Buttons */}
+                        <div className="space-y-2.5 pt-2 border-t border-slate-800/60">
+                          {/* Suitability Score Metric Card */}
+                          <div className="bg-emerald-950/30 border border-emerald-500/20 p-2.5 rounded-2xl flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <Activity className="w-4 h-4 text-emerald-400" />
+                              <span className="text-[11px] font-semibold text-slate-300">Suitability Score:</span>
+                            </div>
+                            <span className="text-xs font-black text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+                              {score} / 100
+                            </span>
+                          </div>
+
+                          <button
+                            onClick={() => {
+                              setSelectedSiteId(s.id);
+                              setActiveTab('select-site');
+                            }}
+                            className={`w-full py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
+                              isActive 
+                                ? 'bg-emerald-500 text-slate-950' 
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                            }`}
+                          >
+                            {isActive ? 'Currently Active Target' : 'Set as Active Target'}
+                          </button>
+                        </div>
+
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Empty State */}
+                {filteredSites.length === 0 && (
+                  <div className="text-center py-12 bg-slate-900/40 rounded-3xl border border-slate-800/60">
+                    <p className="text-sm font-semibold text-slate-300">No sites found in this section.</p>
+                    <p className="text-xs text-slate-500 mt-1">Select another filter or register a new site from the map.</p>
+                  </div>
+                )}
               </div>
             )}
 
