@@ -132,6 +132,37 @@ export default function App() {
     fetchPersistedSites();
   }, []);
 
+  // ----------------------------------------------------
+  // SHORT-POLLING HOOK: Automatically updates cards when background task finishes
+  // ----------------------------------------------------
+  useEffect(() => {
+    const hasPendingData = sites.some(
+      (s) =>
+        (s.solar_potential && String(s.solar_potential).includes('Fetching')) ||
+        (s.wind_speed && String(s.wind_speed).includes('Fetching')) ||
+        (s.solarPotential && String(s.solarPotential).includes('Fetching')) ||
+        (s.windSpeed && String(s.windSpeed).includes('Fetching'))
+    );
+
+    if (!hasPendingData) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/sites');
+        if (res.ok) {
+          const freshSites = await res.json();
+          if (Array.isArray(freshSites) && freshSites.length > 0) {
+            setSites(freshSites);
+          }
+        }
+      } catch (err) {
+        console.warn('Polling check encountered a network error:', err);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [sites]);
+
   // Load remembered credentials on startup
   useEffect(() => {
     const savedEmail = localStorage.getItem('saved_email');
@@ -184,13 +215,19 @@ export default function App() {
       ? { name, email, password, confirm_password: confirmPassword, role }
       : { email, password, role };
 
+    // 10-second timeout controller so it never hangs
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.ok) {
@@ -211,8 +248,13 @@ export default function App() {
         setMessage({ type: 'error', text: data.detail || 'Authentication failed' });
       }
     } catch (err) {
-      setMessage({ type: 'error', text: 'Unable to connect to backend server (http://127.0.0.1:8000)' });
+      if (err.name === 'AbortError') {
+        setMessage({ type: 'error', text: 'Request timed out. Please ensure the backend is running.' });
+      } else {
+        setMessage({ type: 'error', text: 'Unable to connect to backend server (http://127.0.0.1:8000)' });
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
@@ -248,10 +290,8 @@ export default function App() {
   const handleConfirmMapSite = async (siteMeta) => {
     const rawLat = typeof siteMeta.rawLat === 'number' ? siteMeta.rawLat : parseFloat(siteMeta.lat) || 25.0;
     const rawLng = typeof siteMeta.rawLng === 'number' ? siteMeta.rawLng : parseFloat(siteMeta.long) || 75.0;
-    const solarVal = `${(Math.random() * 1.8 + 4.6).toFixed(1)} kWh/m²/day`;
-    const windVal = `${(Math.random() * 3.2 + 5.2).toFixed(1)} m/s`;
-    const scoreVal = Math.floor(Math.random() * 12 + 86);
 
+    // Send placeholder cues to trigger backend NASA POWER and Open-Meteo collection
     const payload = {
       name: siteMeta.name || `Custom Site ${sites.length + 1}`,
       region: siteMeta.region || 'Selected Region',
@@ -259,11 +299,11 @@ export default function App() {
       long: rawLng,
       site_type: 'Hybrid (Solar + Wind)',
       area: siteMeta.area || '30.0 km²',
-      solar_potential: solarVal,
-      wind_speed: windVal,
+      solar_potential: 'Fetching live GHI...',
+      wind_speed: 'Fetching live 100m...',
       grid_proximity: siteMeta.gridProximity || '2.0 km',
       elevation: siteMeta.elevation || '250 m',
-      suitability_score: scoreVal
+      suitability_score: 75
     };
 
     try {
@@ -335,6 +375,9 @@ export default function App() {
   // AUTHENTICATED DASHBOARD
   // ----------------------------------------------------
   if (loggedInUser) {
+    const isSolarPending = String(currentSiteData.solar_potential || currentSiteData.solarPotential || '').includes('Fetching');
+    const isWindPending = String(currentSiteData.wind_speed || currentSiteData.windSpeed || '').includes('Fetching');
+
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col selection:bg-emerald-500 selection:text-white">
 
@@ -614,19 +657,23 @@ export default function App() {
                     <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
                       <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Solar GHI Potential</p>
                       <p className="text-sm font-bold text-amber-400 mt-1 flex items-center space-x-1.5">
-                        <Sun className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                        <Sun className={`w-4 h-4 text-amber-400 flex-shrink-0 ${isSolarPending ? 'animate-spin' : ''}`} />
                         <span>{currentSiteData.solar_potential || currentSiteData.solarPotential || '5.5 kWh/m²/day'}</span>
                       </p>
-                      <p className="text-[11px] text-slate-500 mt-1">NASA POWER Feed</p>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        {isSolarPending ? 'Querying NASA POWER...' : 'NASA POWER Feed'}
+                      </p>
                     </div>
 
                     <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
                       <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Mean Wind (100m)</p>
                       <p className="text-sm font-bold text-sky-400 mt-1 flex items-center space-x-1.5">
-                        <Wind className="w-4 h-4 text-sky-400 flex-shrink-0" />
+                        <Wind className={`w-4 h-4 text-sky-400 flex-shrink-0 ${isWindPending ? 'animate-pulse' : ''}`} />
                         <span>{currentSiteData.wind_speed || currentSiteData.windSpeed || '6.8 m/s'}</span>
                       </p>
-                      <p className="text-[11px] text-slate-500 mt-1">Global Wind Atlas</p>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        {isWindPending ? 'Extrapolating Hub Height...' : 'Open-Meteo Feed'}
+                      </p>
                     </div>
 
                     <div className="bg-emerald-950/30 p-4 rounded-2xl border border-emerald-500/30">
@@ -705,6 +752,8 @@ export default function App() {
                   {filteredSites.map((s) => {
                     const isActive = String(s.id) === String(selectedSiteId);
                     const score = s.suitability_score || s.suitabilityScore || 90;
+                    const cardSolarPending = String(s.solar_potential || s.solarPotential || '').includes('Fetching');
+                    const cardWindPending = String(s.wind_speed || s.windSpeed || '').includes('Fetching');
 
                     return (
                       <div 
@@ -738,13 +787,17 @@ export default function App() {
                               <span className="text-slate-500">Coordinates:</span>
                               <span className="font-mono text-slate-200">{formatCoord(s.lat, 'N', 'S')}, {formatCoord(s.long, 'E', 'W')}</span>
                             </div>
-                            <div className="flex justify-between">
+                            <div className="flex justify-between items-center">
                               <span className="text-slate-500">Solar (GHI):</span>
-                              <span className="text-amber-400 font-semibold">{s.solar_potential || s.solarPotential}</span>
+                              <span className={`font-semibold ${cardSolarPending ? 'text-amber-400/80 animate-pulse text-[11px]' : 'text-amber-400'}`}>
+                                {s.solar_potential || s.solarPotential}
+                              </span>
                             </div>
-                            <div className="flex justify-between">
+                            <div className="flex justify-between items-center">
                               <span className="text-slate-500">Wind (100m):</span>
-                              <span className="text-sky-400 font-semibold">{s.wind_speed || s.windSpeed}</span>
+                              <span className={`font-semibold ${cardWindPending ? 'text-sky-400/80 animate-pulse text-[11px]' : 'text-sky-400'}`}>
+                                {s.wind_speed || s.windSpeed}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-slate-500">Grid Distance:</span>
