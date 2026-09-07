@@ -7,3 +7,67 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: #41b5c5;
 }
+@media print {
+  /* Hide navigation, sidebar, and print/export buttons */
+  header,
+  aside,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Expand the main report to fill the entire page */
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  body, .min-h-screen {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Reset cards to clean print styling */
+  .bg-slate-900, .bg-slate-950, .bg-slate-900\/80 {
+    background: white !important;
+    border: 1px solid #e2e8f0 !important;
+    color: black !important;
+  }
+
+  h1, h2, h3, h4, p, span {
+    color: black !important;
+  }
+}
+@media print {
+  /* Hide navigation, sidebar, and print/export buttons */
+  header,
+  aside,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Expand the main report to fill the entire page */
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  body, .min-h-screen {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Reset cards to clean print styling */
+  .bg-slate-900, .bg-slate-950, .bg-slate-900\/80 {
+    background: white !important;
+    border: 1px solid #e2e8f0 !important;
+    color: black !important;
+  }
+
+  h1, h2, h3, h4, p, span {
+    color: black !important;
+  }
+}

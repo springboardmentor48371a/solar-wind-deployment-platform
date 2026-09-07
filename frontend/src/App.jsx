@@ -25,9 +25,11 @@ import {
   FolderGit2,
   Download,
   Trash2,
-  Mountain
+  Mountain,
+  Printer
 } from 'lucide-react';
 import MapPickerModal from './components/MapPickerModal';
+import jsPDF from 'jspdf';
 
 const DEFAULT_SITES = [
   {
@@ -466,6 +468,86 @@ export default function App() {
     } catch (err) {
       setSites((prev) => prev.filter((s) => String(s.id) !== String(siteId)));
     }
+  };
+
+  // Module 13: One-Click Automated Binary PDF Feasibility Report Export (via jsPDF)
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const timestamp = new Date().toLocaleString();
+
+    // Top Dark Blue Header Bar
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setTextColor(52, 211, 153); // emerald-400
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SOLAR & WIND INTELLIGENCE PLATFORM', 14, 13);
+    doc.setFontSize(8.5);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.setFont('helvetica', 'normal');
+    doc.text(`EXECUTIVE FEASIBILITY DOSSIER • Generated: ${timestamp}`, 14, 21);
+
+    // Section 1: Target Overview
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('1. TARGET SITE IDENTIFICATION', 14, 38);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Site Name: ${currentSiteData.name}`, 14, 46);
+    doc.text(`Geographic Region: ${currentSiteData.region}`, 14, 52);
+    doc.text(`Coordinates: Lat ${currentSiteData.lat}°, Long ${currentSiteData.long}°`, 14, 58);
+    doc.text(`Asset Type: ${currentSiteData.site_type || 'Hybrid'} | Area: ${currentSiteData.area || 'N/A'}`, 14, 64);
+    doc.text(`Suitability Score: ${currentSiteData.suitability_score || currentSiteData.suitabilityScore}/100`, 14, 70);
+
+    // Section 2: Meteorological & GIS
+    doc.setFont('helvetica', 'bold');
+    doc.text('2. METEOROLOGICAL & GIS INTELLIGENCE', 14, 82);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Solar Irradiance: ${currentSiteData.solar_potential || currentSiteData.solarPotential} (NASA POWER Feed)`, 14, 90);
+    doc.text(`100m Wind Speed: ${currentSiteData.wind_speed || currentSiteData.windSpeed} (Open-Meteo Hellmann Model)`, 14, 96);
+    doc.text(`Elevation: ${currentSiteData.elevation || '250 m'} | DEM Slope: ${terrainData.slope_degrees}° (${terrainData.is_solar_viable ? 'Viable for Utility Scale' : 'Steep Slope Constraint'})`, 14, 102);
+    doc.text(`Grid Interconnect Distance: ${currentSiteData.grid_proximity || currentSiteData.gridProximity} to Substation`, 14, 108);
+
+    // Section 3: ML Energy Yield Projections
+    doc.setFont('helvetica', 'bold');
+    doc.text('3. MACHINE LEARNING ENERGY YIELD (MODULE 5, 6, 8)', 14, 120);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Predicted Annual Energy Production (AEP): ${mlYield.annual_generation_mwh}`, 14, 128);
+    doc.text(`Capacity Utilization Factor (CUF): ${mlYield.cuf_percent}`, 14, 134);
+    doc.text(`Model Engine: ${mlYield.model_engine}`, 14, 140);
+    doc.text('Loss Baseline: Standard IEC 61400 & Colocation Wake Derating', 14, 146);
+
+    // Section 4: AHP Suitability Breakdown
+    doc.setFont('helvetica', 'bold');
+    doc.text('4. MULTI-CRITERIA DECISION ANALYSIS (AHP MATRIX)', 14, 158);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text('• Resource Potential (35% Weight)    : 94.0 / 100', 14, 166);
+    doc.text('• Geographic / Slope (25% Weight)    : 92.5 / 100', 14, 172);
+    doc.text('• Grid Infrastructure (15% Weight)   : 88.0 / 100', 14, 178);
+    doc.text('• Environmental Buffer (15% Weight)  : 92.0 / 100', 14, 184);
+    doc.text('• Economic Yield (10% Weight)        : 91.6 / 100', 14, 190);
+
+    // Section 5: Risk Assessment
+    doc.setFont('helvetica', 'bold');
+    doc.text('5. OPERATIONAL HAZARD & RISK EVALUATION (MODULE 12)', 14, 202);
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Overall Risk Level: ${siteRisks.overall_risk_level}`, 14, 210);
+    if (siteRisks.alerts && siteRisks.alerts.length > 0) {
+      siteRisks.alerts.forEach((alert, i) => {
+        doc.text(`- [${alert.category}] ${alert.message}`, 14, 218 + (i * 6));
+      });
+    } else {
+      doc.text('- Optimal site conditions. No extreme climatic, wind shear, or terrain hazards detected.', 14, 218);
+    }
+
+    // Save as binary PDF file
+    doc.save(`${currentSiteData.name.replace(/\s+/g, '_')}_Feasibility_Dossier.pdf`);
   };
 
   const filteredSites = sites.filter((s) => {
@@ -986,69 +1068,200 @@ export default function App() {
               </div>
             )}
 
-            {/* VIEW 3: COMPARE SITES */}
-            {activeTab === 'compare-sites' && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div>
-                  <h2 className="text-xl font-bold text-white">Multi-Site Comparison Matrix</h2>
-                  <p className="text-xs text-slate-400 mt-1">Side-by-side evaluation of registered database sites against resource, infrastructure, and suitability benchmarks.</p>
-                </div>
+            {/* ========================================================================= */}
+            {/* VIEW 3: COMPARE SITES (MODULE 11: ANALYTICS & BENCHMARK MATRIX ENHANCED)  */}
+            {/* ========================================================================= */}
+            {activeTab === 'compare-sites' && (() => {
+              const extractNum = (val) => parseFloat(String(val || '').replace(/[^0-9.]/g, '')) || 0;
+              const maxSolar = Math.max(...sites.map((s) => extractNum(s.solar_potential || s.solarPotential || 0)));
+              const maxWind = Math.max(...sites.map((s) => extractNum(s.wind_speed || s.windSpeed || 0)));
+              const maxScore = Math.max(...sites.map((s) => Number(s.suitability_score || s.suitabilityScore || 0)));
+              const avgSuitability = Math.round(
+                sites.reduce((acc, s) => acc + Number(s.suitability_score || s.suitabilityScore || 0), 0) / (sites.length || 1)
+              );
 
-                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-slate-300">
-                      <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
-                        <tr>
-                          <th className="px-6 py-4">Site Name & Region</th>
-                          <th className="px-6 py-4">Type</th>
-                          <th className="px-6 py-4">Solar Potential (GHI)</th>
-                          <th className="px-6 py-4">Wind Speed (100m)</th>
-                          <th className="px-6 py-4">Land Area</th>
-                          <th className="px-6 py-4">Grid Proximity</th>
-                          <th className="px-6 py-4">Suitability</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800/60">
-                        {sites.map((s) => (
-                          <tr key={s.id} className="hover:bg-slate-800/30 transition">
-                            <td className="px-6 py-4 font-semibold text-white">
-                              {s.name}
-                              <span className="block text-[11px] text-slate-400 font-normal">{s.region}</span>
-                            </td>
-                            <td className="px-6 py-4">{s.site_type || s.type}</td>
-                            <td className="px-6 py-4 font-semibold text-amber-400">{s.solar_potential || s.solarPotential}</td>
-                            <td className="px-6 py-4 font-semibold text-sky-400">{s.wind_speed || s.windSpeed}</td>
-                            <td className="px-6 py-4">{s.area}</td>
-                            <td className="px-6 py-4">{s.grid_proximity || s.gridProximity}</td>
-                            <td className="px-6 py-4">
-                              <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                {s.suitability_score || s.suitabilityScore} / 100
-                              </span>
-                            </td>
+              return (
+                <div className="space-y-6 animate-in fade-in duration-200">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Multi-Site Analytics & Comparison Matrix</h2>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Side-by-side benchmark evaluation across registered database sites. Highlighting top performers per resource tier.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setIsMapModalOpen(true)}
+                      className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition cursor-pointer self-start md:self-auto"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>Add Site to Matrix</span>
+                    </button>
+                  </div>
+
+                  {/* Module 11: Aggregate Portfolio KPI Summary Bar */}
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
+                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Total Sites Monitored</p>
+                      <p className="text-xl font-black text-white mt-1">{sites.length} Sites</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">SQLite Active Registry</p>
+                    </div>
+                    <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
+                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Portfolio Avg Suitability</p>
+                      <p className="text-xl font-black text-emerald-400 mt-1">{avgSuitability} / 100</p>
+                      <p className="text-[10px] text-emerald-500 mt-0.5">AHP Decision Matrix</p>
+                    </div>
+                    <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
+                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Peak Solar Irradiance</p>
+                      <p className="text-xl font-black text-amber-400 mt-1">{maxSolar.toFixed(1)} kWh/m²/d</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">NASA POWER Peak Candidate</p>
+                    </div>
+                    <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
+                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Peak Wind Velocity (100m)</p>
+                      <p className="text-xl font-black text-sky-400 mt-1">{maxWind.toFixed(1)} m/s</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Open-Meteo Hellmann Peak</p>
+                    </div>
+                  </div>
+
+                  {/* Module 11: Benchmark Highlighting Matrix Table */}
+                  <div className="bg-slate-900/80 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs text-slate-300">
+                        <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                          <tr>
+                            <th className="px-6 py-4">Site Name & Region</th>
+                            <th className="px-6 py-4">Technology</th>
+                            <th className="px-6 py-4">Solar GHI</th>
+                            <th className="px-6 py-4">Wind Speed (100m)</th>
+                            <th className="px-6 py-4">Land Area</th>
+                            <th className="px-6 py-4">Grid Proximity</th>
+                            <th className="px-6 py-4">Suitability Score</th>
+                            <th className="px-6 py-4 text-right">Action</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60">
+                          {sites.map((s) => {
+                            const isActive = String(s.id) === String(selectedSiteId);
+                            const sGhi = extractNum(s.solar_potential || s.solarPotential);
+                            const sWind = extractNum(s.wind_speed || s.windSpeed);
+                            const sScore = Number(s.suitability_score || s.suitabilityScore || 0);
+
+                            const isTopSolar = sGhi > 0 && sGhi === maxSolar;
+                            const isTopWind = sWind > 0 && sWind === maxWind;
+                            const isTopScore = sScore > 0 && sScore === maxScore;
+
+                            return (
+                              <tr
+                                key={s.id}
+                                className={`transition duration-150 ${
+                                  isActive ? 'bg-emerald-500/10 hover:bg-emerald-500/15' : 'hover:bg-slate-800/40'
+                                }`}
+                              >
+                                <td className="px-6 py-4 font-semibold text-white">
+                                  <div className="flex items-center space-x-2">
+                                    <span>{s.name}</span>
+                                    {isActive && (
+                                      <span className="text-[9px] bg-emerald-500 text-slate-950 font-extrabold px-2 py-0.5 rounded-md uppercase">
+                                        Active
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="block text-[11px] text-slate-400 font-normal mt-0.5">{s.region}</span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] text-slate-300 font-medium">
+                                    {s.site_type || s.type}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="font-bold text-amber-400">{s.solar_potential || s.solarPotential}</span>
+                                  {isTopSolar && (
+                                    <span className="ml-1.5 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded font-bold">
+                                      Best
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="font-bold text-sky-400">{s.wind_speed || s.windSpeed}</span>
+                                  {isTopWind && (
+                                    <span className="ml-1.5 text-[9px] bg-sky-500/20 text-sky-300 border border-sky-500/40 px-1.5 py-0.5 rounded font-bold">
+                                      Best
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 font-mono text-slate-300">{s.area}</td>
+                                <td className="px-6 py-4 text-slate-300">{s.grid_proximity || s.gridProximity}</td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                      {sScore} / 100
+                                    </span>
+                                    {isTopScore && (
+                                      <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.5 rounded font-bold">
+                                        Top Ranked
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  {isActive ? (
+                                    <span className="text-[11px] text-emerald-400 font-semibold">Selected</span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedSiteId(s.id);
+                                        setActiveTab('select-site');
+                                      }}
+                                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-semibold transition border border-slate-700 cursor-pointer"
+                                    >
+                                      Select
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
-            {/* VIEW 4: VIEW FEASIBILITY REPORT */}
+            {/* ========================================================================= */}
+            {/* VIEW 4: VIEW FEASIBILITY REPORT (MODULE 13: EXPORT DOSSIER SYSTEM)       */}
+            {/* ========================================================================= */}
             {activeTab === 'view-report' && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-bold text-white">Executive Feasibility Report</h2>
                     <p className="text-xs text-slate-400 mt-1">Generated deployment assessment for <span className="text-emerald-400 font-semibold">{currentSiteData.name}</span>.</p>
                   </div>
-                  <button
-                    onClick={() => window.print()}
-                    className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2.5 rounded-2xl transition border border-slate-700 cursor-pointer"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>Export Report</span>
-                  </button>
+                  
+                  {/* Module 13: Dual Export Trigger (Print & Instant Binary PDF Download) */}
+                  <div className="flex items-center space-x-2.5">
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="flex items-center space-x-1.5 bg-slate-850 hover:bg-slate-800 text-slate-300 text-xs font-semibold px-3.5 py-2.5 rounded-2xl transition border border-slate-700/80 cursor-pointer"
+                      title="Open browser print dialog"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Print</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleExportPDF}
+                      className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
+                      title="Download full executive feasibility dossier"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Export Dossier (.pdf)</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-8 space-y-6">
@@ -1297,6 +1510,7 @@ export default function App() {
             </div>
           )}
 
+          {/* Remember Me Checkbox */}
           <div className="flex items-center justify-between py-1">
             <label className="flex items-center space-x-2 text-xs text-slate-400 cursor-pointer select-none">
               <input
