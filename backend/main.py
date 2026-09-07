@@ -5,11 +5,14 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from jose import jwt
+from services.risk_service import assess_site_risks
 from passlib.context import CryptContext
 import requests
 
 import models
 import schemas
+from pydantic import BaseModel
+from services.optimization_service import calculate_hybrid_colocation, calculate_multicriteria_scoring
 from database import engine, get_db, SessionLocal
 from services.environmental_service import fetch_live_meteorological_data
 from services.gis_engine import compute_terrain_slope, calculate_infrastructure_proximity, check_exclusion_buffer
@@ -291,6 +294,59 @@ def calculate_live_yield(req: YieldPredictionRequest):
         wind_speed_100m=req.wind_speed,
         elevation=req.elevation,
         site_type=req.site_type
+    )
+# ----------------- MODULE 8, 9, 10: OPTIMIZATION & AHP SCORING -----------------
+
+class OptimizationRequest(BaseModel):
+    land_area_km2: float = 35.0
+    site_type: str = "Hybrid (Solar + Wind)"
+
+class ScoringRequest(BaseModel):
+    solar_ghi: float = 5.8
+    wind_speed_100m: float = 7.4
+    slope_degrees: float = 2.1
+    substation_dist_km: float = 2.5
+    is_exclusion_zone: bool = False
+
+@app.post("/api/optimization/colocation")
+def get_colocation_optimization(req: OptimizationRequest):
+    """
+    Module 9: Computes turbine wake spacing and hybrid solar-wind capacity allocation.
+    """
+    return calculate_hybrid_colocation(req.land_area_km2, req.site_type)
+
+@app.post("/api/scoring/multicriteria")
+def get_multicriteria_score(req: ScoringRequest):
+    """
+    Module 10: Calculates the 5-factor AHP weighted suitability index (0 - 100).
+    """
+    return calculate_multicriteria_scoring(
+        req.solar_ghi,
+        req.wind_speed_100m,
+        req.slope_degrees,
+        req.substation_dist_km,
+        req.is_exclusion_zone
+    )
+# ----------------- MODULE 12: NOTIFICATION & RISK SYSTEM -----------------
+
+class RiskAssessmentRequest(BaseModel):
+    solar_ghi: float = 5.8
+    wind_speed_100m: float = 7.4
+    avg_temp_c: float = 28.0
+    slope_degrees: float = 2.1
+    suitability_score: int = 85
+
+@app.post("/api/risks/evaluate")
+def evaluate_site_risks(req: RiskAssessmentRequest):
+    """
+    Module 12: Real-time environmental hazard and operational risk evaluation.
+    """
+    return assess_site_risks(
+        req.solar_ghi,
+        req.wind_speed_100m,
+        req.avg_temp_c,
+        req.slope_degrees,
+        req.suitability_score
     )
 # ----------------- APPLICATION ENTRY POINT -----------------
 

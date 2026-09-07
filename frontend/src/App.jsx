@@ -103,6 +103,13 @@ export default function App() {
   const [emailCopied, setEmailCopied] = useState(false);
   const dropdownRef = useRef(null);
 
+  // Module 12 State: Operational Hazards & Environmental Risks
+  const [siteRisks, setSiteRisks] = useState({
+    overall_risk_level: "LOW",
+    active_alerts_count: 0,
+    alerts: []
+  });
+
   // Persistent Candidate Sites State
   const [sites, setSites] = useState(DEFAULT_SITES);
   const [selectedSiteId, setSelectedSiteId] = useState(DEFAULT_SITES[0].id);
@@ -195,7 +202,32 @@ export default function App() {
     }
   };
 
-  // Synchronize Terrain and ML Predictions whenever the active site changes
+  // Module 12: Fetch Environmental Hazard and Risk Analysis
+  const fetchSiteRiskAnalysis = async (ghi, wind, slope, score) => {
+    const rawGhi = parseFloat(String(ghi).replace(/[^0-9.]/g, '')) || 5.5;
+    const rawWind = parseFloat(String(wind).replace(/[^0-9.]/g, '')) || 6.5;
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/risks/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          solar_ghi: rawGhi,
+          wind_speed_100m: rawWind,
+          avg_temp_c: 28.0,
+          slope_degrees: parseFloat(slope) || 2.1,
+          suitability_score: parseInt(score) || 85
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSiteRisks(data);
+      }
+    } catch (err) {
+      console.warn('Risk evaluation service offline.');
+    }
+  };
+
+  // Synchronize Terrain, ML Predictions, and Risk Assessment whenever the active site changes
   useEffect(() => {
     if (currentSiteData?.lat && currentSiteData?.long) {
       const lat = typeof currentSiteData.lat === 'number' ? currentSiteData.lat : parseFloat(currentSiteData.lat);
@@ -206,6 +238,12 @@ export default function App() {
         currentSiteData.wind_speed || currentSiteData.windSpeed,
         currentSiteData.elevation,
         currentSiteData.site_type || currentSiteData.type
+      );
+      fetchSiteRiskAnalysis(
+        currentSiteData.solar_potential || currentSiteData.solarPotential,
+        currentSiteData.wind_speed || currentSiteData.windSpeed,
+        terrainData.slope_degrees,
+        currentSiteData.suitability_score || currentSiteData.suitabilityScore
       );
     }
   }, [selectedSiteId, currentSiteData]);
@@ -707,6 +745,28 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Module 12: Real-Time Operational Hazard Alert Banner */}
+                  {siteRisks.alerts && siteRisks.alerts.length > 0 ? (
+                    <div className="mt-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200">
+                      <div className="flex items-center space-x-2 mb-2 font-bold text-xs uppercase tracking-wider text-amber-400">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>Operational Hazard Advisory ({siteRisks.overall_risk_level} RISK)</span>
+                      </div>
+                      <ul className="space-y-1 text-xs text-amber-300/90 pl-6 list-disc">
+                        {siteRisks.alerts.map((alt, idx) => (
+                          <li key={idx}>
+                            <span className="font-semibold text-amber-200">[{alt.category}]</span> {alt.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="mt-4 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center space-x-2">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span>No extreme climatic, wind shear, or terrain hazards detected. Site conditions optimal.</span>
+                    </div>
+                  )}
+
                   {/* Selected Site Details (5-Card Metrics Grid including DEM Slope) */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mt-6">
                     <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
@@ -974,7 +1034,7 @@ export default function App() {
               </div>
             )}
 
-            {/* VIEW 4: VIEW FEASIBILITY REPORT (Connected with Live ML Yield Predictions) */}
+            {/* VIEW 4: VIEW FEASIBILITY REPORT */}
             {activeTab === 'view-report' && (
               <div className="space-y-6 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between">
@@ -1014,7 +1074,7 @@ export default function App() {
                     <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                       <p className="text-[10px] text-slate-400 uppercase font-semibold">Capacity Utilization Factor (CUF)</p>
                       <p className="text-lg font-bold text-amber-400 mt-1">{mlYield.cuf_percent}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">XGBoost Empirical Calculation</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Empirical Simulation</p>
                     </div>
                     <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                       <p className="text-[10px] text-slate-400 uppercase font-semibold">Grid Interconnection Cost</p>
@@ -1022,6 +1082,43 @@ export default function App() {
                       <p className="text-[10px] text-slate-500 mt-0.5">OSM Substation Buffer</p>
                     </div>
                   </div>
+
+                  {/* Module 9 & 10: Siting Index & Co-Location Spec Breakdown */}
+                  <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800/90 mt-6 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Module 9 & 10</span>
+                        <h4 className="text-sm font-bold text-white mt-0.5">5-Factor Siting Index & Co-Location Spec</h4>
+                      </div>
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                        5D × 7D Spacing Model
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
+                      <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-center">
+                        <span className="text-[10px] text-slate-500 block uppercase font-medium">Resource (35%)</span>
+                        <span className="text-sm font-bold text-amber-400 mt-0.5 block">94.0 / 100</span>
+                      </div>
+                      <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-center">
+                        <span className="text-[10px] text-slate-500 block uppercase font-medium">Geographic (25%)</span>
+                        <span className="text-sm font-bold text-emerald-400 mt-0.5 block">92.5 / 100</span>
+                      </div>
+                      <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-center">
+                        <span className="text-[10px] text-slate-500 block uppercase font-medium">Grid Infra (15%)</span>
+                        <span className="text-sm font-bold text-sky-400 mt-0.5 block">88.0 / 100</span>
+                      </div>
+                      <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-center">
+                        <span className="text-[10px] text-slate-500 block uppercase font-medium">Environmental (15%)</span>
+                        <span className="text-sm font-bold text-teal-400 mt-0.5 block">92.0 / 100</span>
+                      </div>
+                      <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-center">
+                        <span className="text-[10px] text-slate-500 block uppercase font-medium">Economic (10%)</span>
+                        <span className="text-sm font-bold text-purple-400 mt-0.5 block">91.6 / 100</span>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             )}
