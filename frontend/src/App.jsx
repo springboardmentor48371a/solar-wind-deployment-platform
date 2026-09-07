@@ -1,19 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Sun, 
-  Wind, 
-  Mail, 
-  Lock, 
-  UserCheck, 
-  User, 
-  Eye, 
-  EyeOff, 
-  MapPin, 
-  Compass, 
-  LogOut, 
-  AlertCircle, 
-  PlusCircle, 
-  Activity, 
+import {
+  Sun,
+  Wind,
+  Mail,
+  Lock,
+  UserCheck,
+  User,
+  Eye,
+  EyeOff,
+  MapPin,
+  Compass,
+  LogOut,
+  AlertCircle,
+  PlusCircle,
+  Activity,
   AlertTriangle,
   ChevronDown,
   Copy,
@@ -24,7 +24,8 @@ import {
   FileText,
   FolderGit2,
   Download,
-  Trash2
+  Trash2,
+  Mountain
 } from 'lucide-react';
 import MapPickerModal from './components/MapPickerModal';
 
@@ -40,6 +41,7 @@ const DEFAULT_SITES = [
     solar_potential: '5.8 kWh/m²/day',
     wind_speed: '4.2 m/s',
     grid_proximity: '1.8 km',
+    elevation: '210 m',
     suitability_score: 94
   },
   {
@@ -53,6 +55,7 @@ const DEFAULT_SITES = [
     solar_potential: '4.9 kWh/m²/day',
     wind_speed: '8.7 m/s',
     grid_proximity: '3.4 km',
+    elevation: '75 m',
     suitability_score: 91
   },
   {
@@ -66,6 +69,7 @@ const DEFAULT_SITES = [
     solar_potential: '5.6 kWh/m²/day',
     wind_speed: '7.4 m/s',
     grid_proximity: '0.9 km',
+    elevation: '15 m',
     suitability_score: 96
   }
 ];
@@ -105,6 +109,20 @@ export default function App() {
 
   const currentSiteData = sites.find((s) => String(s.id) === String(selectedSiteId)) || sites[0] || DEFAULT_SITES[0];
 
+  // Module 4 & 5 States: Terrain Slope and ML Energy Yield
+  const [terrainData, setTerrainData] = useState({
+    slope_degrees: 2.1,
+    is_solar_viable: true,
+    is_wind_viable: true,
+    status: 'Optimal Slope (< 5°)'
+  });
+
+  const [mlYield, setMlYield] = useState({
+    annual_generation_mwh: '142,800 MWh/yr',
+    cuf_percent: '28.4 %',
+    model_engine: 'XGBoost Yield Model'
+  });
+
   const roles = [
     'Renewable Energy Planner',
     'GIS Analyst',
@@ -132,9 +150,67 @@ export default function App() {
     fetchPersistedSites();
   }, []);
 
-  // ----------------------------------------------------
+  // Module 4: Fetch Terrain Slope Analysis
+  const fetchTerrainAnalysis = async (lat, lon) => {
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/gis/analyze-terrain?lat=${lat}&lon=${lon}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.terrain) {
+          setTerrainData(data.terrain);
+        }
+      }
+    } catch (err) {
+      console.warn('Terrain analysis service offline, using default slope parameters.');
+    }
+  };
+
+  // Module 5: Fetch Live ML Energy Yield Prediction
+  const fetchLiveYieldPrediction = async (solarGhi, windSpeed, elevation, siteType) => {
+    const rawGhi = parseFloat(String(solarGhi).replace(/[^0-9.]/g, '')) || 5.5;
+    const rawWind = parseFloat(String(windSpeed).replace(/[^0-9.]/g, '')) || 6.5;
+    const rawElev = parseFloat(String(elevation).replace(/[^0-9.]/g, '')) || 250.0;
+
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/predict/yield', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          solar_ghi: rawGhi,
+          wind_speed: rawWind,
+          elevation: rawElev,
+          site_type: siteType || 'Hybrid (Solar + Wind)'
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMlYield({
+          annual_generation_mwh: data.annual_generation_mwh || `${Math.round(data.raw_aep_mwh || 140000).toLocaleString()} MWh/yr`,
+          cuf_percent: data.cuf_percent || `${(data.raw_cuf || 28.0).toFixed(1)} %`,
+          model_engine: data.model_engine || 'XGBoost Yield Model'
+        });
+      }
+    } catch (err) {
+      console.warn('ML yield prediction endpoint offline, using cached benchmarks.');
+    }
+  };
+
+  // Synchronize Terrain and ML Predictions whenever the active site changes
+  useEffect(() => {
+    if (currentSiteData?.lat && currentSiteData?.long) {
+      const lat = typeof currentSiteData.lat === 'number' ? currentSiteData.lat : parseFloat(currentSiteData.lat);
+      const lon = typeof currentSiteData.long === 'number' ? currentSiteData.long : parseFloat(currentSiteData.long);
+      fetchTerrainAnalysis(lat, lon);
+      fetchLiveYieldPrediction(
+        currentSiteData.solar_potential || currentSiteData.solarPotential,
+        currentSiteData.wind_speed || currentSiteData.windSpeed,
+        currentSiteData.elevation,
+        currentSiteData.site_type || currentSiteData.type
+      );
+    }
+  }, [selectedSiteId, currentSiteData]);
+
   // SHORT-POLLING HOOK: Automatically updates cards when background task finishes
-  // ----------------------------------------------------
   useEffect(() => {
     const hasPendingData = sites.some(
       (s) =>
@@ -207,15 +283,14 @@ export default function App() {
     }
 
     setLoading(true);
-    const endpoint = isRegister 
-      ? 'http://127.0.0.1:8000/api/auth/register' 
+    const endpoint = isRegister
+      ? 'http://127.0.0.1:8000/api/auth/register'
       : 'http://127.0.0.1:8000/api/auth/login';
 
-    const payload = isRegister 
+    const payload = isRegister
       ? { name, email, password, confirm_password: confirmPassword, role }
       : { email, password, role };
 
-    // 10-second timeout controller so it never hangs
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -291,7 +366,6 @@ export default function App() {
     const rawLat = typeof siteMeta.rawLat === 'number' ? siteMeta.rawLat : parseFloat(siteMeta.lat) || 25.0;
     const rawLng = typeof siteMeta.rawLng === 'number' ? siteMeta.rawLng : parseFloat(siteMeta.long) || 75.0;
 
-    // Send placeholder cues to trigger backend NASA POWER and Open-Meteo collection
     const payload = {
       name: siteMeta.name || `Custom Site ${sites.length + 1}`,
       region: siteMeta.region || 'Selected Region',
@@ -356,12 +430,11 @@ export default function App() {
     }
   };
 
-  // Filter sites across All, Active, and Completed
   const filteredSites = sites.filter((s) => {
     const isCurrentActive = String(s.id) === String(selectedSiteId);
     if (siteCategoryTab === 'active') return isCurrentActive;
     if (siteCategoryTab === 'completed') return !isCurrentActive;
-    return true; // 'all'
+    return true;
   });
 
   const formatCoord = (val, dirPos, dirNeg) => {
@@ -504,14 +577,11 @@ export default function App() {
           {/* ======================= SIDEBAR ======================= */}
           <aside className="w-64 bg-slate-900/70 border-r border-slate-800/80 flex flex-col justify-between p-4 backdrop-blur-xl flex-shrink-0">
             <div className="space-y-6">
-              
               <div>
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">
                   Navigation Menu
                 </p>
                 <nav className="space-y-1.5">
-                  
-                  {/* Option 1: Select / Register New Site */}
                   <button
                     onClick={() => setActiveTab('select-site')}
                     className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition duration-200 cursor-pointer ${
@@ -524,7 +594,6 @@ export default function App() {
                     <span>Select New Site</span>
                   </button>
 
-                  {/* Option 2: View Stored Sites */}
                   <button
                     onClick={() => setActiveTab('stored-sites')}
                     className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition duration-200 cursor-pointer ${
@@ -540,7 +609,6 @@ export default function App() {
                     </span>
                   </button>
 
-                  {/* Option 3: Compare Sites */}
                   <button
                     onClick={() => setActiveTab('compare-sites')}
                     className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition duration-200 cursor-pointer ${
@@ -553,7 +621,6 @@ export default function App() {
                     <span>Compare Sites</span>
                   </button>
 
-                  {/* Option 4: View Report */}
                   <button
                     onClick={() => setActiveTab('view-report')}
                     className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition duration-200 cursor-pointer ${
@@ -565,7 +632,6 @@ export default function App() {
                     <FileText className="w-4 h-4 text-purple-400" />
                     <span>View Feasibility Report</span>
                   </button>
-
                 </nav>
               </div>
 
@@ -582,7 +648,6 @@ export default function App() {
                   <span>Launch Map</span>
                 </button>
               </div>
-
             </div>
 
             {/* Platform Status Info */}
@@ -596,7 +661,6 @@ export default function App() {
                 <span className="font-bold text-white">{currentSiteData.suitability_score || currentSiteData.suitabilityScore}/100</span>
               </div>
             </div>
-
           </aside>
 
           {/* ======================= MAIN CONTENT VIEW ======================= */}
@@ -633,7 +697,7 @@ export default function App() {
                         ))}
                       </select>
 
-                      <button 
+                      <button
                         onClick={() => setIsMapModalOpen(true)}
                         className="flex items-center space-x-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
                       >
@@ -643,8 +707,8 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Selected Site Details */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                  {/* Selected Site Details (5-Card Metrics Grid including DEM Slope) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mt-6">
                     <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
                       <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Coordinates</p>
                       <p className="text-sm font-bold text-slate-200 mt-1 flex items-center space-x-1.5">
@@ -652,6 +716,24 @@ export default function App() {
                         <span className="truncate">{formatCoord(currentSiteData.lat, 'N', 'S')}, {formatCoord(currentSiteData.long, 'E', 'W')}</span>
                       </p>
                       <p className="text-[11px] text-slate-500 mt-1">Area: {currentSiteData.area || 'N/A'}</p>
+                    </div>
+
+                    <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                      <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Topography & Slope</p>
+                      <div className="flex items-baseline justify-between mt-1">
+                        <span className="text-sm font-bold text-slate-200 flex items-center space-x-1">
+                          <Mountain className="w-3.5 h-3.5 text-slate-400 mr-1" />
+                          {currentSiteData.elevation || '250 m'}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          terrainData.is_solar_viable 
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                            : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        }`}>
+                          {terrainData.slope_degrees}° {terrainData.is_solar_viable ? 'Viable' : 'Steep'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">DEM 30m Horn's Kernel</p>
                     </div>
 
                     <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
@@ -700,7 +782,6 @@ export default function App() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    {/* Category Tabs: All, Active, Completed */}
                     <div className="flex items-center space-x-1.5 bg-slate-900 border border-slate-800 p-1 rounded-2xl">
                       <button
                         type="button"
@@ -737,7 +818,7 @@ export default function App() {
                       </button>
                     </div>
 
-                    <button 
+                    <button
                       onClick={() => setIsMapModalOpen(true)}
                       className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition cursor-pointer"
                     >
@@ -756,8 +837,8 @@ export default function App() {
                     const cardWindPending = String(s.wind_speed || s.windSpeed || '').includes('Fetching');
 
                     return (
-                      <div 
-                        key={s.id} 
+                      <div
+                        key={s.id}
                         className={`bg-slate-900/80 p-5 rounded-3xl border transition duration-200 flex flex-col justify-between ${
                           isActive ? 'border-emerald-500 shadow-lg shadow-emerald-500/10' : 'border-slate-800 hover:border-slate-700'
                         }`}
@@ -768,7 +849,6 @@ export default function App() {
                               {s.site_type || s.type || 'Hybrid'}
                             </span>
                             
-                            {/* Delete Unused Site Button */}
                             <button
                               type="button"
                               onClick={(e) => handleDeleteSite(e, s.id)}
@@ -806,9 +886,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Suitability Score Section & Action Buttons */}
                         <div className="space-y-2.5 pt-2 border-t border-slate-800/60">
-                          {/* Suitability Score Metric Card */}
                           <div className="bg-emerald-950/30 border border-emerald-500/20 p-2.5 rounded-2xl flex items-center justify-between">
                             <div className="flex items-center space-x-2">
                               <Activity className="w-4 h-4 text-emerald-400" />
@@ -825,8 +903,8 @@ export default function App() {
                               setActiveTab('select-site');
                             }}
                             className={`w-full py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
-                              isActive 
-                                ? 'bg-emerald-500 text-slate-950' 
+                              isActive
+                                ? 'bg-emerald-500 text-slate-950'
                                 : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
                             }`}
                           >
@@ -839,7 +917,6 @@ export default function App() {
                   })}
                 </div>
 
-                {/* Empty State */}
                 {filteredSites.length === 0 && (
                   <div className="text-center py-12 bg-slate-900/40 rounded-3xl border border-slate-800/60">
                     <p className="text-sm font-semibold text-slate-300">No sites found in this section.</p>
@@ -897,7 +974,7 @@ export default function App() {
               </div>
             )}
 
-            {/* VIEW 4: VIEW FEASIBILITY REPORT */}
+            {/* VIEW 4: VIEW FEASIBILITY REPORT (Connected with Live ML Yield Predictions) */}
             {activeTab === 'view-report' && (
               <div className="space-y-6 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between">
@@ -905,7 +982,7 @@ export default function App() {
                     <h2 className="text-xl font-bold text-white">Executive Feasibility Report</h2>
                     <p className="text-xs text-slate-400 mt-1">Generated deployment assessment for <span className="text-emerald-400 font-semibold">{currentSiteData.name}</span>.</p>
                   </div>
-                  <button 
+                  <button
                     onClick={() => window.print()}
                     className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2.5 rounded-2xl transition border border-slate-700 cursor-pointer"
                   >
@@ -927,16 +1004,17 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* ML Yield Output Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Estimated Annual Generation</p>
-                      <p className="text-lg font-bold text-white mt-1">142,800 MWh/yr</p>
-                      <p className="text-[10px] text-emerald-400 mt-0.5">XGBoost Yield Model</p>
+                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Estimated Annual Generation (AEP)</p>
+                      <p className="text-lg font-bold text-white mt-1">{mlYield.annual_generation_mwh}</p>
+                      <p className="text-[10px] text-emerald-400 mt-0.5">{mlYield.model_engine}</p>
                     </div>
                     <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                       <p className="text-[10px] text-slate-400 uppercase font-semibold">Capacity Utilization Factor (CUF)</p>
-                      <p className="text-lg font-bold text-amber-400 mt-1">28.4 %</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Solar + Wind Colocation</p>
+                      <p className="text-lg font-bold text-amber-400 mt-1">{mlYield.cuf_percent}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">XGBoost Empirical Calculation</p>
                     </div>
                     <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                       <p className="text-[10px] text-slate-400 uppercase font-semibold">Grid Interconnection Cost</p>
@@ -1122,7 +1200,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Remember Me Checkbox */}
           <div className="flex items-center justify-between py-1">
             <label className="flex items-center space-x-2 text-xs text-slate-400 cursor-pointer select-none">
               <input
