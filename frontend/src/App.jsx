@@ -1,136 +1,78 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  Sun,
-  Wind,
-  Mail,
-  Lock,
-  UserCheck,
-  User,
-  Eye,
-  EyeOff,
-  MapPin,
-  Compass,
-  LogOut,
-  AlertCircle,
-  PlusCircle,
-  Activity,
+import { 
+  Sun, 
+  Wind, 
+  Mail, 
+  Lock, 
+  UserCheck, 
+  User, 
+  Eye, 
+  EyeOff, 
+  MapPin, 
+  Compass, 
+  Layers, 
+  Zap, 
+  ArrowRight, 
+  LogOut, 
+  AlertCircle, 
+  PlusCircle, 
+  Activity, 
   AlertTriangle,
   ChevronDown,
   Copy,
   Check,
   Globe2,
-  Sparkles,
+  FolderGit2,
+  FolderPlus,
+  Trash2,
   TrendingUp,
   FileText,
-  FolderGit2,
-  Download,
-  Trash2,
-  Mountain,
-  Printer
+  Sparkles,
+  RotateCw,
+  Clock,
+  CheckCircle2,
+  PlayCircle
 } from 'lucide-react';
 import MapPickerModal from './components/MapPickerModal';
-import jsPDF from 'jspdf';
 
-const DEFAULT_SITES = [
-  {
-    id: 1,
-    name: 'Bhadla Solar Park Extension',
-    region: 'Rajasthan, India',
-    lat: 27.5381,
-    long: 71.9161,
-    site_type: 'Solar PV',
-    area: '45.2 km²',
-    solar_potential: '5.8 kWh/m²/day',
-    wind_speed: '4.2 m/s',
-    grid_proximity: '1.8 km',
-    elevation: '210 m',
-    suitability_score: 94
-  },
-  {
-    id: 2,
-    name: 'Muppandal Wind Corridor',
-    region: 'Tamil Nadu, India',
-    lat: 8.2588,
-    long: 77.5484,
-    site_type: 'Wind Farm',
-    area: '62.0 km²',
-    solar_potential: '4.9 kWh/m²/day',
-    wind_speed: '8.7 m/s',
-    grid_proximity: '3.4 km',
-    elevation: '75 m',
-    suitability_score: 91
-  },
-  {
-    id: 3,
-    name: 'Kutch Hybrid Energy Zone',
-    region: 'Gujarat, India',
-    lat: 23.7337,
-    long: 69.8597,
-    site_type: 'Hybrid (Solar + Wind)',
-    area: '88.5 km²',
-    solar_potential: '5.6 kWh/m²/day',
-    wind_speed: '7.4 m/s',
-    grid_proximity: '0.9 km',
-    elevation: '15 m',
-    suitability_score: 96
-  }
-];
+const API_BASE = 'http://127.0.0.1:8000';
 
 export default function App() {
+  // Authentication states
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState('Renewable Energy Planner');
-  const [rememberMe, setRememberMe] = useState(true);
-
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [loggedInUser, setLoggedInUser] = useState(null);
 
-  // Sidebar navigation state: 'select-site' | 'stored-sites' | 'compare-sites' | 'view-report'
-  const [activeTab, setActiveTab] = useState('select-site');
-
-  // Stored sites category filter state: 'all' | 'active' | 'completed'
-  const [siteCategoryTab, setSiteCategoryTab] = useState('all');
-
-  // Map Modal & User Dropdown States
-  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  // Profile Dropdown states
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [emailCopied, setEmailCopied] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Module 12 State: Operational Hazards & Environmental Risks
-  const [siteRisks, setSiteRisks] = useState({
-    overall_risk_level: "LOW",
-    active_alerts_count: 0,
-    alerts: []
-  });
+  // Dashboard Navigation Tabs
+  const [activeTab, setActiveTab] = useState('select-site');
 
-  // Persistent Candidate Sites State
-  const [sites, setSites] = useState(DEFAULT_SITES);
-  const [selectedSiteId, setSelectedSiteId] = useState(DEFAULT_SITES[0].id);
+  // Projects State
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDesc, setNewProjectDesc] = useState('');
+  const [newProjectStatus, setNewProjectStatus] = useState('Planning');
 
-  const currentSiteData = sites.find((s) => String(s.id) === String(selectedSiteId)) || sites[0] || DEFAULT_SITES[0];
-
-  // Module 4 & 5 States: Terrain Slope and ML Energy Yield
-  const [terrainData, setTerrainData] = useState({
-    slope_degrees: 2.1,
-    is_solar_viable: true,
-    is_wind_viable: true,
-    status: 'Optimal Slope (< 5°)'
-  });
-
-  const [mlYield, setMlYield] = useState({
-    annual_generation_mwh: '142,800 MWh/yr',
-    cuf_percent: '28.4 %',
-    model_engine: 'XGBoost Yield Model'
-  });
+  // Sites State
+  const [sites, setSites] = useState([]);
+  const [selectedSiteId, setSelectedSiteId] = useState(null);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [storedSitesFilter, setStoredSitesFilter] = useState('all');
 
   const roles = [
     'Renewable Energy Planner',
@@ -138,163 +80,6 @@ export default function App() {
     'Project Manager',
     'Administrator'
   ];
-
-  // Fetch persistent sites from backend on load
-  useEffect(() => {
-    const fetchPersistedSites = async () => {
-      try {
-        const res = await fetch('http://127.0.0.1:8000/api/sites');
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            setSites(data);
-            setSelectedSiteId(data[0].id);
-          }
-        }
-      } catch (err) {
-        console.warn('Backend database not reachable, using fallback sites state.');
-      }
-    };
-
-    fetchPersistedSites();
-  }, []);
-
-  // Module 4: Fetch Terrain Slope Analysis
-  const fetchTerrainAnalysis = async (lat, lon) => {
-    try {
-      const res = await fetch(`http://127.0.0.1:8000/api/gis/analyze-terrain?lat=${lat}&lon=${lon}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.terrain) {
-          setTerrainData(data.terrain);
-        }
-      }
-    } catch (err) {
-      console.warn('Terrain analysis service offline, using default slope parameters.');
-    }
-  };
-
-  // Module 5: Fetch Live ML Energy Yield Prediction
-  const fetchLiveYieldPrediction = async (solarGhi, windSpeed, elevation, siteType) => {
-    const rawGhi = parseFloat(String(solarGhi).replace(/[^0-9.]/g, '')) || 5.5;
-    const rawWind = parseFloat(String(windSpeed).replace(/[^0-9.]/g, '')) || 6.5;
-    const rawElev = parseFloat(String(elevation).replace(/[^0-9.]/g, '')) || 250.0;
-
-    try {
-      const res = await fetch('http://127.0.0.1:8000/api/predict/yield', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          solar_ghi: rawGhi,
-          wind_speed: rawWind,
-          elevation: rawElev,
-          site_type: siteType || 'Hybrid (Solar + Wind)'
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMlYield({
-          annual_generation_mwh: data.annual_generation_mwh || `${Math.round(data.raw_aep_mwh || 140000).toLocaleString()} MWh/yr`,
-          cuf_percent: data.cuf_percent || `${(data.raw_cuf || 28.0).toFixed(1)} %`,
-          model_engine: data.model_engine || 'XGBoost Yield Model'
-        });
-      }
-    } catch (err) {
-      console.warn('ML yield prediction endpoint offline, using cached benchmarks.');
-    }
-  };
-
-  // Module 12: Fetch Environmental Hazard and Risk Analysis
-  const fetchSiteRiskAnalysis = async (ghi, wind, slope, score) => {
-    const rawGhi = parseFloat(String(ghi).replace(/[^0-9.]/g, '')) || 5.5;
-    const rawWind = parseFloat(String(wind).replace(/[^0-9.]/g, '')) || 6.5;
-    try {
-      const res = await fetch('http://127.0.0.1:8000/api/risks/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          solar_ghi: rawGhi,
-          wind_speed_100m: rawWind,
-          avg_temp_c: 28.0,
-          slope_degrees: parseFloat(slope) || 2.1,
-          suitability_score: parseInt(score) || 85
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSiteRisks(data);
-      }
-    } catch (err) {
-      console.warn('Risk evaluation service offline.');
-    }
-  };
-
-  // Synchronize Terrain, ML Predictions, and Risk Assessment whenever the active site changes
-  useEffect(() => {
-    if (currentSiteData?.lat && currentSiteData?.long) {
-      const lat = typeof currentSiteData.lat === 'number' ? currentSiteData.lat : parseFloat(currentSiteData.lat);
-      const lon = typeof currentSiteData.long === 'number' ? currentSiteData.long : parseFloat(currentSiteData.long);
-      fetchTerrainAnalysis(lat, lon);
-      fetchLiveYieldPrediction(
-        currentSiteData.solar_potential || currentSiteData.solarPotential,
-        currentSiteData.wind_speed || currentSiteData.windSpeed,
-        currentSiteData.elevation,
-        currentSiteData.site_type || currentSiteData.type
-      );
-      fetchSiteRiskAnalysis(
-        currentSiteData.solar_potential || currentSiteData.solarPotential,
-        currentSiteData.wind_speed || currentSiteData.windSpeed,
-        terrainData.slope_degrees,
-        currentSiteData.suitability_score || currentSiteData.suitabilityScore
-      );
-    }
-  }, [selectedSiteId, currentSiteData]);
-
-  // SHORT-POLLING HOOK: Automatically updates cards when background task finishes
-  useEffect(() => {
-    const hasPendingData = sites.some(
-      (s) =>
-        (s.solar_potential && String(s.solar_potential).includes('Fetching')) ||
-        (s.wind_speed && String(s.wind_speed).includes('Fetching')) ||
-        (s.solarPotential && String(s.solarPotential).includes('Fetching')) ||
-        (s.windSpeed && String(s.windSpeed).includes('Fetching'))
-    );
-
-    if (!hasPendingData) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch('http://127.0.0.1:8000/api/sites');
-        if (res.ok) {
-          const freshSites = await res.json();
-          if (Array.isArray(freshSites) && freshSites.length > 0) {
-            setSites(freshSites);
-          }
-        }
-      } catch (err) {
-        console.warn('Polling check encountered a network error:', err);
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [sites]);
-
-  // Load remembered credentials on startup
-  useEffect(() => {
-    const savedEmail = localStorage.getItem('saved_email');
-    const savedPassword = localStorage.getItem('saved_password');
-    const savedRemember = localStorage.getItem('remember_me');
-
-    if (savedRemember === 'true' && savedEmail) {
-      setEmail(savedEmail);
-      if (savedPassword) {
-        setPassword(savedPassword);
-      }
-      setRememberMe(true);
-    } else if (savedRemember === 'false') {
-      setRememberMe(false);
-    }
-  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -307,6 +92,52 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Fetch Projects from backend
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/projects`);
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data);
+        if (data.length > 0 && !selectedProjectId) {
+          setSelectedProjectId(data[0].id);
+        }
+      }
+    } catch (_) {}
+  };
+
+  // Fetch Sites for selected project
+  const fetchSitesForProject = async (projId) => {
+    if (!projId) {
+      setSites([]);
+      setSelectedSiteId(null);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/sites?project_id=${projId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSites(data);
+        if (data.length > 0) {
+          setSelectedSiteId(data[0].id);
+        } else {
+          setSelectedSiteId(null);
+        }
+      }
+    } catch (_) {}
+  };
+
+  useEffect(() => {
+    if (loggedInUser) fetchProjects();
+  }, [loggedInUser]);
+
+  useEffect(() => {
+    if (selectedProjectId) {
+      fetchSitesForProject(selectedProjectId);
+    }
+  }, [selectedProjectId]);
+
+  // Auth Handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
@@ -323,54 +154,120 @@ export default function App() {
     }
 
     setLoading(true);
-    const endpoint = isRegister
-      ? 'http://127.0.0.1:8000/api/auth/register'
-      : 'http://127.0.0.1:8000/api/auth/login';
-
-    const payload = isRegister
-      ? { name, email, password, confirm_password: confirmPassword, role }
-      : { email, password, role };
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const endpoint = isRegister ? `${API_BASE}/api/auth/register` : `${API_BASE}/api/auth/login`;
+    const payload = isRegister 
+      ? { name: name.trim(), email: email.trim().toLowerCase(), password, confirm_password: confirmPassword, role }
+      : { email: email.trim().toLowerCase(), password, role };
 
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        signal: controller.signal
       });
 
-      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('token', data.access_token);
-
-        if (rememberMe) {
-          localStorage.setItem('saved_email', email);
-          localStorage.setItem('saved_password', password);
-          localStorage.setItem('remember_me', 'true');
-        } else {
-          localStorage.removeItem('saved_email');
-          localStorage.removeItem('saved_password');
-          localStorage.setItem('remember_me', 'false');
-        }
-
+        localStorage.setItem('token', data.access_token || 'demo-token');
         setLoggedInUser({ name: data.name, role: data.role, email: data.email });
       } else {
-        setMessage({ type: 'error', text: data.detail || 'Authentication failed' });
+        if (response.status === 404 || data.detail?.includes('User not registered')) {
+          setMessage({ type: 'error', text: 'User not registered. Please register first to continue!' });
+          setIsRegister(true);
+        } else {
+          setMessage({ type: 'error', text: data.detail || 'Authentication failed' });
+        }
       }
     } catch (err) {
-      if (err.name === 'AbortError') {
-        setMessage({ type: 'error', text: 'Request timed out. Please ensure the backend is running.' });
-      } else {
-        setMessage({ type: 'error', text: 'Unable to connect to backend server (http://127.0.0.1:8000)' });
-      }
+      setMessage({ type: 'error', text: 'Unable to connect to backend server (http://127.0.0.1:8000)' });
     } finally {
-      clearTimeout(timeoutId);
       setLoading(false);
+    }
+  };
+
+  // Create Project
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    if (!newProjectName.trim()) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name: newProjectName.trim(), 
+          description: newProjectDesc.trim(),
+          status: newProjectStatus
+        })
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setProjects(prev => [created, ...prev]);
+        setSelectedProjectId(created.id);
+        setNewProjectName('');
+        setNewProjectDesc('');
+        setNewProjectStatus('Planning');
+        setIsNewProjectModalOpen(false);
+        fetchSitesForProject(created.id);
+      }
+    } catch (_) {}
+  };
+
+  // Update Project Status in Real Time
+  const handleUpdateProjectStatus = async (newStatus) => {
+    if (!selectedProjectId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${selectedProjectId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+      }
+    } catch (_) {
+      // Fallback local update if backend patch is not yet added
+      setProjects(prev => prev.map(p => p.id === selectedProjectId ? { ...p, status: newStatus } : p));
+    }
+  };
+
+  // Add Site From Map Modal
+  const handleConfirmMapSite = async (siteMeta) => {
+    if (!selectedProjectId) {
+      alert('Please create or select a project first!');
+      setIsNewProjectModalOpen(true);
+      return;
+    }
+
+    const rawLat = typeof siteMeta.rawLat === 'number' ? siteMeta.rawLat : parseFloat(siteMeta.lat) || 26.9;
+    const rawLng = typeof siteMeta.rawLng === 'number' ? siteMeta.rawLng : parseFloat(siteMeta.long) || 75.8;
+
+    const payload = {
+      project_id: selectedProjectId,
+      name: siteMeta.name || `Site ${sites.length + 1}`,
+      lat: rawLat,
+      long: rawLng,
+      region: siteMeta.region || 'Selected Corridor',
+      elevation: parseFloat(String(siteMeta.elevation || 12)) || 12.0
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/api/sites`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const createdSite = await res.json();
+        setSites(prev => [createdSite, ...prev]);
+        setSelectedSiteId(createdSite.id);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsMapModalOpen(false);
+      setActiveTab('select-site');
     }
   };
 
@@ -388,193 +285,145 @@ export default function App() {
     setMessage(null);
     setIsUserMenuOpen(false);
     setShowSignOutConfirm(false);
+  };
 
-    const savedEmail = localStorage.getItem('saved_email');
-    const savedPassword = localStorage.getItem('saved_password');
-    const savedRemember = localStorage.getItem('remember_me');
+  const activeProject = projects.find(p => String(p.id) === String(selectedProjectId)) || projects[0] || null;
 
-    if (savedRemember === 'true' && savedEmail) {
-      setEmail(savedEmail);
-      if (savedPassword) setPassword(savedPassword);
-    } else {
-      setPassword('');
+  const currentSiteData = sites.find(s => String(s.id) === String(selectedSiteId)) || sites[0] || {
+    id: 'preview-site',
+    name: 'Ramanathapuram Solar Site',
+    lat: 9.3639,
+    long: 78.8395,
+    solar_irradiance: 5.69,
+    peak_sun_hours: 5.69,
+    temperature_avg: 29.34,
+    rainfall: 133.8,
+    cloud_cover: 70.2,
+    elevation: 12,
+    days_recorded: 30,
+    suitability_score: 8.6,
+    suitability_category: 'Excellent',
+    capacity_factor: 46.4,
+    est_yield: 1618.5
+  };
+
+  const score10 = Number(currentSiteData.suitability_score || 8.6) > 10 
+    ? (Number(currentSiteData.suitability_score) / 10).toFixed(1) 
+    : Number(currentSiteData.suitability_score || 8.6).toFixed(1);
+
+  // Status visual mapping helper
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'Active':
+        return {
+          bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
+          dot: 'bg-emerald-400',
+          icon: <PlayCircle className="w-3.5 h-3.5 mr-1" />
+        };
+      case 'Completed':
+        return {
+          bg: 'bg-sky-500/10 border-sky-500/30 text-sky-400',
+          dot: 'bg-sky-400',
+          icon: <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+        };
+      default:
+        return {
+          bg: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
+          dot: 'bg-amber-400',
+          icon: <Clock className="w-3.5 h-3.5 mr-1" />
+        };
     }
   };
 
-  // Register and persist site returned from map picker to FastAPI DB
-  const handleConfirmMapSite = async (siteMeta) => {
-    const rawLat = typeof siteMeta.rawLat === 'number' ? siteMeta.rawLat : parseFloat(siteMeta.lat) || 25.0;
-    const rawLng = typeof siteMeta.rawLng === 'number' ? siteMeta.rawLng : parseFloat(siteMeta.long) || 75.0;
-
-    const payload = {
-      name: siteMeta.name || `Custom Site ${sites.length + 1}`,
-      region: siteMeta.region || 'Selected Region',
-      lat: rawLat,
-      long: rawLng,
-      site_type: 'Hybrid (Solar + Wind)',
-      area: siteMeta.area || '30.0 km²',
-      solar_potential: 'Fetching live GHI...',
-      wind_speed: 'Fetching live 100m...',
-      grid_proximity: siteMeta.gridProximity || '2.0 km',
-      elevation: siteMeta.elevation || '250 m',
-      suitability_score: 75
-    };
-
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/sites', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        const savedSite = await response.json();
-        setSites((prev) => [savedSite, ...prev]);
-        setSelectedSiteId(savedSite.id);
-      } else {
-        const fallbackSite = { ...payload, id: Date.now() };
-        setSites((prev) => [fallbackSite, ...prev]);
-        setSelectedSiteId(fallbackSite.id);
-      }
-    } catch (err) {
-      const fallbackSite = { ...payload, id: Date.now() };
-      setSites((prev) => [fallbackSite, ...prev]);
-      setSelectedSiteId(fallbackSite.id);
-    } finally {
-      setIsMapModalOpen(false);
-      setActiveTab('select-site');
-    }
-  };
-
-  // Delete site handler
-  const handleDeleteSite = async (e, siteId) => {
-    e.stopPropagation();
-    const confirmDelete = window.confirm("Are you sure you want to delete this site?");
-    if (!confirmDelete) return;
-
-    try {
-      const res = await fetch(`http://127.0.0.1:8000/api/sites/${siteId}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setSites((prev) => prev.filter((s) => String(s.id) !== String(siteId)));
-        if (String(selectedSiteId) === String(siteId)) {
-          const remaining = sites.filter((s) => String(s.id) !== String(siteId));
-          if (remaining.length > 0) setSelectedSiteId(remaining[0].id);
-        }
-      } else {
-        setSites((prev) => prev.filter((s) => String(s.id) !== String(siteId)));
-      }
-    } catch (err) {
-      setSites((prev) => prev.filter((s) => String(s.id) !== String(siteId)));
-    }
-  };
-
-  // Module 13: One-Click Automated Binary PDF Feasibility Report Export (via jsPDF)
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    const timestamp = new Date().toLocaleString();
-
-    // Top Dark Blue Header Bar
-    doc.setFillColor(15, 23, 42); // slate-900
-    doc.rect(0, 0, 210, 28, 'F');
-    doc.setTextColor(52, 211, 153); // emerald-400
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('SOLAR & WIND INTELLIGENCE PLATFORM', 14, 13);
-    doc.setFontSize(8.5);
-    doc.setTextColor(148, 163, 184); // slate-400
-    doc.setFont('helvetica', 'normal');
-    doc.text(`EXECUTIVE FEASIBILITY DOSSIER • Generated: ${timestamp}`, 14, 21);
-
-    // Section 1: Target Overview
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('1. TARGET SITE IDENTIFICATION', 14, 38);
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Site Name: ${currentSiteData.name}`, 14, 46);
-    doc.text(`Geographic Region: ${currentSiteData.region}`, 14, 52);
-    doc.text(`Coordinates: Lat ${currentSiteData.lat}°, Long ${currentSiteData.long}°`, 14, 58);
-    doc.text(`Asset Type: ${currentSiteData.site_type || 'Hybrid'} | Area: ${currentSiteData.area || 'N/A'}`, 14, 64);
-    doc.text(`Suitability Score: ${currentSiteData.suitability_score || currentSiteData.suitabilityScore}/100`, 14, 70);
-
-    // Section 2: Meteorological & GIS
-    doc.setFont('helvetica', 'bold');
-    doc.text('2. METEOROLOGICAL & GIS INTELLIGENCE', 14, 82);
-
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Solar Irradiance: ${currentSiteData.solar_potential || currentSiteData.solarPotential} (NASA POWER Feed)`, 14, 90);
-    doc.text(`100m Wind Speed: ${currentSiteData.wind_speed || currentSiteData.windSpeed} (Open-Meteo Hellmann Model)`, 14, 96);
-    doc.text(`Elevation: ${currentSiteData.elevation || '250 m'} | DEM Slope: ${terrainData.slope_degrees}° (${terrainData.is_solar_viable ? 'Viable for Utility Scale' : 'Steep Slope Constraint'})`, 14, 102);
-    doc.text(`Grid Interconnect Distance: ${currentSiteData.grid_proximity || currentSiteData.gridProximity} to Substation`, 14, 108);
-
-    // Section 3: ML Energy Yield Projections
-    doc.setFont('helvetica', 'bold');
-    doc.text('3. MACHINE LEARNING ENERGY YIELD (MODULE 5, 6, 8)', 14, 120);
-
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Predicted Annual Energy Production (AEP): ${mlYield.annual_generation_mwh}`, 14, 128);
-    doc.text(`Capacity Utilization Factor (CUF): ${mlYield.cuf_percent}`, 14, 134);
-    doc.text(`Model Engine: ${mlYield.model_engine}`, 14, 140);
-    doc.text('Loss Baseline: Standard IEC 61400 & Colocation Wake Derating', 14, 146);
-
-    // Section 4: AHP Suitability Breakdown
-    doc.setFont('helvetica', 'bold');
-    doc.text('4. MULTI-CRITERIA DECISION ANALYSIS (AHP MATRIX)', 14, 158);
-
-    doc.setFont('helvetica', 'normal');
-    doc.text('• Resource Potential (35% Weight)    : 94.0 / 100', 14, 166);
-    doc.text('• Geographic / Slope (25% Weight)    : 92.5 / 100', 14, 172);
-    doc.text('• Grid Infrastructure (15% Weight)   : 88.0 / 100', 14, 178);
-    doc.text('• Environmental Buffer (15% Weight)  : 92.0 / 100', 14, 184);
-    doc.text('• Economic Yield (10% Weight)        : 91.6 / 100', 14, 190);
-
-    // Section 5: Risk Assessment
-    doc.setFont('helvetica', 'bold');
-    doc.text('5. OPERATIONAL HAZARD & RISK EVALUATION (MODULE 12)', 14, 202);
-
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Overall Risk Level: ${siteRisks.overall_risk_level}`, 14, 210);
-    if (siteRisks.alerts && siteRisks.alerts.length > 0) {
-      siteRisks.alerts.forEach((alert, i) => {
-        doc.text(`- [${alert.category}] ${alert.message}`, 14, 218 + (i * 6));
-      });
-    } else {
-      doc.text('- Optimal site conditions. No extreme climatic, wind shear, or terrain hazards detected.', 14, 218);
-    }
-
-    // Save as binary PDF file
-    doc.save(`${currentSiteData.name.replace(/\s+/g, '_')}_Feasibility_Dossier.pdf`);
-  };
-
-  const filteredSites = sites.filter((s) => {
-    const isCurrentActive = String(s.id) === String(selectedSiteId);
-    if (siteCategoryTab === 'active') return isCurrentActive;
-    if (siteCategoryTab === 'completed') return !isCurrentActive;
-    return true;
-  });
-
-  const formatCoord = (val, dirPos, dirNeg) => {
-    if (typeof val === 'number') {
-      return `${Math.abs(val).toFixed(4)}° ${val >= 0 ? dirPos : dirNeg}`;
-    }
-    return String(val || '');
-  };
-
-  // ----------------------------------------------------
-  // AUTHENTICATED DASHBOARD
-  // ----------------------------------------------------
+  // =========================================================================
+  // VIEW: AUTHENTICATED DASHBOARD WITH ACTIVE PROJECT AND REAL-TIME STATUS
+  // =========================================================================
   if (loggedInUser) {
-    const isSolarPending = String(currentSiteData.solar_potential || currentSiteData.solarPotential || '').includes('Fetching');
-    const isWindPending = String(currentSiteData.wind_speed || currentSiteData.windSpeed || '').includes('Fetching');
+    const statusMeta = getStatusBadge(activeProject?.status || 'Planning');
 
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col selection:bg-emerald-500 selection:text-white">
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col selection:bg-emerald-500 selection:text-white relative overflow-hidden">
+        
+        {/* Animated Background Fluid Orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/20 rounded-full mix-blend-screen filter blur-[90px] animate-pulse duration-7000"></div>
+          <div className="absolute top-1/3 -right-40 w-[30rem] h-[30rem] bg-sky-500/20 rounded-full mix-blend-screen filter blur-[100px] animate-pulse duration-10000 delay-1000"></div>
+          <div className="absolute -bottom-40 left-1/3 w-[28rem] h-[28rem] bg-amber-500/15 rounded-full mix-blend-screen filter blur-[90px] animate-pulse duration-8000 delay-2000"></div>
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-30"></div>
+        </div>
 
-        {/* Sign Out Confirmation Modal Dialog */}
+        {/* Modal: Create New Project */}
+        {isNewProjectModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl backdrop-blur-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <div className="flex items-center space-x-2 text-emerald-400">
+                  <FolderPlus className="w-5 h-5" />
+                  <h3 className="text-base font-bold text-white">Create New Project</h3>
+                </div>
+                <button onClick={() => setIsNewProjectModalOpen(false)} className="text-slate-400 hover:text-white">
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateProject} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Project Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Tamil Nadu Solar & Wind Farm"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Initial Project Status</label>
+                  <select
+                    value={newProjectStatus}
+                    onChange={(e) => setNewProjectStatus(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
+                  >
+                    <option value="Planning">Planning (Feasibility & Screening)</option>
+                    <option value="Active">Active (Ongoing Deployment)</option>
+                    <option value="Completed">Completed (Commissioned)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Description / Regional Scope</label>
+                  <textarea
+                    rows={3}
+                    placeholder="e.g. Large scale utility deployment across southern Tamil Nadu plains"
+                    value={newProjectDesc}
+                    onChange={(e) => setNewProjectDesc(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsNewProjectModalOpen(false)}
+                    className="px-4 py-2 text-slate-400 hover:bg-slate-800 rounded-xl cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold px-5 py-2 rounded-xl shadow-md cursor-pointer"
+                  >
+                    Create Project
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Sign Out Confirmation */}
         {showSignOutConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center backdrop-blur-xl animate-in zoom-in-95 duration-150">
@@ -585,7 +434,7 @@ export default function App() {
               <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
                 Are you sure you want to sign out of the <span className="font-medium text-emerald-400">Solar & Wind Intelligence Platform</span>?
               </p>
-
+              
               <div className="mt-6 flex items-center space-x-3">
                 <button
                   type="button"
@@ -634,11 +483,8 @@ export default function App() {
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 font-bold text-xs flex items-center justify-center shadow-sm">
                 {loggedInUser.name.charAt(0).toUpperCase()}
               </div>
-
               <div className="text-left hidden sm:block">
-                <p className="text-xs font-semibold text-slate-200 leading-tight">
-                  {loggedInUser.name}
-                </p>
+                <p className="text-xs font-semibold text-slate-200 leading-tight">{loggedInUser.name}</p>
                 <span className="text-[10px] text-emerald-400 font-medium">{loggedInUser.role}</span>
               </div>
               <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
@@ -649,7 +495,6 @@ export default function App() {
                 <div className="pb-3 border-b border-slate-800">
                   <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Signed in account</p>
                   <p className="text-sm font-bold text-white mt-0.5">{loggedInUser.name}</p>
-
                   <div className="mt-2.5 flex items-center justify-between bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs">
                     <div className="flex items-center space-x-2 truncate mr-2 text-slate-300">
                       <Mail className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
@@ -691,10 +536,10 @@ export default function App() {
           </div>
         </header>
 
-        {/* Dashboard Body with Sidebar */}
-        <div className="flex-1 flex overflow-hidden">
+        {/* Dashboard Body with Left Navigation */}
+        <div className="flex-1 flex overflow-hidden z-10">
           
-          {/* ======================= SIDEBAR ======================= */}
+          {/* Left Sidebar */}
           <aside className="w-64 bg-slate-900/70 border-r border-slate-800/80 flex flex-col justify-between p-4 backdrop-blur-xl flex-shrink-0">
             <div className="space-y-6">
               <div>
@@ -716,664 +561,400 @@ export default function App() {
 
                   <button
                     onClick={() => setActiveTab('stored-sites')}
-                    className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition duration-200 cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition duration-200 cursor-pointer ${
                       activeTab === 'stored-sites'
                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                     }`}
                   >
-                    <FolderGit2 className="w-4 h-4 text-sky-400" />
-                    <span>View Stored Sites</span>
-                    <span className="ml-auto text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700 font-mono">
+                    <div className="flex items-center space-x-3">
+                      <Layers className="w-4 h-4 text-sky-400" />
+                      <span>Stored Sites</span>
+                    </div>
+                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full text-slate-300 font-mono">
                       {sites.length}
                     </span>
                   </button>
 
                   <button
-                    onClick={() => setActiveTab('compare-sites')}
+                    onClick={() => setActiveTab('analytics')}
                     className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition duration-200 cursor-pointer ${
-                      activeTab === 'compare-sites'
+                      activeTab === 'analytics'
                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                     }`}
                   >
-                    <TrendingUp className="w-4 h-4 text-amber-400" />
-                    <span>Compare Sites</span>
+                    <TrendingUp className="w-4 h-4 text-indigo-400" />
+                    <span>Site Analytics</span>
                   </button>
 
                   <button
-                    onClick={() => setActiveTab('view-report')}
+                    onClick={() => setActiveTab('reports')}
                     className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition duration-200 cursor-pointer ${
-                      activeTab === 'view-report'
+                      activeTab === 'reports'
                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                     }`}
                   >
-                    <FileText className="w-4 h-4 text-purple-400" />
-                    <span>View Feasibility Report</span>
+                    <FileText className="w-4 h-4 text-teal-400" />
+                    <span>Feasibility Report</span>
                   </button>
                 </nav>
               </div>
 
-              {/* Quick Map Launcher Card */}
-              <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 text-center">
-                <Globe2 className="w-6 h-6 text-emerald-400 mx-auto mb-2 animate-pulse" />
-                <p className="text-xs font-bold text-white">GIS Map Picker</p>
-                <p className="text-[10px] text-slate-400 mt-1 mb-3">Drop pins and auto-extract coordinates on OpenStreetMap.</p>
-                <button
-                  onClick={() => setIsMapModalOpen(true)}
-                  className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold py-2 rounded-xl transition shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer"
-                >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>Launch Map</span>
-                </button>
-              </div>
-            </div>
+              {/* Sidebar Active Project Card */}
+              <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5 space-y-2">
+                <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block">
+                  Current Open Project
+                </span>
+                <p className="text-xs font-bold text-white truncate">
+                  {activeProject ? activeProject.name : 'No Project Selected'}
+                </p>
 
-            {/* Platform Status Info */}
-            <div className="bg-slate-950/50 rounded-2xl p-3 border border-slate-800/60 text-[11px] text-slate-400">
-              <div className="flex items-center justify-between mb-1">
-                <span>Active Target:</span>
-                <span className="font-semibold text-emerald-400 truncate max-w-[100px]">{currentSiteData.name}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Suitability:</span>
-                <span className="font-bold text-white">{currentSiteData.suitability_score || currentSiteData.suitabilityScore}/100</span>
+                {activeProject && (
+                  <div className="flex items-center space-x-2 pt-1">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${statusMeta.bg}`}>
+                      {statusMeta.icon}
+                      {activeProject.status || 'Planning'}
+                    </span>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setIsNewProjectModalOpen(true)}
+                  className="mt-2 w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold py-1.5 rounded-xl border border-slate-700 cursor-pointer transition"
+                >
+                  + Add New Project
+                </button>
               </div>
             </div>
           </aside>
 
-          {/* ======================= MAIN CONTENT VIEW ======================= */}
-          <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+          {/* Main Dashboard Panel */}
+          <main className="flex-1 p-6 overflow-y-auto space-y-6">
 
-            {/* VIEW 1: SELECT / EVALUATE NEW SITE */}
-            {activeTab === 'select-site' && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                
-                {/* Active Deployment Hero Card */}
-                <div className="bg-slate-900/70 border border-slate-800/80 rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-2xl">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800/60">
-                    <div>
-                      <div className="flex items-center space-x-2 text-emerald-400 mb-1.5">
-                        <Sparkles className="w-4 h-4" />
-                        <span className="text-[11px] font-bold uppercase tracking-wider">Site Intelligence & Selection</span>
-                      </div>
-                      <h2 className="text-xl font-bold text-white tracking-tight">Active Deployment Target Zone</h2>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Evaluating <span className="text-emerald-400 font-semibold">{currentSiteData.name}</span> ({currentSiteData.region}).
-                      </p>
-                    </div>
-
-                    <div className="flex items-center space-x-3">
-                      <select
-                        value={selectedSiteId}
-                        onChange={(e) => setSelectedSiteId(e.target.value)}
-                        className="bg-slate-950 border border-slate-800 text-slate-200 rounded-2xl px-4 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/50 cursor-pointer"
-                      >
-                        {sites.map((site) => (
-                          <option key={site.id} value={site.id}>
-                            {site.name} ({site.region})
-                          </option>
-                        ))}
-                      </select>
-
-                      <button
-                        onClick={() => setIsMapModalOpen(true)}
-                        className="flex items-center space-x-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
-                      >
-                        <Globe2 className="w-4 h-4" />
-                        <span>Register New Site</span>
-                      </button>
-                    </div>
+            {/* ========================================================================= */}
+            {/* ACTIVE PROJECT BANNER WITH REAL-TIME STATUS SWITCHER                      */}
+            {/* ========================================================================= */}
+            <div className="bg-slate-900/80 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-xl shadow-xl space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800/60">
+                <div>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                      Active Project Corridor
+                    </span>
+                    <span className="text-xs text-slate-500">•</span>
+                    <span className="text-xs text-slate-400">
+                      ID: <span className="font-mono">{activeProject?.id?.slice(0, 8) || 'proj-1'}</span>
+                    </span>
                   </div>
 
-                  {/* Module 12: Real-Time Operational Hazard Alert Banner */}
-                  {siteRisks.alerts && siteRisks.alerts.length > 0 ? (
-                    <div className="mt-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200">
-                      <div className="flex items-center space-x-2 mb-2 font-bold text-xs uppercase tracking-wider text-amber-400">
-                        <AlertTriangle className="w-4 h-4" />
-                        <span>Operational Hazard Advisory ({siteRisks.overall_risk_level} RISK)</span>
-                      </div>
-                      <ul className="space-y-1 text-xs text-amber-300/90 pl-6 list-disc">
-                        {siteRisks.alerts.map((alt, idx) => (
-                          <li key={idx}>
-                            <span className="font-semibold text-amber-200">[{alt.category}]</span> {alt.message}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : (
-                    <div className="mt-4 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center space-x-2">
-                      <Check className="w-4 h-4 text-emerald-400" />
-                      <span>No extreme climatic, wind shear, or terrain hazards detected. Site conditions optimal.</span>
+                  <h2 className="text-2xl font-black text-white tracking-tight">
+                    {activeProject ? activeProject.name : 'Select or Create a Project'}
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                    {activeProject?.description || 'No project description entered. Select a registered project or click "+ New Project" to initialize a regional deployment corridor.'}
+                  </p>
+                </div>
+
+                {/* Real-time Project Selector & Status Switcher */}
+                <div className="flex flex-wrap items-center gap-3 bg-slate-950/80 p-3 rounded-2xl border border-slate-800">
+                  <div className="text-left">
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                      Switch Project:
+                    </label>
+                    <select
+                      value={selectedProjectId || ''}
+                      onChange={(e) => setSelectedProjectId(e.target.value)}
+                      className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-semibold text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer min-w-[180px]"
+                    >
+                      {projects.length === 0 ? (
+                        <option value="">No projects registered</option>
+                      ) : (
+                        projects.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} ({p.status || 'Planning'})</option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+
+                  {activeProject && (
+                    <div className="text-left border-l border-slate-800 pl-3">
+                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                        Real-World Status:
+                      </label>
+                      <select
+                        value={activeProject.status || 'Planning'}
+                        onChange={(e) => handleUpdateProjectStatus(e.target.value)}
+                        className={`border rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none cursor-pointer ${statusMeta.bg}`}
+                      >
+                        <option value="Planning" className="bg-slate-900 text-amber-400">🟡 Planning (Screening)</option>
+                        <option value="Active" className="bg-slate-900 text-emerald-400">🟢 Active (In Progress)</option>
+                        <option value="Completed" className="bg-slate-900 text-sky-400">🔵 Completed (Built)</option>
+                      </select>
                     </div>
                   )}
-
-                  {/* Selected Site Details (5-Card Metrics Grid including DEM Slope) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 mt-6">
-                    <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
-                      <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Coordinates</p>
-                      <p className="text-sm font-bold text-slate-200 mt-1 flex items-center space-x-1.5">
-                        <Compass className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                        <span className="truncate">{formatCoord(currentSiteData.lat, 'N', 'S')}, {formatCoord(currentSiteData.long, 'E', 'W')}</span>
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-1">Area: {currentSiteData.area || 'N/A'}</p>
-                    </div>
-
-                    <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
-                      <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Topography & Slope</p>
-                      <div className="flex items-baseline justify-between mt-1">
-                        <span className="text-sm font-bold text-slate-200 flex items-center space-x-1">
-                          <Mountain className="w-3.5 h-3.5 text-slate-400 mr-1" />
-                          {currentSiteData.elevation || '250 m'}
-                        </span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                          terrainData.is_solar_viable 
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                            : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                        }`}>
-                          {terrainData.slope_degrees}° {terrainData.is_solar_viable ? 'Viable' : 'Steep'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-1">DEM 30m Horn's Kernel</p>
-                    </div>
-
-                    <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
-                      <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Solar GHI Potential</p>
-                      <p className="text-sm font-bold text-amber-400 mt-1 flex items-center space-x-1.5">
-                        <Sun className={`w-4 h-4 text-amber-400 flex-shrink-0 ${isSolarPending ? 'animate-spin' : ''}`} />
-                        <span>{currentSiteData.solar_potential || currentSiteData.solarPotential || '5.5 kWh/m²/day'}</span>
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        {isSolarPending ? 'Querying NASA POWER...' : 'NASA POWER Feed'}
-                      </p>
-                    </div>
-
-                    <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
-                      <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Mean Wind (100m)</p>
-                      <p className="text-sm font-bold text-sky-400 mt-1 flex items-center space-x-1.5">
-                        <Wind className={`w-4 h-4 text-sky-400 flex-shrink-0 ${isWindPending ? 'animate-pulse' : ''}`} />
-                        <span>{currentSiteData.wind_speed || currentSiteData.windSpeed || '6.8 m/s'}</span>
-                      </p>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        {isWindPending ? 'Extrapolating Hub Height...' : 'Open-Meteo Feed'}
-                      </p>
-                    </div>
-
-                    <div className="bg-emerald-950/30 p-4 rounded-2xl border border-emerald-500/30">
-                      <p className="text-[10px] font-medium text-emerald-400 uppercase tracking-wider">Suitability Index</p>
-                      <p className="text-base font-extrabold text-emerald-300 mt-0.5 flex items-center space-x-1.5">
-                        <Activity className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                        <span>{currentSiteData.suitability_score || currentSiteData.suitabilityScore || 90} / 100</span>
-                      </p>
-                      <p className="text-[11px] text-emerald-400/80 mt-1">Grid Distance: {currentSiteData.grid_proximity || currentSiteData.gridProximity || '2.0 km'}</p>
-                    </div>
-                  </div>
                 </div>
-
               </div>
-            )}
 
-            {/* VIEW 2: VIEW STORED SITES */}
-            {activeTab === 'stored-sites' && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-white">Stored Candidate Sites</h2>
-                    <p className="text-xs text-slate-400 mt-1">Manage, inspect suitability scores, and delete unused registered project zones.</p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center space-x-1.5 bg-slate-900 border border-slate-800 p-1 rounded-2xl">
-                      <button
-                        type="button"
-                        onClick={() => setSiteCategoryTab('all')}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer ${
-                          siteCategoryTab === 'all'
-                            ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        All ({sites.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSiteCategoryTab('active')}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer ${
-                          siteCategoryTab === 'active'
-                            ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        Active ({sites.filter((s) => String(s.id) === String(selectedSiteId)).length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSiteCategoryTab('completed')}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition cursor-pointer ${
-                          siteCategoryTab === 'completed'
-                            ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        Completed ({sites.filter((s) => String(s.id) !== String(selectedSiteId)).length})
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={() => setIsMapModalOpen(true)}
-                      className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition cursor-pointer"
-                    >
-                      <PlusCircle className="w-4 h-4" />
-                      <span>Register Another Site</span>
-                    </button>
-                  </div>
+              {/* Action Bar for Adding Sites under Open Project */}
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+                <div className="flex items-center space-x-2 text-xs text-slate-400">
+                  <FolderGit2 className="w-4 h-4 text-emerald-400" />
+                  <span>Enrolled Candidate Sites: <strong className="text-white">{sites.length}</strong></span>
                 </div>
 
-                {/* Filtered Candidate Sites Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {filteredSites.map((s) => {
-                    const isActive = String(s.id) === String(selectedSiteId);
-                    const score = s.suitability_score || s.suitabilityScore || 90;
-                    const cardSolarPending = String(s.solar_potential || s.solarPotential || '').includes('Fetching');
-                    const cardWindPending = String(s.wind_speed || s.windSpeed || '').includes('Fetching');
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setIsNewProjectModalOpen(true)}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-700 cursor-pointer transition"
+                  >
+                    + New Project
+                  </button>
 
-                    return (
-                      <div
+                  <button
+                    onClick={() => {
+                      if (!selectedProjectId) {
+                        alert('Please register or select a Project first!');
+                        setIsNewProjectModalOpen(true);
+                        return;
+                      }
+                      setIsMapModalOpen(true);
+                    }}
+                    className="flex items-center space-x-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs shadow-md shadow-emerald-500/20 active:scale-95 cursor-pointer transition"
+                  >
+                    <Globe2 className="w-4 h-4" />
+                    <span>Add Site to Project via Map</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* TAB 1: SITE OVERVIEW & TELEMETRY */}
+            {activeTab === 'select-site' && (
+              <div className="space-y-6">
+
+                {/* Candidate Sites Switcher */}
+                <div className="flex items-center space-x-2 overflow-x-auto pb-1">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex-shrink-0">Sites:</span>
+                  {sites.length === 0 ? (
+                    <span className="text-xs text-slate-500">No sites added yet under this project. Click "Add Site to Project via Map"</span>
+                  ) : (
+                    sites.map(s => (
+                      <button
                         key={s.id}
-                        className={`bg-slate-900/80 p-5 rounded-3xl border transition duration-200 flex flex-col justify-between ${
-                          isActive ? 'border-emerald-500 shadow-lg shadow-emerald-500/10' : 'border-slate-800 hover:border-slate-700'
+                        onClick={() => setSelectedSiteId(s.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                          currentSiteData.id === s.id
+                            ? 'bg-slate-800 text-emerald-400 border border-emerald-500/40 shadow-sm'
+                            : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-slate-200'
                         }`}
                       >
-                        <div>
-                          <div className="flex items-start justify-between mb-3">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                              {s.site_type || s.type || 'Hybrid'}
-                            </span>
-                            
-                            <button
-                              type="button"
-                              onClick={(e) => handleDeleteSite(e, s.id)}
-                              title="Delete site"
-                              className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition cursor-pointer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-
-                          <h3 className="text-base font-bold text-white">{s.name}</h3>
-                          <p className="text-xs text-slate-400 mb-4">{s.region}</p>
-
-                          <div className="space-y-2 text-xs text-slate-300 border-t border-slate-800/80 pt-3 mb-4">
-                            <div className="flex justify-between">
-                              <span className="text-slate-500">Coordinates:</span>
-                              <span className="font-mono text-slate-200">{formatCoord(s.lat, 'N', 'S')}, {formatCoord(s.long, 'E', 'W')}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-slate-500">Solar (GHI):</span>
-                              <span className={`font-semibold ${cardSolarPending ? 'text-amber-400/80 animate-pulse text-[11px]' : 'text-amber-400'}`}>
-                                {s.solar_potential || s.solarPotential}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-slate-500">Wind (100m):</span>
-                              <span className={`font-semibold ${cardWindPending ? 'text-sky-400/80 animate-pulse text-[11px]' : 'text-sky-400'}`}>
-                                {s.wind_speed || s.windSpeed}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-500">Grid Distance:</span>
-                              <span className="text-slate-300 font-semibold">{s.grid_proximity || s.gridProximity}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2.5 pt-2 border-t border-slate-800/60">
-                          <div className="bg-emerald-950/30 border border-emerald-500/20 p-2.5 rounded-2xl flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <Activity className="w-4 h-4 text-emerald-400" />
-                              <span className="text-[11px] font-semibold text-slate-300">Suitability Score:</span>
-                            </div>
-                            <span className="text-xs font-black text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-lg border border-emerald-500/30">
-                              {score} / 100
-                            </span>
-                          </div>
-
-                          <button
-                            onClick={() => {
-                              setSelectedSiteId(s.id);
-                              setActiveTab('select-site');
-                            }}
-                            className={`w-full py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
-                              isActive
-                                ? 'bg-emerald-500 text-slate-950'
-                                : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-                            }`}
-                          >
-                            {isActive ? 'Currently Active Target' : 'Set as Active Target'}
-                          </button>
-                        </div>
-
-                      </div>
-                    );
-                  })}
+                        {s.name}
+                      </button>
+                    ))
+                  )}
                 </div>
 
-                {filteredSites.length === 0 && (
-                  <div className="text-center py-12 bg-slate-900/40 rounded-3xl border border-slate-800/60">
-                    <p className="text-sm font-semibold text-slate-300">No sites found in this section.</p>
-                    <p className="text-xs text-slate-500 mt-1">Select another filter or register a new site from the map.</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ========================================================================= */}
-            {/* VIEW 3: COMPARE SITES (MODULE 11: ANALYTICS & BENCHMARK MATRIX ENHANCED)  */}
-            {/* ========================================================================= */}
-            {activeTab === 'compare-sites' && (() => {
-              const extractNum = (val) => parseFloat(String(val || '').replace(/[^0-9.]/g, '')) || 0;
-              const maxSolar = Math.max(...sites.map((s) => extractNum(s.solar_potential || s.solarPotential || 0)));
-              const maxWind = Math.max(...sites.map((s) => extractNum(s.wind_speed || s.windSpeed || 0)));
-              const maxScore = Math.max(...sites.map((s) => Number(s.suitability_score || s.suitabilityScore || 0)));
-              const avgSuitability = Math.round(
-                sites.reduce((acc, s) => acc + Number(s.suitability_score || s.suitabilityScore || 0), 0) / (sites.length || 1)
-              );
-
-              return (
-                <div className="space-y-6 animate-in fade-in duration-200">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-bold text-white">Multi-Site Analytics & Comparison Matrix</h2>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Side-by-side benchmark evaluation across registered database sites. Highlighting top performers per resource tier.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setIsMapModalOpen(true)}
-                      className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition cursor-pointer self-start md:self-auto"
-                    >
-                      <PlusCircle className="w-4 h-4" />
-                      <span>Add Site to Matrix</span>
-                    </button>
-                  </div>
-
-                  {/* Module 11: Aggregate Portfolio KPI Summary Bar */}
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Total Sites Monitored</p>
-                      <p className="text-xl font-black text-white mt-1">{sites.length} Sites</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">SQLite Active Registry</p>
-                    </div>
-                    <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Portfolio Avg Suitability</p>
-                      <p className="text-xl font-black text-emerald-400 mt-1">{avgSuitability} / 100</p>
-                      <p className="text-[10px] text-emerald-500 mt-0.5">AHP Decision Matrix</p>
-                    </div>
-                    <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Peak Solar Irradiance</p>
-                      <p className="text-xl font-black text-amber-400 mt-1">{maxSolar.toFixed(1)} kWh/m²/d</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">NASA POWER Peak Candidate</p>
-                    </div>
-                    <div className="bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Peak Wind Velocity (100m)</p>
-                      <p className="text-xl font-black text-sky-400 mt-1">{maxWind.toFixed(1)} m/s</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Open-Meteo Hellmann Peak</p>
-                    </div>
-                  </div>
-
-                  {/* Module 11: Benchmark Highlighting Matrix Table */}
-                  <div className="bg-slate-900/80 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs text-slate-300">
-                        <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
-                          <tr>
-                            <th className="px-6 py-4">Site Name & Region</th>
-                            <th className="px-6 py-4">Technology</th>
-                            <th className="px-6 py-4">Solar GHI</th>
-                            <th className="px-6 py-4">Wind Speed (100m)</th>
-                            <th className="px-6 py-4">Land Area</th>
-                            <th className="px-6 py-4">Grid Proximity</th>
-                            <th className="px-6 py-4">Suitability Score</th>
-                            <th className="px-6 py-4 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/60">
-                          {sites.map((s) => {
-                            const isActive = String(s.id) === String(selectedSiteId);
-                            const sGhi = extractNum(s.solar_potential || s.solarPotential);
-                            const sWind = extractNum(s.wind_speed || s.windSpeed);
-                            const sScore = Number(s.suitability_score || s.suitabilityScore || 0);
-
-                            const isTopSolar = sGhi > 0 && sGhi === maxSolar;
-                            const isTopWind = sWind > 0 && sWind === maxWind;
-                            const isTopScore = sScore > 0 && sScore === maxScore;
-
-                            return (
-                              <tr
-                                key={s.id}
-                                className={`transition duration-150 ${
-                                  isActive ? 'bg-emerald-500/10 hover:bg-emerald-500/15' : 'hover:bg-slate-800/40'
-                                }`}
-                              >
-                                <td className="px-6 py-4 font-semibold text-white">
-                                  <div className="flex items-center space-x-2">
-                                    <span>{s.name}</span>
-                                    {isActive && (
-                                      <span className="text-[9px] bg-emerald-500 text-slate-950 font-extrabold px-2 py-0.5 rounded-md uppercase">
-                                        Active
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="block text-[11px] text-slate-400 font-normal mt-0.5">{s.region}</span>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className="bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] text-slate-300 font-medium">
-                                    {s.site_type || s.type}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className="font-bold text-amber-400">{s.solar_potential || s.solarPotential}</span>
-                                  {isTopSolar && (
-                                    <span className="ml-1.5 text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded font-bold">
-                                      Best
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className="font-bold text-sky-400">{s.wind_speed || s.windSpeed}</span>
-                                  {isTopWind && (
-                                    <span className="ml-1.5 text-[9px] bg-sky-500/20 text-sky-300 border border-sky-500/40 px-1.5 py-0.5 rounded font-bold">
-                                      Best
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 font-mono text-slate-300">{s.area}</td>
-                                <td className="px-6 py-4 text-slate-300">{s.grid_proximity || s.gridProximity}</td>
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center space-x-2">
-                                    <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                      {sScore} / 100
-                                    </span>
-                                    {isTopScore && (
-                                      <span className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-1.5 py-0.5 rounded font-bold">
-                                        Top Ranked
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                  {isActive ? (
-                                    <span className="text-[11px] text-emerald-400 font-semibold">Selected</span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setSelectedSiteId(s.id);
-                                        setActiveTab('select-site');
-                                      }}
-                                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-semibold transition border border-slate-700 cursor-pointer"
-                                    >
-                                      Select
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* ========================================================================= */}
-            {/* VIEW 4: VIEW FEASIBILITY REPORT (MODULE 13: EXPORT DOSSIER SYSTEM)       */}
-            {/* ========================================================================= */}
-            {activeTab === 'view-report' && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-white">Executive Feasibility Report</h2>
-                    <p className="text-xs text-slate-400 mt-1">Generated deployment assessment for <span className="text-emerald-400 font-semibold">{currentSiteData.name}</span>.</p>
-                  </div>
-                  
-                  {/* Module 13: Dual Export Trigger (Print & Instant Binary PDF Download) */}
-                  <div className="flex items-center space-x-2.5">
-                    <button
-                      type="button"
-                      onClick={() => window.print()}
-                      className="flex items-center space-x-1.5 bg-slate-850 hover:bg-slate-800 text-slate-300 text-xs font-semibold px-3.5 py-2.5 rounded-2xl transition border border-slate-700/80 cursor-pointer"
-                      title="Open browser print dialog"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Print</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleExportPDF}
-                      className="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold px-4 py-2.5 rounded-2xl transition shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
-                      title="Download full executive feasibility dossier"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Export Dossier (.pdf)</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-8 space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-800 gap-4">
-                    <div>
-                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">DEPLOYMENT READINESS</span>
-                      <h3 className="text-2xl font-black text-white mt-1">{currentSiteData.name}</h3>
-                      <p className="text-xs text-slate-400">{currentSiteData.region} • Coordinates: {formatCoord(currentSiteData.lat, 'N', 'S')}, {formatCoord(currentSiteData.long, 'E', 'W')}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Overall Index</p>
-                      <p className="text-3xl font-extrabold text-emerald-400">{currentSiteData.suitability_score || currentSiteData.suitabilityScore}<span className="text-sm text-slate-400">/100</span></p>
-                    </div>
-                  </div>
-
-                  {/* ML Yield Output Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Estimated Annual Generation (AEP)</p>
-                      <p className="text-lg font-bold text-white mt-1">{mlYield.annual_generation_mwh}</p>
-                      <p className="text-[10px] text-emerald-400 mt-0.5">{mlYield.model_engine}</p>
-                    </div>
-                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Capacity Utilization Factor (CUF)</p>
-                      <p className="text-lg font-bold text-amber-400 mt-1">{mlYield.cuf_percent}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Empirical Simulation</p>
-                    </div>
-                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Grid Interconnection Cost</p>
-                      <p className="text-lg font-bold text-sky-400 mt-1">Low ({currentSiteData.grid_proximity || currentSiteData.gridProximity || '1.8 km'} to Substation)</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">OSM Substation Buffer</p>
-                    </div>
-                  </div>
-
-                  {/* Module 9 & 10: Siting Index & Co-Location Spec Breakdown */}
-                  <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800/90 mt-6 space-y-4">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <div>
-                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Module 9 & 10</span>
-                        <h4 className="text-sm font-bold text-white mt-0.5">5-Factor Siting Index & Co-Location Spec</h4>
-                      </div>
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                        5D × 7D Spacing Model
+                {/* Environmental Ribbon */}
+                <div className="bg-slate-900/70 border border-slate-800/80 rounded-3xl p-5 backdrop-blur-xl">
+                  <div className="flex items-center justify-between mb-3 border-b border-slate-800/60 pb-2.5">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Environmental Data</span>
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
+                        Live Feed
                       </span>
                     </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
-                      <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-center">
-                        <span className="text-[10px] text-slate-500 block uppercase font-medium">Resource (35%)</span>
-                        <span className="text-sm font-bold text-amber-400 mt-0.5 block">94.0 / 100</span>
-                      </div>
-                      <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-center">
-                        <span className="text-[10px] text-slate-500 block uppercase font-medium">Geographic (25%)</span>
-                        <span className="text-sm font-bold text-emerald-400 mt-0.5 block">92.5 / 100</span>
-                      </div>
-                      <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-center">
-                        <span className="text-[10px] text-slate-500 block uppercase font-medium">Grid Infra (15%)</span>
-                        <span className="text-sm font-bold text-sky-400 mt-0.5 block">88.0 / 100</span>
-                      </div>
-                      <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-center">
-                        <span className="text-[10px] text-slate-500 block uppercase font-medium">Environmental (15%)</span>
-                        <span className="text-sm font-bold text-teal-400 mt-0.5 block">92.0 / 100</span>
-                      </div>
-                      <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800/80 text-center">
-                        <span className="text-[10px] text-slate-500 block uppercase font-medium">Economic (10%)</span>
-                        <span className="text-sm font-bold text-purple-400 mt-0.5 block">91.6 / 100</span>
-                      </div>
-                    </div>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {currentSiteData.name} ({currentSiteData.lat?.toFixed ? currentSiteData.lat.toFixed(4) : currentSiteData.lat}°N, {currentSiteData.long?.toFixed ? currentSiteData.long.toFixed(4) : currentSiteData.long}°E)
+                    </span>
                   </div>
 
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3 text-center">
+                    <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                      <p className="text-[10px] font-medium text-slate-500 uppercase">Solar Irradiance</p>
+                      <p className="text-lg font-black text-amber-400 mt-1">{currentSiteData.solar_irradiance || '5.69'}</p>
+                      <p className="text-[10px] text-slate-500">kWh/m²</p>
+                    </div>
+
+                    <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                      <p className="text-[10px] font-medium text-slate-500 uppercase">Peak Sun Hours</p>
+                      <p className="text-lg font-black text-amber-300 mt-1">{currentSiteData.peak_sun_hours || '5.69'}</p>
+                      <p className="text-[10px] text-slate-500">hours/day</p>
+                    </div>
+
+                    <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                      <p className="text-[10px] font-medium text-slate-500 uppercase">Avg Temp</p>
+                      <p className="text-lg font-black text-slate-200 mt-1">{currentSiteData.temperature_avg || '29.34'}</p>
+                      <p className="text-[10px] text-slate-500">°C</p>
+                    </div>
+
+                    <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                      <p className="text-[10px] font-medium text-slate-500 uppercase">Total Rainfall</p>
+                      <p className="text-lg font-black text-sky-400 mt-1">{currentSiteData.rainfall || '133.8'}</p>
+                      <p className="text-[10px] text-slate-500">mm</p>
+                    </div>
+
+                    <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                      <p className="text-[10px] font-medium text-slate-500 uppercase">Cloud Cover</p>
+                      <p className="text-lg font-black text-slate-300 mt-1">{currentSiteData.cloud_cover || '70.2'}</p>
+                      <p className="text-[10px] text-slate-500">%</p>
+                    </div>
+
+                    <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                      <p className="text-[10px] font-medium text-slate-500 uppercase">Elevation</p>
+                      <p className="text-lg font-black text-teal-300 mt-1">{currentSiteData.elevation || 12}</p>
+                      <p className="text-[10px] text-slate-500">m (DEM)</p>
+                    </div>
+
+                    <div className="bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                      <p className="text-[10px] font-medium text-slate-500 uppercase">Data Days</p>
+                      <p className="text-lg font-black text-indigo-400 mt-1">{currentSiteData.days_recorded || 30}</p>
+                      <p className="text-[10px] text-slate-500">days</p>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Suitability Score Bar (0 to 10 Scale) */}
+                <div className="bg-slate-900/70 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-xl space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-4xl font-extrabold text-emerald-300">{score10}</span>
+                      <span className="text-sm font-bold text-slate-500">/ 10</span>
+                      <span className="text-xs font-semibold text-emerald-400 ml-2">
+                        Overall Suitability ({currentSiteData.suitability_category || 'Excellent'})
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono text-slate-400">{(Number(score10) * 10).toFixed(0)}%</span>
+                  </div>
+
+                  <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+                    <div 
+                      className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-300 rounded-full transition-all duration-700 shadow-sm shadow-emerald-500/50"
+                      style={{ width: `${Math.min(100, Number(score10) * 10)}%` }}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-4 text-xs text-slate-300 pt-2">
+                    <span>Capacity Factor: <strong className="text-white">{currentSiteData.capacity_factor || '46.4'}%</strong></span>
+                    <span>Yield: <strong className="text-white">{currentSiteData.est_yield || '1618.5'} kWh/kWp/yr</strong></span>
+                    <span>Substations: <strong className="text-white">&lt; 2 km (Optimal)</strong></span>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB 2: STORED SITES */}
+            {activeTab === 'stored-sites' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Stored Candidate Sites</h2>
+                    <p className="text-xs text-slate-400 mt-1">Sites enrolled under current project: <span className="text-emerald-400 font-semibold">{activeProject?.name}</span></p>
+                  </div>
+                  <button
+                    onClick={() => setIsMapModalOpen(true)}
+                    className="bg-emerald-500 text-slate-950 text-xs font-bold px-4 py-2 rounded-xl cursor-pointer"
+                  >
+                    + Add Site via Map
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {sites.length === 0 ? (
+                    <div className="col-span-full py-12 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-3xl">
+                      No candidate sites registered under this project yet. Click "+ Add Site via Map" above!
+                    </div>
+                  ) : (
+                    sites.map(site => (
+                      <div key={site.id} className="bg-slate-900/80 border border-slate-800/80 rounded-3xl p-5 space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="text-sm font-bold text-white">{site.name}</h4>
+                            <p className="text-[11px] text-slate-400">{site.lat}°N, {site.long}°E</p>
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-950/80 border border-slate-800 p-3 rounded-2xl flex justify-between items-center">
+                          <span className="text-xs text-slate-400 font-medium">Suitability Score:</span>
+                          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg">
+                            {Number(site.suitability_score || 8.6) > 10 ? (site.suitability_score / 10).toFixed(1) : Number(site.suitability_score || 8.6).toFixed(1)} / 10
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setSelectedSiteId(site.id);
+                            setActiveTab('select-site');
+                          }}
+                          className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold py-2 rounded-xl border border-slate-700 cursor-pointer transition"
+                        >
+                          View Full Telemetry
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3 & 4 */}
+            {activeTab === 'analytics' && (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 text-center text-slate-400 space-y-2">
+                <Activity className="w-8 h-8 text-emerald-400 mx-auto" />
+                <h3 className="text-base font-bold text-white">Comparative Energy Analytics</h3>
+                <p className="text-xs max-w-md mx-auto">Evaluating solar radiation, wind speeds, and elevation profile for {activeProject?.name}.</p>
+              </div>
+            )}
+
+            {activeTab === 'reports' && (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-8 text-center text-slate-400 space-y-2">
+                <FileText className="w-8 h-8 text-teal-400 mx-auto" />
+                <h3 className="text-base font-bold text-white">Project Feasibility Report</h3>
+                <p className="text-xs max-w-md mx-auto">Exportable summary for {activeProject?.name} covering candidate site coordinates and multi-criteria scores.</p>
               </div>
             )}
 
           </main>
         </div>
 
-        {/* Integrated Map Modal */}
+        {/* Integrated Leaflet Map Modal */}
         <MapPickerModal
           isOpen={isMapModalOpen}
           onClose={() => setIsMapModalOpen(false)}
           onConfirmSite={handleConfirmMapSite}
+          activeProjectName={activeProject?.name || 'Selected Project'}
         />
       </div>
     );
   }
 
-  // ----------------------------------------------------
-  // LOGIN / REGISTER VIEW (UNAUTHENTICATED)
-  // ----------------------------------------------------
+  // =========================================================================
+  // VIEW: AUTHENTICATION (DARK ANIMATED SCREEN)
+  // =========================================================================
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-slate-200 font-sans relative overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-20 -left-20 w-80 h-80 bg-emerald-500/20 rounded-full blur-[80px] animate-pulse"></div>
-        <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-sky-500/20 rounded-full blur-[80px] animate-pulse delay-1000"></div>
+      
+      {/* Drifting Animated Background Blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-emerald-500/25 rounded-full filter blur-[100px] animate-pulse"></div>
+        <div className="absolute top-1/2 -right-24 w-[30rem] h-[30rem] bg-sky-500/25 rounded-full filter blur-[110px] animate-pulse delay-1000"></div>
+        <div className="absolute -bottom-24 left-1/3 w-96 h-96 bg-amber-500/20 rounded-full filter blur-[100px] animate-pulse delay-2000"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-35"></div>
       </div>
 
-      <div className="max-w-md w-full bg-slate-900/80 rounded-3xl shadow-2xl border border-slate-800 p-8 backdrop-blur-2xl relative z-10">
+      <div className="max-w-md w-full bg-slate-900/80 rounded-3xl shadow-2xl border border-slate-800/80 p-8 backdrop-blur-2xl relative z-10">
         <div className="flex flex-col items-center text-center mb-6">
           <div className="flex items-center justify-center space-x-2 bg-emerald-500/10 text-emerald-400 p-3.5 rounded-2xl border border-emerald-500/20 mb-3 shadow-inner">
             <Sun className="w-6 h-6 text-amber-400" />
             <Wind className="w-6 h-6 text-sky-400" />
           </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">
-            Solar & Wind Intelligence Platform
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Renewable Energy Deployment & Feasibility Analysis
-          </p>
+          <h1 className="text-xl font-bold text-white tracking-tight">Solar & Wind Intelligence Platform</h1>
+          <p className="text-xs text-slate-400 mt-1">Renewable Energy Deployment & Feasibility Analysis</p>
         </div>
 
-        <div className="flex bg-slate-950/80 p-1 rounded-2xl mb-6 border border-slate-800">
+        <div className="flex bg-slate-950/80 p-1.5 rounded-2xl mb-6 border border-slate-800/80">
           <button
             type="button"
             onClick={() => { setIsRegister(false); setMessage(null); }}
@@ -1408,9 +989,7 @@ export default function App() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {isRegister && (
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Display Name
-              </label>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">Display Name</label>
               <div className="relative">
                 <User className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
                 <input
@@ -1419,34 +998,28 @@ export default function App() {
                   placeholder="Sakshi Sharma"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition"
+                  className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              Platform Role
-            </label>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Platform Role</label>
             <div className="relative">
               <UserCheck className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition cursor-pointer"
+                className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               >
-                {roles.map((r) => (
-                  <option key={r} value={r} className="bg-slate-900 text-slate-200">{r}</option>
-                ))}
+                {roles.map((r) => (<option key={r} value={r} className="bg-slate-900 text-slate-200">{r}</option>))}
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              Email Address
-            </label>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Email Address</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
               <input
@@ -1455,15 +1028,13 @@ export default function App() {
                 placeholder="planner@energy.org"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition"
+                className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">
-              {isRegister ? 'Create Password (at least 6 characters)' : 'Password'}
-            </label>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Password</label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
               <input
@@ -1472,7 +1043,7 @@ export default function App() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition"
+                className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
               <button
                 type="button"
@@ -1486,9 +1057,7 @@ export default function App() {
 
           {isRegister && (
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Confirm Password
-              </label>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">Confirm Password</label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
                 <input
@@ -1497,7 +1066,7 @@ export default function App() {
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition"
+                  className="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
                 <button
                   type="button"
@@ -1510,28 +1079,12 @@ export default function App() {
             </div>
           )}
 
-          {/* Remember Me Checkbox */}
-          <div className="flex items-center justify-between py-1">
-            <label className="flex items-center space-x-2 text-xs text-slate-400 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-emerald-500 focus:ring-emerald-500/50 cursor-pointer"
-              />
-              <span>Remember email & password</span>
-            </label>
-          </div>
-
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold py-3 rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition duration-200 ease-in-out mt-2 disabled:opacity-50 active:scale-[0.98] cursor-pointer"
           >
-            {loading 
-              ? (isRegister ? 'Creating Account...' : 'Authenticating...') 
-              : (isRegister ? 'Register & Sign In' : 'Sign In')
-            }
+            {loading ? 'Processing...' : (isRegister ? 'Register & Sign In' : 'Sign In')}
           </button>
         </form>
       </div>
