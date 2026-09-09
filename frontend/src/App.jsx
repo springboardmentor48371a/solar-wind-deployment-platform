@@ -8,15 +8,16 @@ import {
   User, 
   Eye, 
   EyeOff, 
-  ChevronDown,
-  Copy,
-  Check,
-  AlertTriangle,
-  AlertCircle,
-  FolderPlus,
-  LogOut
+  ChevronDown, 
+  Copy, 
+  Check, 
+  AlertTriangle, 
+  AlertCircle, 
+  FolderPlus, 
+  LogOut,
+  MapPin
 } from 'lucide-react';
-import EmbeddedMapPicker from './components/MapPickerModal';
+import MapPickerModal from './components/MapPickerModal';
 
 const API_BASE = 'http://127.0.0.1:8000';
 
@@ -53,7 +54,7 @@ export default function App() {
   ]);
   const [selectedProjectId, setSelectedProjectId] = useState('p1');
 
-  // Sites State - Initialized completely empty
+  // Sites State
   const [sites, setSites] = useState([]);
   const [selectedSiteId, setSelectedSiteId] = useState(null);
 
@@ -64,12 +65,11 @@ export default function App() {
 
   // Modal 2: + Add Site to Project
   const [isAddSiteModalOpen, setIsAddSiteModalOpen] = useState(false);
+  const [isLiveMapOpen, setIsLiveMapOpen] = useState(false);
   const [siteIdentifier, setSiteIdentifier] = useState('');
   const [siteLat, setSiteLat] = useState(9.3639);
   const [siteLong, setSiteLong] = useState(78.8395);
   const [siteTech, setSiteTech] = useState('Solar PV');
-  const [siteOwnership, setSiteOwnership] = useState('Unspecified / Unknown');
-  const [siteNotes, setSiteNotes] = useState('');
 
   const roles = [
     'Renewable Energy Planner',
@@ -218,11 +218,17 @@ export default function App() {
     setIsNewProjectModalOpen(false);
   };
 
+  // Callback when user picks a location on the real-time Leaflet Map
+  const handleLocationPickedFromMap = (locationData) => {
+    setSiteLat(locationData.lat);
+    setSiteLong(locationData.long);
+    setIsLiveMapOpen(false); // Automatically closes the map modal
+  };
+
   // Submit Handler for Adding Site under Currently Open Project
   const handleAddSiteSubmit = async (e) => {
     e.preventDefault();
     
-    // Explicit project verification
     const currentActiveProjId = selectedProjectId || (projects.length > 0 ? projects[0].id : null);
     if (!currentActiveProjId) {
       alert('Please create or select a project first!');
@@ -238,7 +244,6 @@ export default function App() {
     if (siteTech.includes('Wind')) badgeType = 'WI';
     if (siteTech.includes('Hybrid')) badgeType = 'HY';
 
-    // Explicitly stored under the active project
     const newSite = {
       id: `s-${Date.now()}`,
       project_id: currentActiveProjId,
@@ -248,8 +253,6 @@ export default function App() {
       long: parseFloat(Number(siteLong).toFixed(4)),
       elevation: 25,
       tech: siteTech,
-      ownership: siteOwnership,
-      notes: siteNotes,
       solar_irradiance: (Math.random() * 1.5 + 5.0).toFixed(2),
       temperature_avg: (Math.random() * 4 + 27).toFixed(1),
       rainfall: (Math.random() * 50 + 90).toFixed(1),
@@ -279,7 +282,6 @@ export default function App() {
     }
 
     setSiteIdentifier('');
-    setSiteNotes('');
     setIsAddSiteModalOpen(false);
   };
 
@@ -300,8 +302,6 @@ export default function App() {
   };
 
   const activeProject = projects.find(p => String(p.id) === String(selectedProjectId)) || projects[0] || { name: 'Active Project', description: '' };
-  
-  // Isolate candidate sites strictly by the active open project
   const currentProjectSites = sites.filter(s => String(s.project_id) === String(selectedProjectId));
   const currentSiteData = currentProjectSites.find(s => String(s.id) === String(selectedSiteId)) || currentProjectSites[0] || null;
 
@@ -312,14 +312,14 @@ export default function App() {
     return (
       <div className="flex flex-col h-screen w-full bg-slate-950 text-slate-200 font-sans antialiased overflow-hidden selection:bg-emerald-500 selection:text-white">
         
-        {/* Animated Ambient Glow */}
+        {/* Ambient Glow */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
           <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/10 rounded-full filter blur-[100px] animate-pulse"></div>
           <div className="absolute top-1/3 -right-40 w-[30rem] h-[30rem] bg-sky-500/10 rounded-full filter blur-[120px] animate-pulse delay-1000"></div>
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-20"></div>
         </div>
 
-        {/* 1. TOP HEADER WITH LOGIN DETAILS & PROFILE MENU */}
+        {/* 1. Top Header */}
         <header className="bg-slate-900/90 border-b border-slate-800/80 backdrop-blur-xl px-8 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-lg shadow-slate-950/20 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-1.5 bg-emerald-500/10 text-emerald-400 p-2 rounded-2xl border border-emerald-500/20 shadow-inner">
@@ -338,7 +338,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* User Profile Dropdown */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -348,15 +347,12 @@ export default function App() {
                 {(loggedInUser.name || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="text-left hidden sm:block">
-                <p className="text-xs font-semibold text-slate-200 leading-tight">
-                  {loggedInUser.name}
-                </p>
+                <p className="text-xs font-semibold text-slate-200 leading-tight">{loggedInUser.name}</p>
                 <span className="text-[10px] text-emerald-400 font-medium">{loggedInUser.role}</span>
               </div>
               <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* Profile Dropdown Card */}
             {isUserMenuOpen && (
               <div className="absolute right-0 mt-2 w-72 bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 py-3.5 px-4 z-50 backdrop-blur-2xl animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="pb-3 border-b border-slate-800">
@@ -404,47 +400,39 @@ export default function App() {
           </div>
         </header>
 
-        {/* 2. MAIN BODY: SIDEBAR + WORKSPACE */}
+        {/* Main Workspace Body */}
         <div className="flex-1 flex overflow-hidden z-10">
-          
-          {/* Left Navigation Sidebar */}
           <aside className="w-56 bg-slate-900/80 border-r border-slate-800/80 backdrop-blur-xl flex flex-col justify-between p-6 flex-shrink-0">
             <div>
-              <div className="mb-6">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">
-                  Workspace
-                </p>
-                <nav className="space-y-2">
-                  {[
-                    { id: 'projects', label: 'Projects & Sites' },
-                    { id: 'map', label: 'Map View' },
-                    { id: 'analytics', label: 'Analytics' },
-                    { id: 'users', label: 'User Management' },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveNav(item.id)}
-                      className={`w-full text-left text-xs transition-colors cursor-pointer py-1.5 px-2 rounded-lg block ${
-                        activeNav === item.id 
-                          ? 'font-bold text-emerald-400 bg-slate-800/60 border-l-2 border-emerald-400' 
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </nav>
-              </div>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Workspace</p>
+              <nav className="space-y-2">
+                {[
+                  { id: 'projects', label: 'Projects & Sites' },
+                  { id: 'map', label: 'Map View' },
+                  { id: 'analytics', label: 'Analytics' },
+                  { id: 'users', label: 'User Management' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveNav(item.id);
+                      if (item.id === 'map') setIsLiveMapOpen(true);
+                    }}
+                    className={`w-full text-left text-xs transition-colors cursor-pointer py-1.5 px-2 rounded-lg block ${
+                      activeNav === item.id 
+                        ? 'font-bold text-emerald-400 bg-slate-800/60 border-l-2 border-emerald-400' 
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
             </div>
-
-            <div className="text-[11px] text-slate-500 font-mono">
-              v2.4 &middot; Feasibility Core
-            </div>
+            <div className="text-[11px] text-slate-500 font-mono">v2.4 &middot; Feasibility Core</div>
           </aside>
 
-          {/* Main 2-Column Workspace */}
           <main className="flex-1 flex flex-col overflow-y-auto px-10 py-8">
-            
             <div className="mb-6">
               <p className="text-[9px] font-semibold tracking-wider text-slate-500 uppercase">
                 ADMINISTRATOR &middot; SYSTEM GOVERNANCE
@@ -453,8 +441,7 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-12 gap-8 items-start">
-              
-              {/* COLUMN 1: PROJECT PORTFOLIOS */}
+              {/* Column 1: Projects */}
               <div className="col-span-12 lg:col-span-4 space-y-3">
                 <div className="flex items-center justify-between pb-1">
                   <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
@@ -513,9 +500,8 @@ export default function App() {
                 </div>
               </div>
 
-              {/* COLUMN 2: SITES UNDER ACTIVE PROJECT */}
+              {/* Column 2: Sites under active project */}
               <div className="col-span-12 lg:col-span-8 space-y-4">
-                
                 <div className="flex items-start justify-between pb-3 border-b border-slate-800">
                   <div>
                     <h3 className="text-base font-bold text-white">{activeProject.name}</h3>
@@ -577,7 +563,6 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Collapsible Telemetry Ribbon on Click */}
                           {isSiteSelected && (
                             <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-3 sm:grid-cols-6 gap-2 text-center text-[10px] animate-in fade-in duration-150">
                               <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800/60">
@@ -611,15 +596,12 @@ export default function App() {
                     })
                   )}
                 </div>
-
               </div>
-
             </div>
           </main>
-
         </div>
 
-        {/* SIGN OUT CONFIRMATION PERMISSION MODAL */}
+        {/* Sign Out Confirmation Modal */}
         {showSignOutConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center backdrop-blur-xl animate-in zoom-in-95 duration-150">
@@ -651,7 +633,7 @@ export default function App() {
           </div>
         )}
 
-        {/* DIALOG 1: NEW PROJECT PORTFOLIO MODAL */}
+        {/* New Project Portfolio Modal */}
         {isNewProjectModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl backdrop-blur-xl relative z-10 animate-in zoom-in-95 duration-150">
@@ -709,7 +691,7 @@ export default function App() {
           </div>
         )}
 
-        {/* DIALOG 2: ADD SITE MODAL */}
+        {/* Add Site Dialog */}
         {isAddSiteModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-lg w-full shadow-2xl backdrop-blur-xl relative z-10 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150">
@@ -724,6 +706,7 @@ export default function App() {
               </div>
 
               <form onSubmit={handleAddSiteSubmit} className="space-y-4 text-xs">
+                {/* Site Identifier Box */}
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Site Identifier *</label>
                   <input
@@ -736,20 +719,20 @@ export default function App() {
                   />
                 </div>
 
-                <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-2xl space-y-2">
-                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
-                    Choose Site From Map (Search place or move pin)
-                  </span>
-                  <EmbeddedMapPicker
-                    lat={siteLat}
-                    lng={siteLong}
-                    onCoordsChange={(newLat, newLng) => {
-                      setSiteLat(newLat);
-                      setSiteLong(newLng);
-                    }}
-                  />
+                {/* Choose Site From Map Button */}
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Geographic Selection</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsLiveMapOpen(true)}
+                    className="w-full py-2.5 px-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl font-bold flex items-center justify-center space-x-2 transition cursor-pointer"
+                  >
+                    <MapPin className="w-4 h-4" />
+                    <span>Choose Site From Map (Search Place or Move Pin)</span>
+                  </button>
                 </div>
 
+                {/* Latitude & Longitude Inputs (Auto-filled from map) */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-400 font-semibold mb-1">Latitude</label>
@@ -775,6 +758,7 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Technology Focus */}
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Technology Focus</label>
                   <select
@@ -786,31 +770,6 @@ export default function App() {
                     <option value="Wind Turbine">Wind Turbine</option>
                     <option value="Hybrid (Solar + Wind)">Hybrid (Solar + Wind)</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Land Ownership Model</label>
-                  <select
-                    value={siteOwnership}
-                    onChange={(e) => setSiteOwnership(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none cursor-pointer"
-                  >
-                    <option value="Unspecified / Unknown">Unspecified / Unknown</option>
-                    <option value="Government Allotment">Government Allotment</option>
-                    <option value="Private Leasehold">Private Leasehold</option>
-                    <option value="Purchased Freehold">Purchased Freehold</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Notes &amp; Constraints</label>
-                  <input
-                    type="text"
-                    placeholder="Substation distance, terrain notes, etc."
-                    value={siteNotes}
-                    onChange={(e) => setSiteNotes(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none"
-                  />
                 </div>
 
                 <div className="flex justify-end space-x-3 pt-2">
@@ -833,21 +792,29 @@ export default function App() {
           </div>
         )}
 
+        {/* Real-time Map Picker Modal */}
+        {isLiveMapOpen && (
+          <MapPickerModal
+            isOpen={isLiveMapOpen}
+            onClose={() => setIsLiveMapOpen(false)}
+            onSelectLocation={handleLocationPickedFromMap}
+            initialLat={siteLat}
+            initialLong={siteLong}
+          />
+        )}
+
       </div>
     );
   }
 
   // =========================================================================
-  // VIEW: AUTHENTICATION (WITH ROLE SELECTION DROPDOWN)
+  // VIEW: AUTHENTICATION
   // =========================================================================
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-slate-200 font-sans relative overflow-hidden">
-      
-      {/* Drifting Animated Background Blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-emerald-500/25 rounded-full filter blur-[100px] animate-pulse"></div>
         <div className="absolute top-1/2 -right-24 w-[30rem] h-[30rem] bg-sky-500/25 rounded-full filter blur-[110px] animate-pulse delay-1000"></div>
-        <div className="absolute -bottom-24 left-1/3 w-96 h-96 bg-amber-500/20 rounded-full filter blur-[100px] animate-pulse delay-2000"></div>
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-35"></div>
       </div>
 
@@ -911,7 +878,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Platform Role Dropdown Selector */}
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5">Platform Role</label>
             <div className="relative">

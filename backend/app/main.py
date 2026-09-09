@@ -19,6 +19,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 
+# Environmental data extraction & AHP scoring + ML inference imports
+from services.environmental_service import fetch_realtime_environmental_factors
+from services.scoring_service import compute_site_suitability
+
 # =====================================================================
 # 1. DATABASE CONFIGURATION & SESSIONS
 # =====================================================================
@@ -79,7 +83,7 @@ class Site(Base):
     region = Column(String(100), default="Candidate Region")
     site_type = Column(String(50), default="Solar")
 
-    # 5 Environmental Factors + Elevation + Window Days
+    # Environmental Factors + Elevation + Window Days
     solar_irradiance = Column(Float, default=5.69)
     peak_sun_hours = Column(Float, default=5.69)
     temperature_avg = Column(Float, default=29.34)
@@ -153,102 +157,7 @@ class SiteCreate(BaseModel):
     site_type: Optional[str] = "Solar"
 
 # =====================================================================
-# 5. BACKGROUND ENVIRONMENTAL HARVESTER & 0-10 SCORING
-# =====================================================================
-
-def sync_site_environmental_data(site_id: str, lat: float, lon: float):
-    """
-    Collects live meteorological data from NASA POWER & Open-Meteo,
-    computes the 0-10 suitability index, and updates the site record in DB.
-    """
-    db = SessionLocal()
-    try:
-        # Step A: Collect from NASA POWER
-        solar_ghi, temp_avg, rain_total, cloud_cover = 5.69, 29.34, 133.8, 70.2
-        try:
-            nasa_url = "https://power.larc.nasa.gov/api/temporal/climatology/point"
-            params = {
-                "parameters": "ALLSKY_SFC_SW_DWN,T2M,PRECTOTCORR,CLOUD_AMT",
-                "community": "RE",
-                "longitude": lon,
-                "latitude": lat,
-                "format": "JSON"
-            }
-            res = requests.get(nasa_url, params=params, timeout=10)
-            if res.status_code == 200:
-                p = res.json().get("properties", {}).get("parameter", {})
-                solar_ghi = float(p.get("ALLSKY_SFC_SW_DWN", {}).get("ANN", 5.69))
-                temp_avg = float(p.get("T2M", {}).get("ANN", 29.34))
-                rain_total = float(p.get("PRECTOTCORR", {}).get("ANN", 133.8))
-                cloud_cover = float(p.get("CLOUD_AMT", {}).get("ANN", 70.2))
-        except Exception as e:
-            print(f"[NASA Sync Warn] Site {site_id} fallback used: {e}")
-
-        # Step B: Collect Elevation from Open-Meteo DEM
-        elevation = 12.0
-        try:
-            elev_res = requests.get(
-                f"https://elevation-api.open-meteo.com/v1/elevation?latitude={lat}&longitude={lon}",
-                timeout=8
-            )
-            if elev_res.status_code == 200:
-                elevation = float(elev_res.json().get("elevation", [12.0])[0])
-        except Exception as e:
-            print(f"[Elevation Sync Warn] Site {site_id} fallback used: {e}")
-
-        # Step C: Compute 0-10 Multi-Factor Suitability Formula
-        resource_sub = min(solar_ghi / 6.0, 1.0) * 10.0
-        geographic_sub = 9.1 if elevation < 500.0 else 7.5
-        infrastructure_sub = 6.5
-        environmental_sub = max(2.0, 10.0 - (cloud_cover / 10.0))
-        economic_sub = 10.0
-
-        score_0_to_10 = round(
-            (resource_sub * 0.35) +
-            (geographic_sub * 0.25) +
-            (infrastructure_sub * 0.15) +
-            (environmental_sub * 0.15) +
-            (economic_sub * 0.10),
-            1
-        )
-        score_0_to_10 = max(1.0, min(10.0, score_0_to_10))
-
-        if score_0_to_10 >= 9.0:
-            category = "Excellent"
-        elif score_0_to_10 >= 7.5:
-            category = "Highly Suitable"
-        elif score_0_to_10 >= 6.0:
-            category = "Moderately Suitable"
-        else:
-            category = "Low Viability"
-
-        annual_yield = round(solar_ghi * 365.0 * 0.78, 1)
-        cuf = round((annual_yield / 8760.0) * 100, 1)
-
-        # Step D: Persist to DB
-        site = db.query(Site).filter(Site.id == site_id).first()
-        if site:
-            site.solar_irradiance = round(solar_ghi, 2)
-            site.peak_sun_hours = round(solar_ghi, 2)
-            site.temperature_avg = round(temp_avg, 2)
-            site.rainfall = round(rain_total, 1)
-            site.cloud_cover = round(cloud_cover, 1)
-            site.elevation = round(elevation, 1)
-            site.days_recorded = 30
-            site.suitability_score = score_0_to_10
-            site.suitability_category = category
-            site.capacity_factor = cuf
-            site.est_yield = annual_yield
-            db.commit()
-            print(f"[Harvest Complete] Site {site_id} updated with 0-10 score: {score_0_to_10}")
-    except Exception as err:
-        db.rollback()
-        print(f"[Harvest Error] Failed to update site {site_id}: {err}")
-    finally:
-        db.close()
-
-# =====================================================================
-# 6. AUTHENTICATION ROUTES
+# 5. AUTHENTICATION ROUTES
 # =====================================================================
 
 @app.post("/api/auth/register")
@@ -311,7 +220,7 @@ def login(creds: UserLogin, db: Session = Depends(get_db)):
     }
 
 # =====================================================================
-# 7. PROJECT MANAGEMENT ROUTES
+# 6. PROJECT MANAGEMENT ROUTES
 # =====================================================================
 
 @app.get("/api/projects")
@@ -336,7 +245,6 @@ def create_project(data: ProjectCreate, db: Session = Depends(get_db)):
 
 @app.patch("/api/projects/{project_id}/status")
 def update_project_status(project_id: str, payload: ProjectStatusUpdate, db: Session = Depends(get_db)):
-    """Allows user to transition real-world progress between Planning, Active, and Completed."""
     proj = db.query(Project).filter(Project.id == project_id).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -358,20 +266,23 @@ def delete_project(project_id: str, db: Session = Depends(get_db)):
     return {"message": "Project deleted successfully", "id": project_id}
 
 # =====================================================================
-# 8. SITE MANAGEMENT ROUTES
+# 7. SITE MANAGEMENT ROUTES (LIVE HARVESTING + SCORING + ML INFERENCE)
 # =====================================================================
 
 @app.get("/api/sites")
 def get_sites(project_id: Optional[str] = None, db: Session = Depends(get_db)):
-    """Filters sites strictly by the active project when project_id query is provided."""
     q = db.query(Site)
     if project_id:
         q = q.filter(Site.project_id == project_id)
     return q.order_by(Site.created_at.desc()).all()
 
 @app.post("/api/sites")
-def create_site(data: SiteCreate, bg_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """Enforces parent project existence before creating a site."""
+def create_site(data: SiteCreate, db: Session = Depends(get_db)):
+    """
+    Creates a candidate site under the active project, fetches live 30-day 
+    environmental telemetry from Open-Meteo, calculates suitability score,
+    and runs XGBoost inference for energy yield prediction.
+    """
     proj = db.query(Project).filter(Project.id == data.project_id).first()
     if not proj:
         raise HTTPException(
@@ -379,26 +290,40 @@ def create_site(data: SiteCreate, bg_tasks: BackgroundTasks, db: Session = Depen
             detail="Parent project does not exist. Create a project first."
         )
 
+    # 1. Fetch real-time environmental metrics for candidate coordinates
+    env_factors = fetch_realtime_environmental_factors(
+        lat=data.lat, 
+        lon=data.long, 
+        days=30
+    )
+
+    # 2. Calculate suitability and run solar XGBoost model inference
+    scoring_data = compute_site_suitability(env_factors)
+
+    # 3. Create and persist the complete record in the database
     site = Site(
         project_id=data.project_id,
         name=data.name.strip(),
         lat=data.lat,
         long=data.long,
         region=data.region or "Selected Corridor",
-        elevation=data.elevation or 12.0,
-        site_type=data.site_type or "Solar"
+        site_type=data.site_type or "Solar",
+        solar_irradiance=env_factors.get("solar_irradiance", 5.69),
+        peak_sun_hours=env_factors.get("peak_sun_hours", 5.69),
+        temperature_avg=env_factors.get("temperature_avg", 29.34),
+        rainfall=env_factors.get("total_rainfall", 133.8),
+        cloud_cover=env_factors.get("cloud_cover", 70.2),
+        elevation=env_factors.get("elevation", data.elevation or 12.0),
+        days_recorded=env_factors.get("days_recorded", 30),
+        suitability_score=scoring_data.get("suitability_score", 8.6),
+        suitability_category=scoring_data.get("suitability_category", "Excellent"),
+        capacity_factor=scoring_data.get("capacity_factor", 46.4),
+        est_yield=scoring_data.get("est_yield", 1618.5)
     )
+
     db.add(site)
     db.commit()
     db.refresh(site)
-
-    # Launch background meteorological collection and 0-10 scoring
-    bg_tasks.add_task(
-        sync_site_environmental_data, 
-        site_id=site.id, 
-        lat=site.lat, 
-        lon=site.long
-    )
 
     return site
 
@@ -412,7 +337,7 @@ def delete_site(site_id: str, db: Session = Depends(get_db)):
     return {"message": "Site deleted successfully", "id": site_id}
 
 # =====================================================================
-# 9. SERVER ENTRY POINT
+# 8. SERVER ENTRY POINT
 # =====================================================================
 
 if __name__ == "__main__":
