@@ -182,39 +182,101 @@ def create_site(
         )
 
     # 1. Spatial distance calculations (GIS Engine)
+    from app.osm import fetch_osm_infrastructure
+    
+    osm_res = fetch_osm_infrastructure(site_in.latitude, site_in.longitude)
+    
     gis_res = perform_gis_distance_analysis(
         site_in.latitude, 
         site_in.longitude, 
         STATIC_SUBSTATIONS, 
         STATIC_PROTECTED_ZONES
     )
+    
+    if osm_res:
+        gis_res["nearest_substation_distance"] = osm_res["nearest_substation_distance"]
+        gis_res["road_distance"] = osm_res["road_distance"]
 
-    # 2. Climate variables mapping (Simulating Copernicus/Sentinel inputs locally)
-    # Default averages for Western India (dry/hot zone)
+    # 2. Climate variables mapping (Querying NASA POWER or falling back to local simulation)
     solar_irr = 6.2 # Default kWh/m2/day
     wind_spd = 5.5  # Default m/s
+    wind_dir = 180.0 # Default Degrees
     temp = 30.5     # Default °C
     rain = 250.0    # Default mm
     hum = 35.0      # Default %
     cloud = 15.0    # Default %
     veg = 0.10      # Default NDVI
-    slope = 1.5     # Default slope
+    
+    # SRTM Elevation and Slope
+    from app.srtm import fetch_srtm_data
+    srtm_res = fetch_srtm_data(site_in.latitude, site_in.longitude)
+    if srtm_res:
+        elevation = srtm_res["elevation"]
+        slope = srtm_res["terrain_slope"]
+        srtm_source = srtm_res["source"]
+    else:
+        elevation = 150.0 # Default elevation
+        slope = 1.5       # Default slope
+        srtm_source = "Local Estimate"
+        
+    # Esri Land Cover
+    from app.landcover import fetch_esri_landcover
+    landcover_res = fetch_esri_landcover(site_in.latitude, site_in.longitude)
+    if landcover_res:
+        site_in.land_type = landcover_res["mapped_land_type"]
+        
+    # OSM Protected Area
+    from app.osm import fetch_osm_protected_areas
+    protected_res = fetch_osm_protected_areas(site_in.latitude, site_in.longitude)
+    if protected_res:
+        gis_res["protected_area"] = protected_res["is_protected"]
+        
+    climate_source = "Local Estimate"
+    nasa_success = False
+    gwa_success = False
 
     if site_in.environmental_data:
         solar_irr = site_in.environmental_data.solar_irradiance
         wind_spd = site_in.environmental_data.wind_speed
+        wind_dir = site_in.environmental_data.wind_direction
         temp = site_in.environmental_data.temperature
         rain = site_in.environmental_data.rainfall
         hum = site_in.environmental_data.humidity
         cloud = site_in.environmental_data.cloud_cover
         slope = site_in.environmental_data.terrain_slope
         veg = site_in.environmental_data.vegetation_index
+        climate_source = "Local Estimate"
+    else:
+        # Query Global Wind Atlas local cropped GeoTIFFs
+        from app.global_wind_atlas import fetch_gwa_point_data
+        gwa_data = fetch_gwa_point_data(site_in.latitude, site_in.longitude)
+        if gwa_data:
+            wind_spd = gwa_data["wind_speed"]
+            gwa_success = True
+            
+        # Query NASA POWER Climatology Point API
+        from app.nasa_power import fetch_nasa_power_climatology
+        nasa_data = fetch_nasa_power_climatology(site_in.latitude, site_in.longitude)
+        if nasa_data:
+            solar_irr = nasa_data["ALLSKY_SFC_SW_DWN"]
+            # Only use NASA wind speed if GWA is unavailable
+            if not gwa_success:
+                wind_spd = nasa_data["WS50M"]
+            wind_dir = nasa_data["WD50M"]
+            temp = nasa_data["T2M"]
+            rain = nasa_data["PRECTOTCORR_annual"]
+            hum = nasa_data["RH2M"]
+            cloud = nasa_data["CLOUD_AMT"]
+            climate_source = "NASA POWER Climatology"
+            nasa_success = True
+        else:
+            climate_source = "Local Estimate"
 
     # 3. Model Predictions (Scikit-Learn ML Engine)
     ml_inputs = {
         "latitude": site_in.latitude,
         "longitude": site_in.longitude,
-        "elevation": 150.0, # default meters
+        "elevation": elevation, # fetched from SRTM or default
         "cloud_cover": cloud,
         "temperature": temp,
         "humidity": hum,
@@ -223,9 +285,30 @@ def create_site(
     }
     ml_preds = predictor.predict_resource_potential(ml_inputs)
 
-    # Use ML predicted resources or fallback to manual inputs
-    final_solar_irr = ml_preds["solar_irradiance"] if not site_in.environmental_data else solar_irr
-    final_wind_spd = ml_preds["wind_speed"] if not site_in.environmental_data else wind_spd
+    # Use real resource data if successfully retrieved (manual, NASA, or GWA)
+    if site_in.environmental_data:
+        final_solar_irr = solar_irr
+        final_wind_spd = wind_spd
+    elif nasa_success or gwa_success:
+        final_solar_irr = solar_irr
+        final_wind_spd = wind_spd
+        
+        # Override ML prediction inputs with GWA/NASA values for yield forecasts
+        solar_cf = (solar_irr * 0.75) / 24.0
+        expected_solar_mwh = solar_irr * 365.0 * 0.75 * 1.0
+        wind_cf_pct = min(48.0, max(5.0, (wind_spd ** 2.2) / (9.0 ** 2.2) * 35.0))
+        wind_cf = wind_cf_pct / 100.0
+        expected_wind_mwh = wind_cf * 8760.0 * 1.0
+        
+        ml_preds["solar_irradiance"] = round(solar_irr, 2)
+        ml_preds["wind_speed"] = round(wind_spd, 2)
+        ml_preds["solar_capacity_factor"] = round(solar_cf, 3)
+        ml_preds["wind_capacity_factor"] = round(wind_cf, 3)
+        ml_preds["expected_solar_energy"] = round(expected_solar_mwh, 2)
+        ml_preds["expected_wind_energy"] = round(expected_wind_mwh, 2)
+    else:
+        final_solar_irr = ml_preds["solar_irradiance"]
+        final_wind_spd = ml_preds["wind_speed"]
 
     # Calculate overall suitability score (Decision scoring Engine)
     suit_res = calculate_suitability_score(
@@ -265,7 +348,7 @@ def create_site(
             longitude=site_in.longitude,
             region=project.region,
             land_area=site_in.land_area,
-            elevation=150.0, # default
+            elevation=elevation, # fetched from SRTM or default
             land_type=site_in.land_type,
             ownership=site_in.ownership
         )
@@ -277,7 +360,7 @@ def create_site(
             site_id=new_site.site_id,
             solar_irradiance=final_solar_irr,
             wind_speed=final_wind_spd,
-            wind_direction=180.0,
+            wind_direction=wind_dir,
             temperature=temp,
             rainfall=rain,
             humidity=hum,
@@ -307,6 +390,7 @@ def create_site(
                 f"Overall score is {suit_res['suitability_score']}/100 ({suit_res['suitability_category']}). "
                 f"Proximity to grid: {gis_res['nearest_substation_distance']} km. "
                 f"Environmental protection zone intersection: {'YES (UNSUITABLE)' if gis_res['protected_area'] else 'NO'}."
+                f" | Climate Source: {climate_source}"
             ),
             analysis_status="Completed"
         )

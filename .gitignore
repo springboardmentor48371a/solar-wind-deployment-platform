@@ -216,3 +216,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+node_modules/
+
+# Large generated datasets and trained models
+backend/data/
+backend/models/
+backend/app/data/
+*.tif
+*.zip
+*.joblib
+

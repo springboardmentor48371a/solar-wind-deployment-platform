@@ -1,34 +1,62 @@
 import os
 import pickle
+import joblib
+import json
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 SOLAR_MODEL_PATH = os.path.join(MODEL_DIR, "solar_model.pkl")
 WIND_MODEL_PATH = os.path.join(MODEL_DIR, "wind_model.pkl")
+REAL_MODELS_DIR = os.path.join(os.path.dirname(MODEL_DIR), "models")
+REAL_SOLAR_MODEL_PATH = os.path.join(REAL_MODELS_DIR, "solar_model_real.joblib")
+REAL_WIND_MODEL_PATH = os.path.join(REAL_MODELS_DIR, "wind_model_real.joblib")
+REAL_SOLAR_META_PATH = os.path.join(REAL_MODELS_DIR, "solar_model_real_meta.json")
+REAL_WIND_META_PATH = os.path.join(REAL_MODELS_DIR, "wind_model_real_meta.json")
 
 class RenewablePredictor:
     def __init__(self):
         self.solar_model = None
         self.wind_model = None
+        self.real_solar_model = None
+        self.real_wind_model = None
+        self.real_solar_meta = None
+        self.real_wind_meta = None
         self._initialize_models()
 
     def _initialize_models(self):
         """Loads models if they exist, otherwise trains them on synthetic data."""
+        # Load synthetic fallback models
         if os.path.exists(SOLAR_MODEL_PATH) and os.path.exists(WIND_MODEL_PATH):
             try:
                 with open(SOLAR_MODEL_PATH, "rb") as f:
                     self.solar_model = pickle.load(f)
                 with open(WIND_MODEL_PATH, "rb") as f:
                     self.wind_model = pickle.load(f)
-                print("ML models loaded successfully from disk.")
-                return
+                print("Synthetic ML models loaded successfully from disk.")
             except Exception as e:
-                print(f"Error loading models: {e}. Retraining...")
-        
-        self.train_and_save_models()
+                print(f"Error loading synthetic models: {e}. Retraining...")
+                self.train_and_save_models()
+        else:
+            self.train_and_save_models()
+            
+        # Load real models and metadata
+        try:
+            if os.path.exists(REAL_SOLAR_MODEL_PATH) and os.path.exists(REAL_SOLAR_META_PATH):
+                self.real_solar_model = joblib.load(REAL_SOLAR_MODEL_PATH)
+                with open(REAL_SOLAR_META_PATH, "r") as f:
+                    self.real_solar_meta = json.load(f)
+                print("Real Solar model loaded successfully.")
+                
+            if os.path.exists(REAL_WIND_MODEL_PATH) and os.path.exists(REAL_WIND_META_PATH):
+                self.real_wind_model = joblib.load(REAL_WIND_MODEL_PATH)
+                with open(REAL_WIND_META_PATH, "r") as f:
+                    self.real_wind_meta = json.load(f)
+                print("Real Wind model loaded successfully.")
+        except Exception as e:
+            print(f"Error loading real models: {e}")
 
     def train_and_save_models(self):
         """Generates synthetic data and trains Scikit-learn RandomForest models."""
@@ -94,14 +122,33 @@ class RenewablePredictor:
         humidity = inputs.get("humidity", 40.0)
         rainfall = inputs.get("rainfall", 450.0)
         slope = inputs.get("terrain_slope", 2.0)
+        wind_speed_input = inputs.get("wind_speed", 5.0)
+        wind_direction_input = inputs.get("wind_direction", 180.0)
+        solar_irr_input = inputs.get("solar_irradiance", 5.5)
 
-        # Format feature vectors
+        solar_model_source = "Synthetic Fallback — Required Feature Unavailable"
+        wind_model_source = "Synthetic Fallback"
+
+        # SOLAR PREDICTION
+        # The real model requires "AMBIENT_TEMPERATURE", "MODULE_TEMPERATURE", "IRRADIATION"
+        # Since MODULE_TEMPERATURE is missing, we must fallback.
+        # Run synthetic model for Solar
         solar_features = np.array([[lat, lon, elevation, cloud_cover, temp, rainfall]])
-        wind_features = np.array([[lat, lon, elevation, slope, humidity, rainfall]])
-
-        # Run predictions
         predicted_solar_irr = float(self.solar_model.predict(solar_features)[0])
-        predicted_wind_spd = float(self.wind_model.predict(wind_features)[0])
+
+        # WIND PREDICTION
+        predicted_wind_power_kw = None
+        predicted_wind_spd = float(self.wind_model.predict(np.array([[lat, lon, elevation, slope, humidity, rainfall]]))[0])
+        
+        if self.real_wind_model and self.real_wind_meta:
+            expected_features = self.real_wind_meta.get("features", [])
+            # Must strictly match: ["Wind speed (m/s)", "Wind direction (\\u00b0)", "Nacelle ambient temperature (\\u00b0C)"]
+            if expected_features == ["Wind speed (m/s)", "Wind direction (\u00b0)", "Nacelle ambient temperature (\u00b0C)"]:
+                wind_features = np.array([[wind_speed_input, wind_direction_input, temp]])
+                predicted_wind_power_kw = float(self.real_wind_model.predict(wind_features)[0])
+                # Ensure physical limits
+                predicted_wind_power_kw = max(0.0, predicted_wind_power_kw)
+                wind_model_source = "Real Historical ML Model \u2014 Kelmarsh SCADA (Not validated for Gujarat/Rajasthan)"
 
         # Calculations:
         # 1. Solar energy output forecast (kWh per kWp installed per year)
@@ -111,19 +158,28 @@ class RenewablePredictor:
         expected_solar_mwh = predicted_solar_irr * 365.0 * 0.75 * 1.0 # per MWp installed per year
 
         # 2. Wind energy output forecast
-        # Wind capacity factor calculated based on power curve approximation:
-        # e.g., CF = (wind_speed ** 3) / (12 ** 3) * 100 for wind_speed <= 12, max out around 45%
-        wind_capacity_factor = min(48.0, max(5.0, (predicted_wind_spd ** 2.2) / (9.0 ** 2.2) * 35.0))
-        expected_wind_mwh = (wind_capacity_factor / 100.0) * 8760.0 * 1.0 # per MW installed per year
+        if predicted_wind_power_kw is not None:
+            # The real Random Forest model predicts active power in kW for a Senvion MM92 (2050 kW rated).
+            # Mathematical Conversion:
+            # 1. Capacity Factor (CF) = predicted_power_kw / 2050.0 kW
+            # 2. Annual Energy (MWh) per 1 MW installed = CF * 8760 hours * 1 MW
+            wind_capacity_factor = min(1.0, max(0.0, predicted_wind_power_kw / 2050.0))
+            expected_wind_mwh = wind_capacity_factor * 8760.0 * 1.0 # MWh per year per 1 MW installed
+        else:
+            wind_capacity_factor = min(48.0, max(5.0, (predicted_wind_spd ** 2.2) / (9.0 ** 2.2) * 35.0)) / 100.0
+            expected_wind_mwh = wind_capacity_factor * 8760.0 * 1.0 # per MW installed per year
 
         return {
-            "solar_irradiance": round(predicted_solar_irr, 2),
-            "wind_speed": round(predicted_wind_spd, 2),
+            "solar_irradiance": round(solar_irr_input if solar_irr_input else predicted_solar_irr, 2),
+            "wind_speed": round(wind_speed_input if wind_speed_input else predicted_wind_spd, 2),
             "solar_capacity_factor": round(solar_capacity_factor, 3),
-            "wind_capacity_factor": round(wind_capacity_factor / 100.0, 3), # as a ratio, e.g. 0.28
+            "wind_capacity_factor": round(wind_capacity_factor, 3), # as a ratio, e.g. 0.28
             "expected_solar_energy": round(expected_solar_mwh, 2),
             "expected_wind_energy": round(expected_wind_mwh, 2),
-            "is_synthetic": True # Clearly label as synthetic/demo data
+            "is_synthetic": (wind_model_source == "Synthetic Fallback"), # Deprecated logically, kept for backwards compat
+            "is_hybrid_mode": ("Real" in wind_model_source and "Synthetic" in solar_model_source),
+            "solar_model_source": solar_model_source,
+            "wind_model_source": wind_model_source
         }
 
 # Singleton instance

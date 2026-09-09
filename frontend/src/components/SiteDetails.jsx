@@ -122,6 +122,12 @@ export default function SiteDetails({ site, weights }) {
               {env?.protected_area ? 'YES (Prohibited)' : 'NO (Clear)'}
             </span>
           </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Climate Source:</span>
+            <span style={{ fontWeight: '600', color: env?.climate_data_source === 'NASA POWER Climatology' ? '#f59e0b' : 'var(--text-secondary)' }}>
+              {env?.climate_data_source || 'Local Estimate'}
+            </span>
+          </div>
         </div>
 
         {/* Suitability Score Radial representation */}
@@ -170,6 +176,14 @@ export default function SiteDetails({ site, weights }) {
               <span style={{ color: 'var(--text-muted)' }}>Annual Energy:</span>
               <span style={{ fontWeight: '600' }}>{assess.solar_energy_prediction} MWh</span>
             </div>
+            <div style={{ display: 'flex', flexDirection: 'column', marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed rgba(255,255,255,0.05)', fontSize: '0.6875rem', gap: '2px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Model Source:</span>
+                <span style={{ fontWeight: '500', color: 'var(--text-secondary)' }}>
+                  {assess.solar_model_source || 'Synthetic Fallback'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -184,12 +198,36 @@ export default function SiteDetails({ site, weights }) {
               <span style={{ fontWeight: '500' }}>{env?.wind_speed} m/s</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Power Density:</span>
+              <span style={{ fontWeight: '600', color: 'var(--wind)' }}>{env?.wind_power_density} W/m²</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Capacity Factor:</span>
               <span style={{ fontWeight: '500' }}>{Math.round(assess.wind_capacity_factor * 100)}%</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>Annual Energy:</span>
               <span style={{ fontWeight: '600' }}>{assess.wind_energy_prediction} MWh</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed rgba(255,255,255,0.05)', fontSize: '0.6875rem', gap: '2px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Wind Source:</span>
+                <span style={{ fontWeight: '600', color: env?.wind_data_source === 'Global Wind Atlas' ? 'var(--wind)' : 'var(--text-secondary)' }}>
+                  {env?.wind_data_source || 'Local Estimate'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                <span>Resource:</span>
+                <span style={{ fontWeight: '500', color: '#fff' }}>
+                  {env?.wind_resource ? env.wind_resource.replace('Derived Wind Resource Class: ', '') : 'Class 1 (Poor)'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Model Source:</span>
+                <span style={{ fontWeight: '500', color: assess.wind_model_source?.includes('Real') ? '#10b981' : 'var(--text-secondary)' }}>
+                  {assess.wind_model_source || 'Synthetic Fallback'}
+                </span>
+              </div>
             </div>
           </div>
         </div>

@@ -151,7 +151,7 @@ export default function App() {
   const fetchProjects = async () => {
     try {
       const res = await fetch(`${API_BASE}/projects`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       })
       if (res.ok) {
         const data = await res.json()
@@ -168,7 +168,7 @@ export default function App() {
   const fetchSites = async (projId) => {
     try {
       const res = await fetch(`${API_BASE}/sites?project_id=${projId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       })
       if (res.ok) {
         const data = await res.json()
@@ -182,7 +182,7 @@ export default function App() {
   const fetchInfrastructure = async () => {
     try {
       const res = await fetch(`${API_BASE}/infrastructure`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       })
       if (res.ok) {
         const data = await res.json()
@@ -196,7 +196,7 @@ export default function App() {
   const fetchNotifications = async () => {
     try {
       const res = await fetch(`${API_BASE}/notifications`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       })
       if (res.ok) {
         const data = await res.json()
@@ -214,7 +214,7 @@ export default function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
           project_name: newProjName,
@@ -244,7 +244,7 @@ export default function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
           project_id: activeProject.project_id,
@@ -278,7 +278,7 @@ export default function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify(newWeights)
       })
@@ -302,7 +302,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/notifications/${notifId}/read`, {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       })
       if (res.ok) {
         setNotifications(notifications.map(n => n.notification_id === notifId ? { ...n, is_read: true } : n))
@@ -479,10 +479,22 @@ export default function App() {
           </div>
 
           {/* Demo Mode Warn Badge */}
-          <div className="demo-banner">
-            <ShieldAlert size={18} />
-            <span>Active Demo Mode — Displaying Synthetic ML Predictor Yields</span>
-          </div>
+          {activeSite?.assessments?.[0]?.is_hybrid_mode ? (
+            <div className="demo-banner" style={{ background: 'rgba(245, 158, 11, 0.15)', borderColor: 'rgba(245, 158, 11, 0.3)', color: '#fcd34d' }}>
+              <ShieldAlert size={18} />
+              <span>Hybrid Mode — Real Wind ML / Synthetic Solar Fallback</span>
+            </div>
+          ) : activeSite?.assessments?.[0]?.is_synthetic === false ? (
+            <div className="demo-banner" style={{ background: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)', color: '#6ee7b7' }}>
+              <ShieldAlert size={18} />
+              <span>Production Mode — Real Historical ML Predictors</span>
+            </div>
+          ) : (
+            <div className="demo-banner">
+              <ShieldAlert size={18} />
+              <span>Active Demo Mode — Displaying Synthetic ML Predictor Yields</span>
+            </div>
+          )}
         </div>
 
         {/* Top Stats & Dashboard Widgets */}

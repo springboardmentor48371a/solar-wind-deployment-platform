@@ -99,6 +99,14 @@ class EnvironmentalDataResponse(EnvironmentalDataCreate):
     environment_id: UUID
     site_id: UUID
     collected_at: datetime
+    climate_data_source: str = "Local Estimate"
+    wind_power_density: float = 0.0
+    wind_resource: str = "Derived Wind Resource Class: Class 1 (Poor)"
+    wind_data_source: str = "Local Estimate"
+    infra_data_source: str = "Local Estimate"
+    elevation_data_source: str = "Local Estimate"
+    land_cover_data_source: str = "Local Estimate"
+    protected_area_data_source: str = "Local Estimate"
 
     class Config:
         from_attributes = True
@@ -121,6 +129,17 @@ class SiteAssessmentResponse(BaseModel):
     analysis_status: str
     analyzed_at: datetime
     is_synthetic: bool = True # Demo indicator
+    solar_model_source: str = "Synthetic Fallback"
+    wind_model_source: str = "Synthetic Fallback"
+    is_hybrid_mode: bool = False
+    climate_data_source: str = "Local Estimate"
+    wind_power_density: float = 0.0
+    wind_resource: str = "Derived Wind Resource Class: Class 1 (Poor)"
+    wind_data_source: str = "Local Estimate"
+    infra_data_source: str = "Local Estimate"
+    elevation_data_source: str = "Local Estimate"
+    land_cover_data_source: str = "Local Estimate"
+    protected_area_data_source: str = "Local Estimate"
 
     class Config:
         from_attributes = True
