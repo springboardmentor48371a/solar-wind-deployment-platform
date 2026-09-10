@@ -3,9 +3,10 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { 
   Sun, Wind, LogOut, CheckCircle2, User, Mail, 
-  Calculator, Activity, PlusCircle, History, Landmark, Compass, AlertTriangle, MapPin, Ruler
+  Calculator, Activity, PlusCircle, History, Landmark, Compass, AlertTriangle, MapPin, Ruler, FileText
 } from 'lucide-react';
 import { SiteMapPicker, type LocationData } from './SiteMapPicker';
+import { FeasibilityReportModal } from './FeasibilityReportModal';
 
 interface SiteAssessment {
   id: string;
@@ -68,6 +69,7 @@ export const PlatformDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [assessmentResult, setAssessmentResult] = useState<SiteAssessment | null>(null);
   const [historyList, setHistoryList] = useState<SiteAssessment[]>([]);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   // Coordinate presets for quick demonstration
   const presets = [
@@ -439,6 +441,16 @@ export const PlatformDashboard: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* Action Button: Generate Feasibility & Investment Report */}
+                      <button
+                        type="button"
+                        onClick={() => setIsReportOpen(true)}
+                        className="w-full py-2.5 px-4 rounded-xl bg-slate-950 border border-amber-500/40 hover:border-amber-400 hover:bg-amber-500/10 text-amber-300 font-bold text-xs transition-all flex items-center justify-center space-x-2 shadow-md"
+                      >
+                        <FileText className="w-4 h-4 text-amber-400" />
+                        <span>Generate Bankable Feasibility & Investment Report (PDF)</span>
+                      </button>
+
                       {/* Part 1: ML Model Predictions */}
                       <div>
                         <h4 className="text-amber-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center space-x-2">
@@ -710,6 +722,15 @@ export const PlatformDashboard: React.FC = () => {
         )}
 
       </main>
+
+      {/* Bankable Feasibility & Investment Report Modal */}
+      {assessmentResult && (
+        <FeasibilityReportModal
+          isOpen={isReportOpen}
+          onClose={() => setIsReportOpen(false)}
+          site={assessmentResult}
+        />
+      )}
 
       {/* Footer */}
       <footer className="border-t border-slate-800 py-6 text-center text-xs text-slate-500 font-medium z-10">

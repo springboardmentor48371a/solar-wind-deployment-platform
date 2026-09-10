@@ -32,9 +32,21 @@ y_train = np.array([
     [4.4, 3.8, 29.5, 55.0, 9.0, 0.2],   # Kolkata
 ])
 
-# Initialize and fit KNN regressor
-ml_predictor = KNeighborsRegressor(n_neighbors=2, weights='distance')
-ml_predictor.fit(X_train, y_train)
+import os
+import pickle
+
+# Load serialized trained model if available, otherwise fit in-memory fallback
+model_path = os.path.join(os.path.dirname(__file__), "..", "..", "models", "spatial_knn_model.pkl")
+if os.path.exists(model_path):
+    try:
+        with open(model_path, "rb") as f:
+            ml_predictor = pickle.load(f)
+    except Exception:
+        ml_predictor = KNeighborsRegressor(n_neighbors=2, weights='distance')
+        ml_predictor.fit(X_train, y_train)
+else:
+    ml_predictor = KNeighborsRegressor(n_neighbors=2, weights='distance')
+    ml_predictor.fit(X_train, y_train)
 
 def assess_site_suitability(
     user_id: str,
