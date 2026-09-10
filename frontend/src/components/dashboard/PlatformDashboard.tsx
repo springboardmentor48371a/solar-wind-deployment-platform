@@ -3,8 +3,9 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { 
   Sun, Wind, LogOut, CheckCircle2, User, Mail, 
-  Calculator, Activity, PlusCircle, History, Landmark, Compass, AlertTriangle
+  Calculator, Activity, PlusCircle, History, Landmark, Compass, AlertTriangle, MapPin, Ruler
 } from 'lucide-react';
+import { SiteMapPicker, type LocationData } from './SiteMapPicker';
 
 interface SiteAssessment {
   id: string;
@@ -38,13 +39,29 @@ export const PlatformDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<'assess' | 'settings'>('assess');
   
-  // Form States
-  const [name, setName] = useState('');
-  const [latitude, setLatitude] = useState('');
-  const [longitude, setLongitude] = useState('');
-  const [region, setRegion] = useState('');
-  const [landArea, setLandArea] = useState('');
+  // Form States - with sensible default candidate location
+  const [name, setName] = useState('Jaipur Solar & Wind Park Phase I');
+  const [latitude, setLatitude] = useState('26.9124');
+  const [longitude, setLongitude] = useState('75.7873');
+  const [region, setRegion] = useState('Rajasthan');
+  const [district, setDistrict] = useState('Jaipur District');
+  const [landArea, setLandArea] = useState('150000');
   const [landOwnership, setLandOwnership] = useState('Government Lease');
+
+  // Real-time Area & Spatial Geometry states
+  const [areaDimensions, setAreaDimensions] = useState<{
+    areaLengthM: number;
+    areaWidthM: number;
+    radiusM: number;
+    acres: number;
+    hectares: number;
+  }>({
+    areaLengthM: 387,
+    areaWidthM: 387,
+    radiusM: 219,
+    acres: 37.07,
+    hectares: 15.0,
+  });
   
   // Status States
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,19 +71,62 @@ export const PlatformDashboard: React.FC = () => {
 
   // Coordinate presets for quick demonstration
   const presets = [
-    { name: "Jaipur, Rajasthan", lat: 26.9124, lon: 75.7873, reg: "Rajasthan", area: 150000, own: "Government Lease" },
-    { name: "Kanyakumari Coast, TN", lat: 8.0883, lon: 77.5385, reg: "Tamil Nadu", area: 250000, own: "Government Lease" },
-    { name: "Leh Mountain, Ladakh", lat: 34.1526, lon: 77.5771, reg: "Ladakh", area: 180000, own: "Government Lease" },
-    { name: "Shillong Hills, Meghalaya", lat: 25.5788, lon: 91.8933, reg: "Meghalaya", area: 90000, own: "Private Purchase" }
+    { name: "Jaipur, Rajasthan", lat: 26.9124, lon: 75.7873, reg: "Rajasthan", district: "Jaipur District", area: 150000, own: "Government Lease" },
+    { name: "Kanyakumari Coast, TN", lat: 8.0883, lon: 77.5385, reg: "Tamil Nadu", district: "Kanyakumari District", area: 250000, own: "Government Lease" },
+    { name: "Leh Mountain, Ladakh", lat: 34.1526, lon: 77.5771, reg: "Ladakh", district: "Leh District", area: 180000, own: "Government Lease" },
+    { name: "Shillong Hills, Meghalaya", lat: 25.5788, lon: 91.8933, reg: "Meghalaya", district: "East Khasi Hills", area: 90000, own: "Private Purchase" }
   ];
 
   const applyPreset = (preset: typeof presets[0]) => {
-    setName(preset.name);
+    setName(`${preset.name} Renewable Project`);
     setLatitude(preset.lat.toString());
     setLongitude(preset.lon.toString());
     setRegion(preset.reg);
+    setDistrict(preset.district);
     setLandArea(preset.area.toString());
     setLandOwnership(preset.own);
+    const radiusM = Math.round(Math.sqrt(preset.area / Math.PI));
+    const sideM = Math.round(Math.sqrt(preset.area));
+    setAreaDimensions({
+      areaLengthM: sideM,
+      areaWidthM: sideM,
+      radiusM,
+      acres: parseFloat((preset.area * 0.000247105).toFixed(2)),
+      hectares: parseFloat((preset.area / 10000).toFixed(2)),
+    });
+  };
+
+  // Callback when user clicks or selects a point anywhere on the interactive GIS map
+  const handleMapLocationSelect = (loc: LocationData) => {
+    setLatitude(loc.lat.toString());
+    setLongitude(loc.lon.toString());
+    setRegion(loc.state);
+    setDistrict(loc.district);
+    setAreaDimensions({
+      areaLengthM: loc.areaLengthM,
+      areaWidthM: loc.areaWidthM,
+      radiusM: loc.radiusM,
+      acres: loc.acres,
+      hectares: loc.hectares,
+    });
+    // Auto-update project title if using standard naming
+    if (!name || name.includes('Solar') || name.includes('Wind') || name.includes('Project') || name.includes('Park')) {
+      setName(`${loc.district} Renewable Energy Site`);
+    }
+  };
+
+  // Callback when user modifies or clicks quick area presets
+  const handleAreaSelect = (newArea: number) => {
+    setLandArea(newArea.toString());
+    const radiusM = Math.round(Math.sqrt(newArea / Math.PI));
+    const sideM = Math.round(Math.sqrt(newArea));
+    setAreaDimensions({
+      areaLengthM: sideM,
+      areaWidthM: sideM,
+      radiusM,
+      acres: parseFloat((newArea * 0.000247105).toFixed(2)),
+      hectares: parseFloat((newArea / 10000).toFixed(2)),
+    });
   };
 
   const fetchHistory = async () => {
@@ -183,6 +243,15 @@ export const PlatformDashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* Interactive GIS Map & Site Dimension Explorer */}
+            <SiteMapPicker
+              latitude={latitude ? parseFloat(latitude) : null}
+              longitude={longitude ? parseFloat(longitude) : null}
+              landArea={landArea ? parseFloat(landArea) : 150000}
+              onLocationSelect={handleMapLocationSelect}
+              onAreaSelect={handleAreaSelect}
+            />
+
             {/* Assessment Dashboard Section */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
               
@@ -274,6 +343,28 @@ export const PlatformDashboard: React.FC = () => {
                         <option value="Private Purchase">Private Purchase</option>
                         <option value="Community Land">Community Land</option>
                       </select>
+                    </div>
+
+                    {/* Live GIS & Boundary Derived Metadata Card */}
+                    <div className="bg-slate-950/70 rounded-xl p-3 border border-slate-800/80 space-y-2 text-xs">
+                      <div className="flex items-center justify-between text-slate-400">
+                        <span className="font-semibold flex items-center space-x-1">
+                          <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Detected District:</span>
+                        </span>
+                        <span className="font-bold text-white truncate max-w-[200px]">{district}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-400 border-t border-slate-850 pt-1.5">
+                        <span className="font-semibold flex items-center space-x-1">
+                          <Ruler className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Estimated Plot Span:</span>
+                        </span>
+                        <span className="font-mono text-cyan-300 font-semibold">~{areaDimensions.areaLengthM}m × {areaDimensions.areaWidthM}m</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-400 border-t border-slate-850 pt-1.5">
+                        <span className="font-semibold">Equivalent Land Scale:</span>
+                        <span className="font-bold text-amber-300">{areaDimensions.acres} Acres ({areaDimensions.hectares} Ha)</span>
+                      </div>
                     </div>
 
                     {error && (

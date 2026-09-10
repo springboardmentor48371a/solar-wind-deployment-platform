@@ -37,8 +37,7 @@ def main():
         session = Session()
         
         users = session.query(User).all()
-        session.close()
-
+        
         print(f"\n[INFO] Total registered users: {len(users)}")
         print("\nRegistered Users Records:")
         print("-" * 80)
@@ -48,6 +47,23 @@ def main():
         for user in users:
             print(f"{str(user.id):<38} | {user.full_name:<20} | {user.email:<25}")
         print("-" * 80)
+
+        # 4. Retrieve and display assessed sites
+        if "sites" in tables:
+            from app.models.site import Site
+            sites = session.query(Site).all()
+            print(f"\n[INFO] Total assessed sites: {len(sites)}")
+            print("\nAssessed Sites Records:")
+            print("-" * 120)
+            print(f"{'Site Name':<25} | {'Coordinates (Lat, Lon)':<25} | {'Region':<15} | {'Score':<8} | {'Suitability':<12}")
+            print("-" * 120)
+            for s in sites:
+                coords = f"{s.latitude:.4f}, {s.longitude:.4f}"
+                score_str = f"{s.overall_score}%"
+                print(f"{s.name:<25} | {coords:<25} | {s.region:<15} | {score_str:<8} | {s.suitability_class:<12}")
+            print("-" * 120)
+
+        session.close()
         
     except Exception as e:
         print(f"\n[ERROR] Failed to query database: {e}")
