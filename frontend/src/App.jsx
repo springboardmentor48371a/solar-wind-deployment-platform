@@ -15,7 +15,8 @@ import {
   AlertCircle, 
   FolderPlus, 
   LogOut,
-  MapPin
+  MapPin,
+  Trash2
 } from 'lucide-react';
 import MapPickerModal from './components/MapPickerModal';
 
@@ -222,7 +223,7 @@ export default function App() {
   const handleLocationPickedFromMap = (locationData) => {
     setSiteLat(locationData.lat);
     setSiteLong(locationData.long);
-    setIsLiveMapOpen(false); // Automatically closes the map modal
+    setIsLiveMapOpen(false);
   };
 
   // Submit Handler for Adding Site under Currently Open Project
@@ -285,6 +286,23 @@ export default function App() {
     setIsAddSiteModalOpen(false);
   };
 
+  // Handler for Deleting a Site
+  const handleDeleteSite = async (e, siteId) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to remove this site?')) return;
+
+    try {
+      await fetch(`${API_BASE}/api/sites/${siteId}`, {
+        method: 'DELETE'
+      });
+    } catch (_) {}
+
+    setSites(prev => prev.filter(s => String(s.id) !== String(siteId)));
+    if (selectedSiteId === siteId) {
+      setSelectedSiteId(null);
+    }
+  };
+
   const handleCopyEmail = () => {
     if (loggedInUser?.email) {
       navigator.clipboard.writeText(loggedInUser.email);
@@ -316,10 +334,10 @@ export default function App() {
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
           <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/10 rounded-full filter blur-[100px] animate-pulse"></div>
           <div className="absolute top-1/3 -right-40 w-[30rem] h-[30rem] bg-sky-500/10 rounded-full filter blur-[120px] animate-pulse delay-1000"></div>
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-20"></div>
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-20"></div>
         </div>
 
-        {/* 1. Top Header */}
+        {/* Top Header */}
         <header className="bg-slate-900/90 border-b border-slate-800/80 backdrop-blur-xl px-8 py-3.5 flex items-center justify-between sticky top-0 z-30 shadow-lg shadow-slate-950/20 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-1.5 bg-emerald-500/10 text-emerald-400 p-2 rounded-2xl border border-emerald-500/20 shadow-inner">
@@ -553,10 +571,21 @@ export default function App() {
                               </div>
                             </div>
 
-                            <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-2.5">
                               <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                                 {site.suitability_score} / 10
                               </span>
+                              
+                              {/* Delete site button */}
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteSite(e, site.id)}
+                                title="Remove Site"
+                                className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+
                               <span className="text-slate-500 text-xs">
                                 {isSiteSelected ? '▲' : '▼'}
                               </span>
