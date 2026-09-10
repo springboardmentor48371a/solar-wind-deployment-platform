@@ -142,29 +142,49 @@ export const PlatformDashboard: React.FC = () => {
     fetchHistory();
   }, []);
 
-  const handleAssessSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeAssess = async () => {
     setError(null);
     setIsSubmitting(true);
     
     try {
+      const latVal = parseFloat(latitude);
+      const lonVal = parseFloat(longitude);
+      const areaVal = parseFloat(landArea);
+
+      if (isNaN(latVal) || isNaN(lonVal)) {
+        throw new Error("Please select valid coordinates on the map.");
+      }
+
       const payload = {
-        name,
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
-        region,
-        land_area: parseFloat(landArea),
-        land_ownership: landOwnership
+        name: name || `${district || 'Selected'} Renewable Energy Site`,
+        latitude: latVal,
+        longitude: lonVal,
+        region: region || "Candidate Region",
+        land_area: isNaN(areaVal) ? 150000 : areaVal,
+        land_ownership: landOwnership || "Government Lease"
       };
       
       const response = await api.post<SiteAssessment>('/api/sites/assess', payload);
       setAssessmentResult(response.data);
       fetchHistory(); // Refresh history table
+
+      // Smoothly scroll down to the Results panel beside the form
+      setTimeout(() => {
+        const resultsEl = document.getElementById('results-panel');
+        if (resultsEl) {
+          resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "An error occurred during site assessment.");
+      setError(err.response?.data?.detail || err.message || "An error occurred during site assessment.");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleAssessSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await executeAssess();
   };
 
   const getSuitabilityColor = (suitClass: string) => {
@@ -229,16 +249,11 @@ export const PlatformDashboard: React.FC = () => {
                 <Wind className="w-48 h-48 text-emerald-500" />
               </div>
               <div className="relative z-10">
-                <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/35 text-emerald-400 text-xs font-bold mb-4 shadow-sm">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Milestone 2 - Core Intelligence Module Active</span>
-                </div>
                 <h2 className="text-3xl font-extrabold text-white mb-2">
                   Solar & Wind Site Suitability Assessment
                 </h2>
                 <p className="text-slate-300 text-sm max-w-3xl leading-relaxed">
-                  Enter geographic coordinates below to run our **scikit-learn machine learning regressor models**. 
-                  The platform predicts weather, climate, and terrain features for the location, and then calculates deployment suitability rankings using our weighted math formula.
+                  Tap anywhere on the interactive GIS map or select a candidate location to evaluate solar and wind deployment suitability using our machine learning prediction pipeline and weighted scoring matrix.
                 </p>
               </div>
             </div>
@@ -250,6 +265,7 @@ export const PlatformDashboard: React.FC = () => {
               landArea={landArea ? parseFloat(landArea) : 150000}
               onLocationSelect={handleMapLocationSelect}
               onAreaSelect={handleAreaSelect}
+              onRunAssessment={executeAssess}
             />
 
             {/* Assessment Dashboard Section */}
@@ -293,56 +309,67 @@ export const PlatformDashboard: React.FC = () => {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Latitude</label>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Detected District</label>
                         <input
-                          type="number" step="any" required
-                          placeholder="e.g. 26.9124"
-                          value={latitude} onChange={(e) => setLatitude(e.target.value)}
-                          className="glass-input w-full px-3 py-2 text-sm"
+                          type="text" required
+                          placeholder="e.g. Tirupati"
+                          value={district} onChange={(e) => setDistrict(e.target.value)}
+                          className="glass-input w-full px-3 py-2 text-sm text-amber-300 font-semibold"
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Longitude</label>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Region / State</label>
                         <input
-                          type="number" step="any" required
-                          placeholder="e.g. 75.7873"
-                          value={longitude} onChange={(e) => setLongitude(e.target.value)}
-                          className="glass-input w-full px-3 py-2 text-sm"
+                          type="text" required
+                          placeholder="e.g. Andhra Pradesh"
+                          value={region} onChange={(e) => setRegion(e.target.value)}
+                          className="glass-input w-full px-3 py-2 text-sm text-emerald-300 font-semibold"
                         />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Region / State</label>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Latitude</label>
                         <input
-                          type="text" required
-                          placeholder="e.g. Rajasthan"
-                          value={region} onChange={(e) => setRegion(e.target.value)}
-                          className="glass-input w-full px-3 py-2 text-sm"
+                          type="number" step="any" required
+                          placeholder="e.g. 13.9319"
+                          value={latitude} onChange={(e) => setLatitude(e.target.value)}
+                          className="glass-input w-full px-3 py-2 text-sm font-mono"
                         />
                       </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Longitude</label>
+                        <input
+                          type="number" step="any" required
+                          placeholder="e.g. 79.5220"
+                          value={longitude} onChange={(e) => setLongitude(e.target.value)}
+                          className="glass-input w-full px-3 py-2 text-sm font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Land Area (m²)</label>
                         <input
                           type="number" required min="1"
                           placeholder="e.g. 150000"
-                          value={landArea} onChange={(e) => setLandArea(e.target.value)}
-                          className="glass-input w-full px-3 py-2 text-sm"
+                          value={landArea} onChange={(e) => handleAreaSelect(parseFloat(e.target.value) || 0)}
+                          className="glass-input w-full px-3 py-2 text-sm font-mono"
                         />
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Land Ownership</label>
-                      <select
-                        value={landOwnership} onChange={(e) => setLandOwnership(e.target.value)}
-                        className="glass-input w-full px-3 py-2 text-sm bg-slate-950"
-                      >
-                        <option value="Government Lease">Government Lease</option>
-                        <option value="Private Purchase">Private Purchase</option>
-                        <option value="Community Land">Community Land</option>
-                      </select>
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Land Ownership</label>
+                        <select
+                          value={landOwnership} onChange={(e) => setLandOwnership(e.target.value)}
+                          className="glass-input w-full px-3 py-2 text-sm bg-slate-950"
+                        >
+                          <option value="Government Lease">Government Lease</option>
+                          <option value="Private Purchase">Private Purchase</option>
+                          <option value="Community Land">Community Land</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Live GIS & Boundary Derived Metadata Card */}
@@ -388,16 +415,23 @@ export const PlatformDashboard: React.FC = () => {
 
               {/* Right Column: Results Display Panel (Grid size: 7) */}
               <div className="lg:col-span-7 flex flex-col">
-                <div className="glass-card rounded-2xl p-6 border border-slate-800 shadow-lg flex-1 flex flex-col justify-between">
+                <div id="results-panel" className="glass-card rounded-2xl p-6 border border-slate-800 shadow-lg flex-1 flex flex-col justify-between scroll-mt-24">
                   {assessmentResult ? (
                     <div className="space-y-6">
                       
                       {/* Overall Assessment Score Header */}
                       <div className="flex items-center justify-between border-b border-slate-800/60 pb-4">
                         <div>
-                          <h4 className="text-slate-400 text-xs font-bold uppercase tracking-wider">Overall Assessment</h4>
-                          <h3 className="text-2xl font-black text-white mt-0.5">{assessmentResult.name}</h3>
-                          <p className="text-xs text-slate-400 mt-0.5">Coordinates: Lat {assessmentResult.latitude}, Lon {assessmentResult.longitude}</p>
+                          <div className="flex items-center space-x-2">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              Assessed Location
+                            </span>
+                            <span className="text-xs text-slate-400">{assessmentResult.region}</span>
+                          </div>
+                          <h3 className="text-2xl font-black text-white mt-1">{assessmentResult.name}</h3>
+                          <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                            Coordinates: Lat {assessmentResult.latitude}°, Lon {assessmentResult.longitude}° | Area: {assessmentResult.land_area.toLocaleString()} m²
+                          </p>
                         </div>
                         <div className={`px-4 py-2 rounded-2xl border text-center ${getSuitabilityColor(assessmentResult.suitability_class)}`}>
                           <span className="text-2xl font-black block tracking-tight">{assessmentResult.overall_score}%</span>
@@ -507,14 +541,32 @@ export const PlatformDashboard: React.FC = () => {
 
                     </div>
                   ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                      <div className="p-4 rounded-full bg-slate-900 border border-slate-800 text-slate-500 mb-4 animate-pulse">
-                        <Compass className="w-12 h-12" />
+                    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-400 mb-4">
+                        <Compass className="w-10 h-10 animate-pulse" />
                       </div>
-                      <h4 className="text-lg font-bold text-white mb-2">No Site Selected</h4>
-                      <p className="text-slate-400 text-sm max-w-sm">
-                        Apply one of the geographic coordinates presets on the left or enter a custom coordinate, then click **Assess** to run the prediction pipeline.
+                      <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-amber-400 text-xs font-bold mb-2">
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>Selected Region Ready for Evaluation</span>
+                      </div>
+                      <h4 className="text-xl font-black text-white mb-1">
+                        {district ? `${district}, ${region}` : 'Candidate Site Location'}
+                      </h4>
+                      <p className="text-xs text-slate-400 font-mono mb-4">
+                        Lat: {latitude}°, Lon: {longitude}° | Scale: {parseInt(landArea || '150000').toLocaleString()} m² ({areaDimensions.acres} ac)
                       </p>
+                      <p className="text-xs text-slate-400 max-w-md leading-relaxed mb-6">
+                        Click the button below to run the <span className="text-amber-400 font-semibold">scikit-learn ML regressor models</span> on these coordinates and calculate the weighted suitability score for this specific region.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={executeAssess}
+                        disabled={isSubmitting}
+                        className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold text-sm transition-all shadow-lg flex items-center space-x-2 disabled:opacity-50"
+                      >
+                        <Calculator className="w-4 h-4" />
+                        <span>{isSubmitting ? 'Running ML Models...' : `Calculate Suitability Score for ${district || 'this site'}`}</span>
+                      </button>
                     </div>
                   )}
                 </div>
