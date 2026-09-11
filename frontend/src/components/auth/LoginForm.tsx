@@ -106,9 +106,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
       {/* Quick Role Demo Accounts (For Springboard Presentation) */}
       <div className="pt-2 border-t border-slate-800/80 mt-4">
         <span className="text-[11px] font-semibold text-slate-400 block mb-2 text-center">
-          1-Click Mentor Demo Role Logins:
+          1-Click Mentor Demo Logins (4 Platform Roles):
         </span>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => {
@@ -116,21 +116,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
               setPassword('Madurga@26');
               login({ email: 'admin@solarwind.ai', password: 'Madurga@26' });
             }}
-            className="px-2 py-1.5 rounded-lg bg-slate-900 border border-amber-500/40 hover:bg-amber-500/20 text-[11px] font-bold text-amber-300 transition-all text-center truncate"
+            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-rose-500/40 hover:bg-rose-500/20 text-[11px] font-bold text-rose-300 transition-all text-left truncate flex items-center justify-between"
           >
-            👑 Admin
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('gis.specialist@solarwind.ai');
-              setPassword('Madurga@26');
-              login({ email: 'gis.specialist@solarwind.ai', password: 'Madurga@26' });
-            }}
-            className="px-2 py-1.5 rounded-lg bg-slate-900 border border-emerald-500/40 hover:bg-emerald-500/20 text-[11px] font-bold text-emerald-300 transition-all text-center truncate"
-          >
-            🗺️ GIS Specialist
+            <span>👑 Admin</span>
+            <span className="text-[9px] font-normal opacity-75">Full Access</span>
           </button>
 
           <button
@@ -140,9 +129,36 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
               setPassword('Madurga@26');
               login({ email: 'planner@solarwind.ai', password: 'Madurga@26' });
             }}
-            className="px-2 py-1.5 rounded-lg bg-slate-900 border border-cyan-500/40 hover:bg-cyan-500/20 text-[11px] font-bold text-cyan-300 transition-all text-center truncate"
+            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-amber-500/40 hover:bg-amber-500/20 text-[11px] font-bold text-amber-300 transition-all text-left truncate flex items-center justify-between"
           >
-            ⚡ Energy Planner
+            <span>⚡ Energy Planner</span>
+            <span className="text-[9px] font-normal opacity-75">All Access</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('gis.specialist@solarwind.ai');
+              setPassword('Madurga@26');
+              login({ email: 'gis.specialist@solarwind.ai', password: 'Madurga@26' });
+            }}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-cyan-500/40 hover:bg-cyan-500/20 text-[11px] font-bold text-cyan-300 transition-all text-left truncate flex items-center justify-between"
+          >
+            <span>🗺️ GIS Specialist</span>
+            <span className="text-[9px] font-normal opacity-75">Spatial</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('financial.analyst@solarwind.ai');
+              setPassword('Madurga@26');
+              login({ email: 'financial.analyst@solarwind.ai', password: 'Madurga@26' });
+            }}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-emerald-500/40 hover:bg-emerald-500/20 text-[11px] font-bold text-emerald-300 transition-all text-left truncate flex items-center justify-between"
+          >
+            <span>📊 Financial Analyst</span>
+            <span className="text-[9px] font-normal opacity-75">Read-Only</span>
           </button>
         </div>
       </div>

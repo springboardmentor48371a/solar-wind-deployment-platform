@@ -226,11 +226,13 @@ export const PlatformDashboard: React.FC = () => {
             {/* User Role Badge */}
             <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-extrabold border border-slate-800 bg-slate-900 shadow-sm">
               {user?.role === 'admin' ? (
-                <span className="text-rose-400 flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-rose-500" /> Admin System View</span>
+                <span className="text-rose-400 flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-rose-500" /> System Admin</span>
+              ) : user?.role === 'financial_analyst' ? (
+                <span className="text-emerald-400 flex items-center gap-1.5"><Landmark className="w-3.5 h-3.5 text-emerald-500" /> Financial Analyst (Read-Only)</span>
               ) : user?.role === 'gis_analyst' ? (
                 <span className="text-cyan-400 flex items-center gap-1.5"><Compass className="w-3.5 h-3.5 text-cyan-500" /> GIS Specialist</span>
               ) : (
-                <span className="text-amber-400 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-amber-500" /> Energy Planner</span>
+                <span className="text-amber-400 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-amber-500" /> Energy Planner (Full Access)</span>
               )}
             </div>
 
@@ -264,7 +266,13 @@ export const PlatformDashboard: React.FC = () => {
               <div className="relative z-10">
                 <div className="flex items-center space-x-3 mb-2">
                   <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-amber-500/30 bg-amber-500/10 text-amber-400">
-                    {user?.role === 'admin' ? '👑 Admin Mode: Full System Access & Audit' : user?.role === 'gis_analyst' ? '🗺️ GIS Specialist Workstation (Spatial Canvas Active)' : '⚡ Energy Planner View'}
+                    {user?.role === 'admin' 
+                      ? '👑 Admin Mode: Full System Access & Audit' 
+                      : user?.role === 'financial_analyst'
+                      ? '📊 Financial Analyst Mode: Read-Only Financial Analysis & Investment Metrics'
+                      : user?.role === 'gis_analyst' 
+                      ? '🗺️ GIS Specialist Workstation (Spatial Canvas Active)' 
+                      : '⚡ Energy Planner Workspace: Complete System Access (Create & Analyze)'}
                   </span>
                 </div>
                 <h2 className="text-3xl font-extrabold text-white mb-2">
@@ -276,6 +284,17 @@ export const PlatformDashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* Financial Analyst Restricted Notice */}
+            {user?.role === 'financial_analyst' && (
+              <div className="mb-8 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center space-x-3 shadow-md">
+                <Landmark className="w-5 h-5 text-amber-400 shrink-0" />
+                <div>
+                  <span className="font-bold text-amber-300 block mb-0.5">Financial Analyst Access Scoping</span>
+                  <span>As a Financial Analyst, you have access to economic feasibility scores, LCOE modeling, ROI, and bankable reports. <strong>Project creation & site assessment form submissions are disabled for this role.</strong> Switch to Energy Planner for full project creation rights.</span>
+                </div>
+              </div>
+            )}
+
             {/* Interactive GIS Map & Site Dimension Explorer */}
             <SiteMapPicker
               latitude={latitude ? parseFloat(latitude) : null}
@@ -284,6 +303,7 @@ export const PlatformDashboard: React.FC = () => {
               onLocationSelect={handleMapLocationSelect}
               onAreaSelect={handleAreaSelect}
               onRunAssessment={executeAssess}
+              isReadOnly={user?.role === 'financial_analyst'}
             />
 
             {/* Assessment Dashboard Section */}
@@ -421,11 +441,21 @@ export const PlatformDashboard: React.FC = () => {
 
                     <button
                       type="submit"
-                      disabled={isSubmitting}
-                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-sm transition-all shadow-md flex items-center justify-center space-x-2 disabled:opacity-50"
+                      disabled={isSubmitting || user?.role === 'financial_analyst'}
+                      className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all shadow-md flex items-center justify-center space-x-2 ${
+                        user?.role === 'financial_analyst'
+                          ? 'bg-slate-800 text-slate-400 border border-slate-700 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950'
+                      }`}
                     >
                       <Calculator className="w-4 h-4" />
-                      <span>{isSubmitting ? 'Running ML Models...' : 'Run AI Suitability Assessment'}</span>
+                      <span>
+                        {user?.role === 'financial_analyst'
+                          ? '🔒 Project Creation Disabled (Financial Analyst Role)'
+                          : isSubmitting
+                          ? 'Running ML Models...'
+                          : 'Run AI Suitability Assessment'}
+                      </span>
                     </button>
                   </form>
                 </div>
@@ -791,8 +821,19 @@ export const PlatformDashboard: React.FC = () => {
                           <Activity className="w-4 h-4" /> Energy Planner
                         </td>
                         <td className="py-3.5 px-4 font-mono">planner@solarwind.ai</td>
-                        <td className="py-3.5 px-4">Feasibility Analyst (Scoring & Financial Reports)</td>
-                        <td className="py-3.5 px-4">Standard Site Assessment</td>
+                        <td className="py-3.5 px-4">Master Operational Role (Full Platform Access)</td>
+                        <td className="py-3.5 px-4">Full Spatial & Site Assessment Rights</td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">Active</span>
+                        </td>
+                      </tr>
+                      <tr className="bg-emerald-950/10">
+                        <td className="py-3.5 px-4 font-bold text-emerald-400 flex items-center gap-1.5">
+                          <Landmark className="w-4 h-4" /> Financial Analyst
+                        </td>
+                        <td className="py-3.5 px-4 font-mono">financial.analyst@solarwind.ai</td>
+                        <td className="py-3.5 px-4">Financial Analyst (Read-Only Financial Metrics & LCOE)</td>
+                        <td className="py-3.5 px-4">Read-Only (Project Creation Disabled)</td>
                         <td className="py-3.5 px-4 text-center">
                           <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">Active</span>
                         </td>

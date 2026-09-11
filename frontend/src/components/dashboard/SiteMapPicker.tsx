@@ -24,6 +24,7 @@ interface SiteMapPickerProps {
   onLocationSelect: (data: LocationData) => void;
   onAreaSelect?: (areaM2: number) => void;
   onRunAssessment?: () => void;
+  isReadOnly?: boolean;
 }
 
 // Fast geographical state and district heuristic fallback for immediate responsiveness
@@ -143,6 +144,7 @@ export const SiteMapPicker: React.FC<SiteMapPickerProps> = ({
   onLocationSelect,
   onAreaSelect,
   onRunAssessment,
+  isReadOnly = false,
 }) => {
   const initialPos: [number, number] = latitude && longitude ? [latitude, longitude] : [26.9124, 75.7873]; // Jaipur fallback
 
@@ -451,11 +453,16 @@ export const SiteMapPicker: React.FC<SiteMapPickerProps> = ({
                 {onRunAssessment && (
                   <button
                     type="button"
-                    onClick={onRunAssessment}
-                    className="mt-2 w-full py-1.5 px-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-[11px] rounded-lg shadow transition-all flex items-center justify-center space-x-1"
+                    onClick={isReadOnly ? undefined : onRunAssessment}
+                    disabled={isReadOnly}
+                    className={`mt-2 w-full py-1.5 px-2 font-bold text-[11px] rounded-lg shadow transition-all flex items-center justify-center space-x-1 ${
+                      isReadOnly
+                        ? 'bg-slate-800 text-slate-400 border border-slate-700 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950'
+                    }`}
                   >
-                    <Zap className="w-3 h-3 fill-slate-950" />
-                    <span>Run AI Assessment for this Site</span>
+                    <Zap className="w-3 h-3 fill-current" />
+                    <span>{isReadOnly ? '🔒 Project Creation Disabled (Financial Analyst)' : 'Run AI Assessment for this Site'}</span>
                   </button>
                 )}
               </div>

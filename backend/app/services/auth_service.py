@@ -15,6 +15,10 @@ def create_user(db: Session, user_in: UserRegister) -> User:
     user_role = getattr(user_in, 'role', None) or "gis_analyst"
     if "admin" in user_in.email.lower():
         user_role = "admin"
+    elif "planner" in user_in.email.lower():
+        user_role = "energy_planner"
+    elif "financial" in user_in.email.lower():
+        user_role = "financial_analyst"
 
     db_user = User(
         full_name=user_in.full_name.strip(),
@@ -32,7 +36,7 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     user = get_user_by_email(db, email_clean)
 
     # Auto-seed preset role accounts on demand if first login attempt
-    if not user and (password in ["Madurga@26", "SecretPassword123"] or "admin" in email_clean or "gis" in email_clean):
+    if not user and (password in ["Madurga@26", "SecretPassword123"] or "admin" in email_clean or "gis" in email_clean or "planner" in email_clean or "financial" in email_clean):
         if "admin" in email_clean:
             user_in = UserRegister(full_name="System Administrator", email=email_clean, password=password, role="admin")
             return create_user(db, user_in)
@@ -40,7 +44,10 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
             user_in = UserRegister(full_name="GIS Spatial Engineer", email=email_clean, password=password, role="gis_analyst")
             return create_user(db, user_in)
         elif "planner" in email_clean:
-            user_in = UserRegister(full_name="Renewable Energy Planner", email=email_clean, password=password, role="planner")
+            user_in = UserRegister(full_name="Renewable Energy Planner", email=email_clean, password=password, role="energy_planner")
+            return create_user(db, user_in)
+        elif "financial" in email_clean:
+            user_in = UserRegister(full_name="Financial Analyst", email=email_clean, password=password, role="financial_analyst")
             return create_user(db, user_in)
 
     if not user:
