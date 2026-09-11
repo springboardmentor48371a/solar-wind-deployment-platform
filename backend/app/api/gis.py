@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.models.user import SessionLocal, User, UserRole
 from app.models.project_site import Site
-from app.api.auth import get_current_user, require_roles
+from app.api.auth import require_roles
 from app.core.osm_service import scan_osm_infrastructure
 
 router = APIRouter(prefix="/gis", tags=["Module 4: Geographic Intelligence & Spatial Analysis"])
@@ -14,41 +14,40 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/proximity-preview")
-async def preview_infrastructure_proximity(
-    latitude: float,
-    longitude: float,
-    current_user: User = Depends(get_current_user)
-):
-    """Preview distances to substations, transmission corridors, and roads using OpenStreetMap."""
-    data = await scan_osm_infrastructure(latitude, longitude)
-    return data
-
 @router.post("/scan/{site_id}")
-async def scan_and_update_site_gis(
+async def run_osm_spatial_scan(
     site_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles([
+        UserRole.PLANNER.value,
         UserRole.GIS_ANALYST.value,
         UserRole.ADMIN.value
     ]))
 ):
     """
-    Scans OpenStreetMap around the site's coordinates and updates its
-    existing infrastructure summary in the database.
+    Module 4: Executes Overpass spatial proximity analysis for a candidate site.
+    Computes distances to grid substations, transmission lines, access roads,
+    and protected buffer zones, then updates the site record.
     """
     site = db.query(Site).filter(Site.id == site_id).first()
     if not site:
-        raise HTTPException(status_code=404, detail="Site not found")
+        raise HTTPException(status_code=404, detail="Candidate site not found")
 
-    gis_data = await scan_osm_infrastructure(site.latitude, site.longitude)
+    spatial_data = await scan_osm_infrastructure(site.latitude, site.longitude)
 
-    site.existing_infrastructure = gis_data["infrastructure_summary"]
+    # Persist the infrastructure analysis directly to the site model
+    site.existing_infrastructure = (
+        f"Substation: {spatial_data['substation_dist_km']} km | "
+        f"Line: {spatial_data['transmission_line_dist_km']} km | "
+        f"Road: {spatial_data['access_road_dist_km']} km | "
+        f"Risk: {spatial_data['interconnect_risk']}"
+    )
+
     db.commit()
     db.refresh(site)
 
     return {
-        "message": f"OSM infrastructure scan completed for '{site.site_name}'",
+        "message": f"Spatial analysis completed for '{site.site_name}'",
         "site": site,
-        "spatial_analytics": gis_data
+        "spatial_analytics": spatial_data
     }

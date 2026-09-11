@@ -346,6 +346,60 @@ export default function App() {
     }
   };
 
+  // Module 5: Solar Potential ML Predictor
+  const handlePredictSolar = async (siteId) => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_BASE_URL}/solar/predict/${siteId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Solar ML prediction failed");
+
+      setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
+      alert(
+        `☀️ ${data.message}\n` +
+        `• Capacity Factor (Derated): ${data.solar_analytics.predicted_capacity_factor}%\n` +
+        `• Annual Yield: ${data.solar_analytics.annual_yield_gwh} GWh\n` +
+        `• Installable Capacity: ${data.solar_analytics.installable_capacity_mw} MW\n` +
+        `• Cell Operating Temp: ${data.solar_analytics.t_cell_celsius}°C\n` +
+        `• Thermal Derate Loss: -${data.solar_analytics.temp_derate_loss_pct}%\n` +
+        `• Performance Ratio (PR): ${data.solar_analytics.performance_ratio_pct}%\n` +
+        `• Model: ${data.solar_analytics.model_type}`
+      );
+    } catch (err) {
+      alert(`Solar ML Failed: ${err.message}`);
+    }
+  };
+
+  // Module 6: Wind Potential Predictor
+  const handlePredictWind = async (siteId) => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_BASE_URL}/wind/predict/${siteId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Wind prediction failed");
+
+      setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
+      alert(
+        `💨 ${data.message}\n` +
+        `• 50m Wind Speed: ${data.wind_analytics.wind_speed_50m} m/s\n` +
+        `• 100m Hub Speed: ${data.wind_analytics.wind_speed_100m} m/s\n` +
+        `• Wind Power Density: ${data.wind_analytics.wind_power_density_w_m2} W/m²\n` +
+        `• Capacity Factor: ${data.wind_analytics.predicted_capacity_factor}%\n` +
+        `• Annual Wind Yield: ${data.wind_analytics.annual_yield_gwh} GWh\n` +
+        `• Turbulence Intensity: ${data.wind_analytics.turbulence_intensity_pct}%\n` +
+        `• Turbine Class: ${data.wind_analytics.turbine_class}`
+      );
+    } catch (err) {
+      alert(`Wind Prediction Failed: ${err.message}`);
+    }
+  };
+
   const toggleSiteSelection = (siteId) => {
     setSelectedSiteIds(prev =>
       prev.includes(siteId) ? prev.filter(id => id !== siteId) : [...prev, siteId]
@@ -512,7 +566,7 @@ export default function App() {
             🛡️ Platform Security & User Governance
           </h3>
           <p style={{ color: '#94a3b8', fontSize: '13px', margin: '0 0 24px 0' }}>
-            Live directory of registered users, RBAC roles, and infrastructure status[cite: 1].
+            Live directory of registered users, RBAC roles, and infrastructure status.
           </p>
 
           <div style={{ background: '#0d1526', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px' }}>
@@ -721,6 +775,46 @@ export default function App() {
                                 }}
                               >
                                 🗺️ Scan OSM Grid
+                              </button>
+                            )}
+
+                            {/* MODULE 5: SOLAR MACHINE LEARNING PREDICTOR */}
+                            {canAddSite && (
+                              <button
+                                onClick={() => handlePredictSolar(site.id)}
+                                title="Execute Module 5 Random Forest ML yield and thermal derating model"
+                                style={{
+                                  padding: '6px 12px',
+                                  background: 'linear-gradient(to right, #d97706, #f59e0b)',
+                                  color: '#000',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                ☀️ Predict Solar ML
+                              </button>
+                            )}
+
+                            {/* MODULE 6: WIND POTENTIAL PREDICTOR */}
+                            {canAddSite && (
+                              <button
+                                onClick={() => handlePredictWind(site.id)}
+                                title="Execute Module 6 hub-height wind shear and power density estimation model"
+                                style={{
+                                  padding: '6px 12px',
+                                  background: 'linear-gradient(to right, #0284c7, #38bdf8)',
+                                  color: '#000',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                💨 Predict Wind
                               </button>
                             )}
 

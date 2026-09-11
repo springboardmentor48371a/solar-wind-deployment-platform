@@ -6,11 +6,16 @@ from app.api.auth import router as auth_router
 from app.api.projects import router as projects_router
 from app.api.environmental import router as environmental_router
 from app.api.gis import router as gis_router
+from app.api.solar import router as solar_router
+from app.api.wind import router as wind_router
 
-# Ensure all database tables exist
+# Ensure all database tables exist (users, projects, sites)
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Solar & Wind Deployment Intelligence Platform API")
+app = FastAPI(
+    title="Solar & Wind Deployment Intelligence Platform API",
+    version="1.0.0"
+)
 
 # Explicit CORS configuration to guarantee all headers and preflight (OPTIONS) requests pass
 origins = [
@@ -23,7 +28,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex="http://(localhost|127\\.0\\.0\\.1)(:\\d+)?",
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
@@ -35,7 +40,20 @@ app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(environmental_router)
 app.include_router(gis_router)
+app.include_router(solar_router)
+app.include_router(wind_router)
 
 @app.get("/")
 def health_check():
-    return {"status": "online", "message": "Solar & Wind Intelligence API Gateway"}
+    return {
+        "status": "online",
+        "message": "Solar & Wind Intelligence API Gateway",
+        "modules_active": [
+            "Auth & RBAC",
+            "Projects & Sites",
+            "Environmental Engine",
+            "GIS Intelligence",
+            "Solar ML Prediction",
+            "Wind Resource Prediction"
+        ]
+    }

@@ -20,7 +20,7 @@ async def preview_environmental_data(
     longitude: float,
     current_user: User = Depends(get_current_user)
 ):
-    """Preview live NASA POWER climate and solar variables for any coordinate."""
+    """Preview live NASA POWER, SRTM DEM slope, and Sentinel NDVI data."""
     data = await fetch_nasa_environmental_data(latitude, longitude)
     return data
 
@@ -35,19 +35,23 @@ async def sync_site_environmental_data(
     ]))
 ):
     """
-    Fetches real NASA POWER irradiance and weather data for the site's GPS coordinates,
-    and updates the site's database record.
+    Fetches full environmental telemetry (NASA POWER + SRTM DEM + Sentinel-2)
+    and updates the site database record.
     """
     site = db.query(Site).filter(Site.id == site_id).first()
     if not site:
-        raise HTTPException(status_code=404, detail="Site not found")
+        raise HTTPException(status_code=404, detail="Site not found in database")
 
     env_data = await fetch_nasa_environmental_data(site.latitude, site.longitude)
 
+    # Update database columns with Module 3 metrics
     site.solar_ghi = env_data["solar_ghi"]
     site.avg_temp = env_data["avg_temp"]
     site.rainfall_mm = env_data["rainfall_mm"]
     site.cloud_cover_pct = env_data["cloud_cover_pct"]
+    site.elevation_m = env_data["elevation_m"]
+    site.slope_deg = env_data["slope_deg"]
+    site.vegetation_ndvi = env_data["vegetation_ndvi"]
     site.capacity_factor = env_data["capacity_factor"]
     site.est_yield_gwh = env_data["est_yield_gwh"]
 
@@ -55,7 +59,7 @@ async def sync_site_environmental_data(
     db.refresh(site)
 
     return {
-        "message": f"Successfully synchronized site '{site.site_name}' with NASA POWER API",
+        "message": f"Successfully synchronized all Module 3 environmental indicators for '{site.site_name}'",
         "site": site,
         "telemetry": env_data
     }
