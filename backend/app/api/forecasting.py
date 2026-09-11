@@ -19,9 +19,10 @@ def optimize_site_deployment(
     site_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles([
-        UserRole.PLANNER.value,
+       UserRole.PLANNER.value,
         UserRole.PROJECT_MANAGER.value,
-        UserRole.ADMIN.value
+        UserRole.ADMIN.value,
+        UserRole.GIS_ANALYST.value  # <--- Added GIS Analyst
     ]))
 ):
     site = db.query(Site).filter(Site.id == site_id).first()

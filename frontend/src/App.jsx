@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, Legend, BarChart, Bar, CartesianGrid
+} from 'recharts';
 
-// Fix default Leaflet icon paths
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -35,70 +41,46 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Admin Data
   const [adminUserList, setAdminUserList] = useState([]);
-
-  // Projects & Sites Data
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [sites, setSites] = useState([]);
 
-  // Selection & Comparison Engine State
+  // NEW: Store feature output results to display as inline cards instead of alerts
+  const [featureResults, setFeatureResults] = useState({});
+
   const [selectedSiteIds, setSelectedSiteIds] = useState([]);
   const [comparisonSites, setComparisonSites] = useState([]);
   const [showComparisonModal, setShowComparisonModal] = useState(false);
 
-  // Modals
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showSiteModal, setShowSiteModal] = useState(false);
   const [showGisEditModal, setShowGisEditModal] = useState(false);
   const [activeSiteForGis, setActiveSiteForGis] = useState(null);
   const [showMapModal, setShowMapModal] = useState(false);
+  
+  const [analyticsSite, setAnalyticsSite] = useState(null);
 
-  // Forms
   const [newProject, setNewProject] = useState({
-    name: '',
-    description: '',
-    target_capacity_mw: 150,
-    region: 'Rajasthan',
-    status: 'Active',
-    timeline_cod: 'Q3 2027'
+    name: '', description: '', target_capacity_mw: 150, region: 'Rajasthan', status: 'Active', timeline_cod: 'Q3 2027'
   });
 
   const [newSite, setNewSite] = useState({
-    site_name: '',
-    latitude: 27.0234,
-    longitude: 71.8741,
-    elevation_m: 210,
-    land_area_sqkm: 12.5,
-    region: 'Rajasthan',
-    land_ownership: 'Government Lease',
-    existing_infrastructure: '400kV corridor within 4km'
+    site_name: '', latitude: 27.0234, longitude: 71.8741, elevation_m: 210, land_area_sqkm: 12.5, region: 'Rajasthan', land_ownership: 'Government Lease', existing_infrastructure: '400kV corridor within 4km'
   });
 
   const [gisForm, setGisForm] = useState({
-    latitude: 0,
-    longitude: 0,
-    elevation_m: 0,
-    slope_deg: 0,
-    vegetation_ndvi: 0,
-    solar_ghi: 0,
-    avg_temp: 0
+    latitude: 0, longitude: 0, elevation_m: 0, slope_deg: 0, vegetation_ndvi: 0, solar_ghi: 0, avg_temp: 0
   });
 
   const [authData, setAuthData] = useState({
-    email: 'planner@energygrid.gov',
-    password: 'planner123',
-    full_name: 'Elena Rostova',
-    role: ROLES[0]
+    email: 'planner@energygrid.gov', password: 'planner123', full_name: 'Elena Rostova', role: ROLES[0]
   });
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      fetch(`${API_BASE_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      fetch(`${API_BASE_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
         .then(res => res.ok ? res.json() : Promise.reject())
         .then(userData => {
           setUser(userData);
@@ -117,21 +99,15 @@ export default function App() {
 
   const fetchAdminUsers = async (token) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/users`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/auth/users`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (Array.isArray(data)) setAdminUserList(data);
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const fetchProjects = async (token) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/projects/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/projects/`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         setProjects(data);
@@ -141,22 +117,16 @@ export default function App() {
       } else {
         setProjects([]);
       }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const fetchSitesForProject = async (projectId, token) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/projects/sites?project_id=${projectId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/projects/sites?project_id=${projectId}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       setSites(Array.isArray(data) ? data : []);
       setSelectedSiteIds([]);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleSelectProject = (id) => {
@@ -170,17 +140,10 @@ export default function App() {
     const token = localStorage.getItem('token');
     try {
       const payload = {
-        name: newProject.name.trim(),
-        description: newProject.description || "Renewable project portfolio",
-        target_capacity_mw: parseFloat(newProject.target_capacity_mw) || 100.0,
-        region: newProject.region.trim() || "Rajasthan",
-        status: newProject.status || "Active",
-        timeline_cod: newProject.timeline_cod || "Q3 2027"
+        name: newProject.name.trim(), description: newProject.description || "Renewable project portfolio", target_capacity_mw: parseFloat(newProject.target_capacity_mw) || 100.0, region: newProject.region.trim() || "Rajasthan", status: newProject.status || "Active", timeline_cod: newProject.timeline_cod || "Q3 2027"
       };
       const res = await fetch(`${API_BASE_URL}/projects`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload)
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error("Failed to create project");
       const created = await res.json();
@@ -189,9 +152,7 @@ export default function App() {
       fetchSitesForProject(created.id, token);
       setShowProjectModal(false);
       setNewProject({ name: '', description: '', target_capacity_mw: 150, region: 'Rajasthan', status: 'Active', timeline_cod: 'Q3 2027' });
-    } catch (err) {
-      alert(err.message);
-    }
+    } catch (err) { alert(err.message); }
   };
 
   const handleDeleteProject = async (e, projectId) => {
@@ -199,10 +160,7 @@ export default function App() {
     if (!window.confirm("Delete this project and all associated sites?")) return;
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/projects/${projectId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("Deletion failed");
       const remaining = projects.filter(p => p.id !== projectId);
       setProjects(remaining);
@@ -212,9 +170,7 @@ export default function App() {
         if (nextId) fetchSitesForProject(nextId, token);
         else setSites([]);
       }
-    } catch (err) {
-      alert(err.message);
-    }
+    } catch (err) { alert(err.message); }
   };
 
   const handleCreateSite = async (e) => {
@@ -223,42 +179,28 @@ export default function App() {
     const token = localStorage.getItem('token');
     try {
       const payload = {
-        ...newSite,
-        project_id: selectedProjectId,
-        latitude: parseFloat(newSite.latitude),
-        longitude: parseFloat(newSite.longitude),
-        elevation_m: parseFloat(newSite.elevation_m),
-        land_area_sqkm: parseFloat(newSite.land_area_sqkm)
+        ...newSite, project_id: selectedProjectId, latitude: parseFloat(newSite.latitude), longitude: parseFloat(newSite.longitude), elevation_m: parseFloat(newSite.elevation_m), land_area_sqkm: parseFloat(newSite.land_area_sqkm)
       };
       const res = await fetch(`${API_BASE_URL}/projects/sites`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload)
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error("Failed to register site");
       const created = await res.json();
       setSites(prev => [...prev, created]);
       setShowSiteModal(false);
       fetchProjects(token);
-    } catch (err) {
-      alert(err.message);
-    }
+    } catch (err) { alert(err.message); }
   };
 
   const handleDeleteSite = async (siteId) => {
     if (!window.confirm("Are you sure you want to delete this candidate site?")) return;
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_BASE_URL}/projects/sites/${siteId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/projects/sites/${siteId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("Failed to delete site");
       setSites(prev => prev.filter(s => s.id !== siteId));
       setSelectedSiteIds(prev => prev.filter(id => id !== siteId));
-    } catch (err) {
-      alert(err.message);
-    }
+    } catch (err) { alert(err.message); }
   };
 
   const handleSaveGis = async (e) => {
@@ -266,25 +208,16 @@ export default function App() {
     const token = localStorage.getItem('token');
     try {
       const res = await fetch(`${API_BASE_URL}/projects/sites/${activeSiteForGis.id}/gis-data`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          latitude: parseFloat(gisForm.latitude),
-          longitude: parseFloat(gisForm.longitude),
-          elevation_m: parseFloat(gisForm.elevation_m),
-          slope_deg: parseFloat(gisForm.slope_deg),
-          vegetation_ndvi: parseFloat(gisForm.vegetation_ndvi),
-          solar_ghi: parseFloat(gisForm.solar_ghi),
-          avg_temp: parseFloat(gisForm.avg_temp)
+          latitude: parseFloat(gisForm.latitude), longitude: parseFloat(gisForm.longitude), elevation_m: parseFloat(gisForm.elevation_m), slope_deg: parseFloat(gisForm.slope_deg), vegetation_ndvi: parseFloat(gisForm.vegetation_ndvi), solar_ghi: parseFloat(gisForm.solar_ghi), avg_temp: parseFloat(gisForm.avg_temp)
         })
       });
       if (!res.ok) throw new Error("Failed to update GIS data");
       const updated = await res.json();
       setSites(prev => prev.map(s => s.id === updated.id ? updated : s));
       setShowGisEditModal(false);
-    } catch (err) {
-      alert(err.message);
-    }
+    } catch (err) { alert(err.message); }
   };
 
   const handleToggleApproval = async (site) => {
@@ -292,232 +225,224 @@ export default function App() {
     const newStatus = !site.is_approved;
     try {
       const res = await fetch(`${API_BASE_URL}/projects/sites/${site.id}/approval`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          is_approved: newStatus,
-          is_shortlisted: true,
-          approval_notes: newStatus
-            ? "Approved for Phase 1 construction by Project Manager"
-            : "Approval revoked by Project Manager"
+          is_approved: newStatus, is_shortlisted: true, approval_notes: newStatus ? "Approved for Phase 1 construction by Project Manager" : "Approval revoked by Project Manager"
         })
       });
       if (!res.ok) throw new Error("Approval update failed");
       const updated = await res.json();
       setSites(prev => prev.map(s => s.id === updated.id ? updated : s));
-    } catch (err) {
-      alert(err.message);
-    }
+    } catch (err) { alert(err.message); }
   };
 
-  // Module 3: NASA POWER Climate Sync
+  // =========================================================
+  // ACTIONS: ALL ALERTS REPLACED WITH INLINE CARD STATE
+  // =========================================================
   const handleSyncNasa = async (siteId) => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_BASE_URL}/environmental/sync/${siteId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/environmental/sync/${siteId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "NASA sync failed");
-
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
-      alert(`🛰️ ${data.message}\n• Solar GHI: ${data.telemetry.solar_ghi} kWh/m²\n• Avg Temp: ${data.telemetry.avg_temp}°C\n• Rainfall: ${data.telemetry.rainfall_mm} mm\n• Cloud Cover: ${data.telemetry.cloud_cover_pct}%`);
-    } catch (err) {
-      alert(`NASA Sync Failed: ${err.message}`);
-    }
+      
+      // Update inline card state instead of alert
+      setFeatureResults(prev => ({
+        ...prev, [siteId]: { ...prev[siteId], nasa: { message: data.message, details: data.telemetry } }
+      }));
+    } catch (err) { alert(`NASA Sync Failed: ${err.message}`); }
   };
 
-  // Module 4: OpenStreetMap Spatial Proximity Scan
   const handleScanOsm = async (siteId) => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_BASE_URL}/gis/scan/${siteId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/gis/scan/${siteId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "OSM Scan failed");
-
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
-      alert(`🗺️ ${data.message}\n• Substation: ${data.spatial_analytics.substation_dist_km} km\n• Transmission Line: ${data.spatial_analytics.transmission_line_dist_km} km\n• Access Road: ${data.spatial_analytics.access_road_dist_km} km\n• Risk Index: ${data.spatial_analytics.interconnect_risk}`);
-    } catch (err) {
-      alert(`OSM Scan Failed: ${err.message}`);
-    }
+      
+      // Update inline card state instead of alert
+      setFeatureResults(prev => ({
+        ...prev, [siteId]: { ...prev[siteId], osm: { message: data.message, details: data.spatial_analytics } }
+      }));
+    } catch (err) { alert(`OSM Scan Failed: ${err.message}`); }
   };
 
-  // Module 5: Solar Potential ML Predictor
   const handlePredictSolar = async (siteId) => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_BASE_URL}/solar/predict/${siteId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/solar/predict/${siteId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Solar ML prediction failed");
-
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
-      alert(
-        `☀️ ${data.message}\n` +
-        `• Capacity Factor (Derated): ${data.solar_analytics.predicted_capacity_factor}%\n` +
-        `• Annual Yield: ${data.solar_analytics.annual_yield_gwh} GWh\n` +
-        `• Installable Capacity: ${data.solar_analytics.installable_capacity_mw} MW\n` +
-        `• Cell Operating Temp: ${data.solar_analytics.t_cell_celsius}°C\n` +
-        `• Thermal Derate Loss: -${data.solar_analytics.temp_derate_loss_pct}%\n` +
-        `• Performance Ratio (PR): ${data.solar_analytics.performance_ratio_pct}%\n` +
-        `• Model: ${data.solar_analytics.model_type}`
-      );
-    } catch (err) {
-      alert(`Solar ML Failed: ${err.message}`);
-    }
+      
+      // Update inline card state instead of alert
+      setFeatureResults(prev => ({
+        ...prev, [siteId]: { ...prev[siteId], solar: { message: data.message, details: data.solar_analytics } }
+      }));
+    } catch (err) { alert(`Solar ML Failed: ${err.message}`); }
   };
 
-  // Module 6: Wind Potential Predictor
   const handlePredictWind = async (siteId) => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_BASE_URL}/wind/predict/${siteId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/wind/predict/${siteId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Wind prediction failed");
-
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
-      alert(
-        `💨 ${data.message}\n` +
-        `• 50m Wind Speed: ${data.wind_analytics.wind_speed_50m} m/s\n` +
-        `• 100m Hub Speed: ${data.wind_analytics.wind_speed_100m} m/s\n` +
-        `• Wind Power Density: ${data.wind_analytics.wind_power_density_w_m2} W/m²\n` +
-        `• Capacity Factor: ${data.wind_analytics.predicted_capacity_factor}%\n` +
-        `• Annual Wind Yield: ${data.wind_analytics.annual_yield_gwh} GWh\n` +
-        `• Turbulence Intensity: ${data.wind_analytics.turbulence_intensity_pct}%\n` +
-        `• Turbine Class: ${data.wind_analytics.turbine_class}`
-      );
-    } catch (err) {
-      alert(`Wind Prediction Failed: ${err.message}`);
-    }
+      
+      // Update inline card state instead of alert
+      setFeatureResults(prev => ({
+        ...prev, [siteId]: { ...prev[siteId], wind: { message: data.message, details: data.wind_analytics } }
+      }));
+    } catch (err) { alert(`Wind Prediction Failed: ${err.message}`); }
   };
 
-  // Module 7 & 10: Site Suitability & Scoring Engine
   const handleCalculateSuitability = async (siteId) => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_BASE_URL}/suitability/score/${siteId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/suitability/score/${siteId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Suitability scoring failed");
-
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
-      alert(
-        `📊 ${data.message}\n` +
-        `• Composite Score: ${data.suitability_analytics.composite_score} / 10\n` +
-        `• Category: ${data.suitability_analytics.category}\n` +
-        `• Resource (35%): ${data.suitability_analytics.factor_breakdown.resource_score_35pct}\n` +
-        `• Terrain (25%): ${data.suitability_analytics.factor_breakdown.terrain_score_25pct}\n` +
-        `• Infrastructure (15%): ${data.suitability_analytics.factor_breakdown.infra_score_15pct}\n` +
-        `• Environment (15%): ${data.suitability_analytics.factor_breakdown.environment_score_15pct}\n` +
-        `• Economic (10%): ${data.suitability_analytics.factor_breakdown.economic_score_10pct}`
-      );
-    } catch (err) {
-      alert(`Suitability Calculation Failed: ${err.message}`);
-    }
+      
+      // Update inline card state instead of alert
+      setFeatureResults(prev => ({
+        ...prev, [siteId]: { ...prev[siteId], suitability: { message: data.message, details: data.suitability_analytics } }
+      }));
+    } catch (err) { alert(`Suitability Calculation Failed: ${err.message}`); }
   };
 
-  // Frontend Optimization & Forecasting Trigger
   const handleRunOptimization = async (siteId) => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_BASE_URL}/forecasting/optimize/${siteId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/forecasting/optimize/${siteId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Optimization failed");
-
-      alert(
-        `⚡ ${data.message}\n` +
-        `• Recommended Tech: ${data.forecasting_analytics.recommended_technology}\n` +
-        `• LCOE: $${data.forecasting_analytics.lcoe_usd_per_mwh} / MWh\n` +
-        `• Est. CAPEX: $${data.forecasting_analytics.estimated_capex_million_usd}M\n` +
-        `• Payback Period: ${data.forecasting_analytics.payback_period_years} Years\n` +
-        `• Peak Hybrid Month Yield: ${Math.max(...data.forecasting_analytics.monthly_generation_gwh.hybrid_combined_gwh)} GWh`
-      );
-    } catch (err) {
-      alert(`Forecasting Error: ${err.message}`);
-    }
+      
+      // Update inline card state instead of alert
+      setFeatureResults(prev => ({
+        ...prev, [siteId]: { ...prev[siteId], optimize: { message: data.message, details: data.forecasting_analytics } }
+      }));
+    } catch (err) { alert(`Forecasting Error: ${err.message}`); }
   };
 
-  const toggleSiteSelection = (siteId) => {
-    setSelectedSiteIds(prev =>
-      prev.includes(siteId) ? prev.filter(id => id !== siteId) : [...prev, siteId]
-    );
+  // Closes an individual feature result card
+  const closeFeatureResult = (siteId, featureKey) => {
+    setFeatureResults(prev => {
+      const updated = { ...prev };
+      if (updated[siteId]) {
+        delete updated[siteId][featureKey];
+      }
+      return updated;
+    });
   };
 
   const handleRunComparison = async () => {
-    if (selectedSiteIds.length < 2) {
-      alert("Please select at least 2 candidate sites to compare.");
-      return;
-    }
+    if (selectedSiteIds.length < 2) { alert("Please select at least 2 candidate sites to compare."); return; }
     const token = localStorage.getItem('token');
     const query = selectedSiteIds.map(id => `site_ids=${id}`).join('&');
     try {
-      const res = await fetch(`${API_BASE_URL}/projects/sites/compare?${query}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/projects/sites/compare?${query}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Comparison failed");
       setComparisonSites(data);
       setShowComparisonModal(true);
-    } catch (err) {
-      alert(err.message);
-    }
+    } catch (err) { alert(err.message); }
+  };
+
+  const handleExportPDF = (site) => {
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text(`Feasibility Report: ${site.site_name || 'Unknown Site'}`, 14, 22);
+      
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Region: ${site.region || 'N/A'} | Project ID: ${site.project_id || 'N/A'}`, 14, 30);
+      doc.text(`Coordinates: ${site.latitude || 0}°N, ${site.longitude || 0}°E`, 14, 36);
+      doc.text(`Generated by: ${user?.full_name || 'System Admin'} (${user?.role || 'User'})`, 14, 42);
+
+      autoTable(doc, {
+        startY: 50,
+        head: [['Assessment Metric', 'Value Data']],
+        body: [
+          ['Land Area', `${site.land_area_sqkm || 0} km²`],
+          ['Elevation', `${site.elevation_m || 0} m`],
+          ['Ownership Type', site.land_ownership || 'N/A'],
+          ['Solar Irradiance (GHI)', `${site.solar_ghi || 0} kWh/m²`],
+          ['Average Temperature', `${site.avg_temp || 0} °C`],
+          ['Predicted Capacity Factor', `${site.capacity_factor || 0} %`],
+          ['Estimated Annual Yield', `${site.est_yield_gwh || 0} GWh`],
+          ['MCDM Suitability Score', `${site.suitability_score || 0} / 10`],
+          ['Existing Infrastructure', site.existing_infrastructure || 'None recorded'],
+          ['Approval Status', site.is_approved ? 'APPROVED for deployment' : 'Pending Review']
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [6, 182, 212] }
+      });
+
+      doc.save(`${(site.site_name || 'Site').replace(/\s+/g, '_')}_Feasibility_Report.pdf`);
+    } catch (err) { console.error("Failed to generate PDF: ", err); alert("Error generating PDF. Check console."); }
+  };
+
+  const handleExportExcel = (site) => {
+    try {
+      const wsData = [
+        ['Renewable Energy Deployment Platform - Feasibility Data'],
+        [],
+        ['Parameter', 'Value'],
+        ['Site Name', site.site_name],
+        ['Region', site.region],
+        ['Latitude (°N)', site.latitude],
+        ['Longitude (°E)', site.longitude],
+        ['Elevation (m)', site.elevation_m],
+        ['Land Area (sqkm)', site.land_area_sqkm],
+        ['Land Ownership', site.land_ownership],
+        ['Solar GHI (kWh/m2)', site.solar_ghi],
+        ['Average Temp (°C)', site.avg_temp],
+        ['Capacity Factor (%)', site.capacity_factor],
+        ['Estimated Yield (GWh)', site.est_yield_gwh],
+        ['Suitability Score', site.suitability_score],
+        ['Approval Status', site.is_approved ? 'Approved' : 'Pending']
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Feasibility Data");
+      XLSX.writeFile(wb, `${(site.site_name || 'Site').replace(/\s+/g, '_')}_Feasibility_Data.xlsx`);
+    } catch (err) { console.error("Failed to generate Excel: ", err); alert("Error generating Excel. Check console."); }
   };
 
   const handleAuth = async (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setError(''); setLoading(true);
     const endpoint = isLogin ? `${API_BASE_URL}/auth/login` : `${API_BASE_URL}/auth/register`;
     const payload = isLogin ? { email: authData.email, password: authData.password } : authData;
-
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Authentication failed');
-
       localStorage.setItem('token', data.access_token);
       setUser(data.user);
-      if (data.user.role === 'Administrator') {
-        fetchAdminUsers(data.access_token);
-      } else {
-        fetchProjects(data.access_token);
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+      if (data.user.role === 'Administrator') fetchAdminUsers(data.access_token);
+      else fetchProjects(data.access_token);
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
 
-  // Role Flags
+  const toggleSiteSelection = (siteId) => {
+    setSelectedSiteIds(prev => prev.includes(siteId) ? prev.filter(id => id !== siteId) : [...prev, siteId]);
+  };
+
   const isPlanner = user?.role === 'Renewable Energy Planner';
   const isGis = user?.role === 'GIS Analyst';
   const isPM = user?.role === 'Project Manager';
   const isAdmin = user?.role === 'Administrator';
 
-  // Permission Logic
-  const canCreateProject = isPlanner || isPM;
-  const canAddSite = isPlanner || isGis;
+  const canCreateProject = isPlanner || isPM || isAdmin;
+  const canAddSite = isPlanner || isGis || isAdmin;
   const canEditGis = isGis || isAdmin;
-  const canApprove = isPM;
+  const canApprove = isPM || isAdmin;
 
   const activeProject = projects.find(p => p.id === selectedProjectId);
 
@@ -530,9 +455,7 @@ export default function App() {
             <h2 style={{ margin: '8px 0 4px 0' }}>Solar & Wind Intelligence</h2>
             <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>Operational Platform</p>
           </div>
-
           {error && <div style={{ background: '#450a0a', border: '1px solid #dc2626', color: '#f87171', padding: '10px', borderRadius: '6px', fontSize: '12px', marginBottom: '14px' }}>{error}</div>}
-
           <form onSubmit={handleAuth}>
             {!isLogin && (
               <>
@@ -544,38 +467,20 @@ export default function App() {
                 </select>
               </>
             )}
-
             <label style={lbl}>Email Address</label>
             <input style={inp} type="email" required value={authData.email} onChange={e => setAuthData({ ...authData, email: e.target.value })} />
-
             <label style={lbl}>Password</label>
             <div style={{ position: 'relative' }}>
-              <input
-                style={{ ...inp, paddingRight: '40px' }}
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={authData.password}
-                onChange={e => setAuthData({ ...authData, password: e.target.value })}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{ position: 'absolute', right: '10px', top: '35%', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}
-              >
-                {showPassword ? '👁️' : '🔒'}
-              </button>
+              <input style={{ ...inp, paddingRight: '40px' }} type={showPassword ? 'text' : 'password'} required value={authData.password} onChange={e => setAuthData({ ...authData, password: e.target.value })} />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '10px', top: '35%', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}>{showPassword ? '👁️' : '🔒'}</button>
             </div>
-
             <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px', background: 'linear-gradient(to right, #f59e0b, #06b6d4)', border: 'none', borderRadius: '8px', color: '#000', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
               {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
             </button>
           </form>
-
           <p style={{ textAlign: 'center', fontSize: '13px', color: '#94a3b8', marginTop: '18px' }}>
             {isLogin ? "Need an account? " : "Already have an account? "}
-            <span onClick={() => { setIsLogin(!isLogin); setError(''); }} style={{ color: '#38bdf8', cursor: 'pointer', textDecoration: 'underline' }}>
-              {isLogin ? 'Sign up' : 'Log in'}
-            </span>
+            <span onClick={() => { setIsLogin(!isLogin); setError(''); }} style={{ color: '#38bdf8', cursor: 'pointer', textDecoration: 'underline' }}>{isLogin ? 'Sign up' : 'Log in'}</span>
           </p>
         </div>
       </div>
@@ -588,38 +493,22 @@ export default function App() {
       {/* Top Banner */}
       <div style={{ padding: '20px 36px', borderBottom: '1px solid #142033', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ textTransform: 'uppercase', fontSize: '11px', letterSpacing: '1px', color: isAdmin ? '#ef4444' : '#38bdf8', fontWeight: 'bold' }}>
-            {user.role} WORKSPACE
-          </div>
-          <h1 style={{ margin: '4px 0 0 0', fontSize: '24px', fontWeight: 'bold' }}>
-            {isAdmin ? 'System Governance & Platform Administration' : 'Projects & Sites Registry'}
-          </h1>
+          <div style={{ textTransform: 'uppercase', fontSize: '11px', letterSpacing: '1px', color: isAdmin ? '#ef4444' : '#38bdf8', fontWeight: 'bold' }}>{user.role} WORKSPACE</div>
+          <h1 style={{ margin: '4px 0 0 0', fontSize: '24px', fontWeight: 'bold' }}>{isAdmin ? 'System Governance & Platform Administration' : 'Projects & Sites Registry'}</h1>
         </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontWeight: 600, fontSize: '13px' }}>{user.full_name}</div>
             <div style={{ fontSize: '11px', color: '#94a3b8' }}>{user.email}</div>
           </div>
-          <button
-            onClick={() => { localStorage.removeItem('token'); setUser(null); }}
-            style={{ padding: '6px 12px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
-          >
-            Sign Out
-          </button>
+          <button onClick={() => { localStorage.removeItem('token'); setUser(null); }} style={{ padding: '6px 12px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Sign Out</button>
         </div>
       </div>
 
-      {/* 1. ADMIN DASHBOARD */}
       {isAdmin ? (
         <div style={{ padding: '32px 36px', maxWidth: '1240px', margin: '0 auto' }}>
-          <h3 style={{ margin: '0 0 4px 0', fontSize: '20px', color: '#f8fafc' }}>
-            🛡️ Platform Security & User Governance
-          </h3>
-          <p style={{ color: '#94a3b8', fontSize: '13px', margin: '0 0 24px 0' }}>
-            Live directory of registered users, RBAC roles, and infrastructure status.
-          </p>
-
+          <h3 style={{ margin: '0 0 4px 0', fontSize: '20px', color: '#f8fafc' }}>🛡️ Platform Security & User Governance</h3>
+          <p style={{ color: '#94a3b8', fontSize: '13px', margin: '0 0 24px 0' }}>Live directory of registered users, RBAC roles, and infrastructure status.</p>
           <div style={{ background: '#0d1526', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
               <thead>
@@ -628,8 +517,6 @@ export default function App() {
                   <th style={{ padding: '10px' }}>Full Name</th>
                   <th style={{ padding: '10px' }}>Login Email</th>
                   <th style={{ padding: '10px' }}>Assigned Role</th>
-                  <th style={{ padding: '10px' }}>Organization</th>
-                  <th style={{ padding: '10px' }}>Department</th>
                   <th style={{ padding: '10px' }}>Status</th>
                 </tr>
               </thead>
@@ -640,8 +527,6 @@ export default function App() {
                     <td style={{ padding: '10px', fontWeight: 'bold' }}>{u.full_name}</td>
                     <td style={{ padding: '10px', color: '#38bdf8' }}>{u.email}</td>
                     <td style={{ padding: '10px', fontWeight: 'bold', color: '#ef4444' }}>{u.role}</td>
-                    <td style={{ padding: '10px', color: '#cbd5e1' }}>{u.organization}</td>
-                    <td style={{ padding: '10px', color: '#94a3b8' }}>{u.department}</td>
                     <td style={{ padding: '10px', color: '#10b981' }}>● Active</td>
                   </tr>
                 ))}
@@ -650,66 +535,31 @@ export default function App() {
           </div>
         </div>
       ) : (
-        /* 2. OPERATIONAL PROJECTS & SITES VIEW */
         <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', minHeight: 'calc(100vh - 85px)' }}>
-          
           {/* Left Column: Portfolios */}
           <div style={{ borderRight: '1px solid #142033', padding: '24px 20px', backgroundColor: '#09101d' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.5px', color: '#94a3b8', textTransform: 'uppercase' }}>
-                Project Portfolios ({projects.length})
-              </span>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Project Portfolios ({projects.length})</span>
               {canCreateProject ? (
-                <button
-                  onClick={() => setShowProjectModal(true)}
-                  style={{ padding: '5px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-                >
-                  + New
-                </button>
-              ) : (
-                <span style={{ fontSize: '10px', color: '#64748b' }}>Creation Locked</span>
-              )}
+                <button onClick={() => setShowProjectModal(true)} style={{ padding: '5px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>+ New</button>
+              ) : (<span style={{ fontSize: '10px', color: '#64748b' }}>Creation Locked</span>)}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {projects.map((proj) => {
                 const isSelected = proj.id === selectedProjectId;
                 return (
-                  <div
-                    key={proj.id}
-                    onClick={() => handleSelectProject(proj.id)}
-                    style={{
-                      backgroundColor: isSelected ? '#101c30' : '#0d1626',
-                      border: isSelected ? '1px solid #1e3a5f' : '1px solid #142033',
-                      borderRadius: '10px',
-                      padding: '16px',
-                      cursor: 'pointer'
-                    }}
-                  >
+                  <div key={proj.id} onClick={() => handleSelectProject(proj.id)} style={{ backgroundColor: isSelected ? '#101c30' : '#0d1626', border: isSelected ? '1px solid #1e3a5f' : '1px solid #142033', borderRadius: '10px', padding: '16px', cursor: 'pointer' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected ? '#38bdf8' : '#e2e8f0' }}>
-                        {proj.name}
-                      </div>
+                      <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected ? '#38bdf8' : '#e2e8f0' }}>{proj.name}</div>
                       {canCreateProject && (
-                        <button
-                          onClick={(e) => handleDeleteProject(e, proj.id)}
-                          title="Delete Project"
-                          style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px' }}
-                        >
-                          🗑️
-                        </button>
+                        <button onClick={(e) => handleDeleteProject(e, proj.id)} title="Delete Project" style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px' }}>🗑️</button>
                       )}
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '12px' }}>
-                      Target: {proj.target_capacity_mw} MW • {proj.region}
-                    </div>
+                    <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '12px' }}>Target: {proj.target_capacity_mw} MW • {proj.region}</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
-                        {proj.status || 'Active'}
-                      </span>
-                      <span style={{ fontSize: '12px', color: '#64748b' }}>
-                        Timeline: {proj.timeline_cod || 'Q3 2027'}
-                      </span>
+                      <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>{proj.status || 'Active'}</span>
+                      <span style={{ fontSize: '12px', color: '#64748b' }}>Timeline: {proj.timeline_cod || 'Q3 2027'}</span>
                     </div>
                   </div>
                 );
@@ -724,272 +574,177 @@ export default function App() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                   <div>
                     <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 'bold' }}>{activeProject.name}</h2>
-                    <span style={{ fontSize: '13px', color: '#64748b' }}>
-                      Region: {activeProject.region} • Target Capacity: {activeProject.target_capacity_mw} MW
-                    </span>
+                    <span style={{ fontSize: '13px', color: '#64748b' }}>Region: {activeProject.region} • Target Capacity: {activeProject.target_capacity_mw} MW</span>
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     {selectedSiteIds.length >= 2 && (
-                      <button
-                        onClick={handleRunComparison}
-                        style={{ padding: '8px 16px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
-                      >
-                        ⚖️ Compare Selected ({selectedSiteIds.length})
-                      </button>
+                      <button onClick={handleRunComparison} style={{ padding: '8px 16px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>⚖️ Compare Selected</button>
                     )}
                     {canAddSite && (
-                      <button
-                        onClick={() => setShowSiteModal(true)}
-                        style={{ padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
-                      >
-                        + Add Site
-                      </button>
+                      <button onClick={() => setShowSiteModal(true)} style={{ padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>+ Add Site</button>
                     )}
                   </div>
                 </div>
 
-                {/* Sites List */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {sites.map((site) => {
                     const isSelected = selectedSiteIds.includes(site.id);
                     return (
-                      <div
-                        key={site.id}
-                        style={{
-                          backgroundColor: '#0c1524',
-                          border: isSelected ? '1.5px solid #38bdf8' : site.is_approved ? '1px solid #10b981' : '1px solid #16243b',
-                          borderRadius: '12px',
-                          padding: '20px'
-                        }}
-                      >
+                      <div key={site.id} style={{ backgroundColor: '#0c1524', border: isSelected ? '1.5px solid #38bdf8' : site.is_approved ? '1px solid #10b981' : '1px solid #16243b', borderRadius: '12px', padding: '20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleSiteSelection(site.id)}
-                              style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                            />
-                            <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#13233c', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
-                              ⚡
-                            </div>
+                            <input type="checkbox" checked={isSelected} onChange={() => toggleSiteSelection(site.id)} style={{ cursor: 'pointer', width: '16px', height: '16px' }} />
+                            <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#13233c', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>⚡</div>
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>{site.site_name}</h3>
-                                {site.is_approved && (
-                                  <span style={{ backgroundColor: '#065f46', color: '#6ee7b7', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
-                                    APPROVED
-                                  </span>
-                                )}
+                                {site.is_approved && (<span style={{ backgroundColor: '#065f46', color: '#6ee7b7', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>APPROVED</span>)}
                               </div>
-                              <span style={{ fontSize: '12px', color: '#64748b' }}>
-                                solar • {site.latitude?.toFixed(4)}°N, {site.longitude?.toFixed(4)}°E • {site.elevation_m}m • {site.land_area_sqkm} km²
-                              </span>
+                              <span style={{ fontSize: '12px', color: '#64748b' }}>solar • {site.latitude?.toFixed(4)}°N, {site.longitude?.toFixed(4)}°E • {site.elevation_m}m • {site.land_area_sqkm} km²</span>
                             </div>
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            {/* MODULE 3: NASA POWER CLIMATE SYNC */}
-                            {canAddSite && (
-                              <button
-                                onClick={() => handleSyncNasa(site.id)}
-                                title="Fetch live NASA POWER irradiance and weather data"
-                                style={{
-                                  padding: '6px 12px',
-                                  background: 'linear-gradient(to right, #0284c7, #06b6d4)',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  fontSize: '12px',
-                                  cursor: 'pointer',
-                                  fontWeight: 600
-                                }}
-                              >
-                                🛰️ Sync NASA Data
-                              </button>
-                            )}
+                            {canAddSite && <button onClick={() => handleSyncNasa(site.id)} style={btnStyle('#0284c7')}>🛰️ Sync NASA</button>}
+                            {canEditGis && <button onClick={() => handleScanOsm(site.id)} style={btnStyle('#059669')}>🗺️ Scan OSM</button>}
+                            {canAddSite && <button onClick={() => handlePredictSolar(site.id)} style={btnStyle('#d97706')}>☀️ Predict Solar</button>}
+                            {canAddSite && <button onClick={() => handlePredictWind(site.id)} style={btnStyle('#0284c7')}>💨 Predict Wind</button>}
+                            {canAddSite && <button onClick={() => handleCalculateSuitability(site.id)} style={btnStyle('#10b981')}>📊 Score Suitability</button>}
+                            {canAddSite && <button onClick={() => handleRunOptimization(site.id)} style={btnStyle('#8b5cf6')}>📈 Forecast & Optimize</button>}
+                            {canAddSite && <button onClick={() => setAnalyticsSite(site)} style={btnStyle('#3b82f6')}>📊 View Charts</button>}
 
-                            {/* MODULE 4: OPENSTREETMAP SPATIAL GRID SCAN */}
-                            {canEditGis && (
-                              <button
-                                onClick={() => handleScanOsm(site.id)}
-                                title="Query OpenStreetMap for nearby substations, transmission lines, and roads"
-                                style={{
-                                  padding: '6px 12px',
-                                  background: 'linear-gradient(to right, #059669, #10b981)',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  fontSize: '12px',
-                                  cursor: 'pointer',
-                                  fontWeight: 600
-                                }}
-                              >
-                                🗺️ Scan OSM Grid
-                              </button>
-                            )}
-
-                            {/* MODULE 5: SOLAR MACHINE LEARNING PREDICTOR */}
-                            {canAddSite && (
-                              <button
-                                onClick={() => handlePredictSolar(site.id)}
-                                title="Execute Module 5 Random Forest ML yield and thermal derating model"
-                                style={{
-                                  padding: '6px 12px',
-                                  background: 'linear-gradient(to right, #d97706, #f59e0b)',
-                                  color: '#000',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  fontSize: '12px',
-                                  cursor: 'pointer',
-                                  fontWeight: 'bold'
-                                }}
-                              >
-                                ☀️ Predict Solar ML
-                              </button>
-                            )}
-
-                            {/* MODULE 6: WIND POTENTIAL PREDICTOR */}
-                            {canAddSite && (
-                              <button
-                                onClick={() => handlePredictWind(site.id)}
-                                title="Execute Module 6 hub-height wind shear and power density estimation model"
-                                style={{
-                                  padding: '6px 12px',
-                                  background: 'linear-gradient(to right, #0284c7, #38bdf8)',
-                                  color: '#000',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  fontSize: '12px',
-                                  cursor: 'pointer',
-                                  fontWeight: 'bold'
-                                }}
-                              >
-                                💨 Predict Wind
-                              </button>
-                            )}
-
-                            {/* MODULE 7 & 10: SITE SUITABILITY & SCORING */}
-                            {canAddSite && (
-                              <button
-                                onClick={() => handleCalculateSuitability(site.id)}
-                                title="Execute 5-factor weighted suitability and scoring algorithm"
-                                style={{
-                                  padding: '6px 12px',
-                                  background: 'linear-gradient(to right, #10b981, #34d399)',
-                                  color: '#000',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  fontSize: '12px',
-                                  cursor: 'pointer',
-                                  fontWeight: 'bold'
-                                }}
-                              >
-                                📊 Score Suitability
-                              </button>
-                            )}
-
-                            {/* FORECAST & HYBRID OPTIMIZATION TRIGGER */}
-                            {canAddSite && (
-                              <button
-                                onClick={() => handleRunOptimization(site.id)}
-                                title="Execute 12-month time-series forecasting & hybrid optimization model"
-                                style={{
-                                  padding: '6px 12px',
-                                  background: 'linear-gradient(to right, #8b5cf6, #ec4899)',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  fontSize: '12px',
-                                  cursor: 'pointer',
-                                  fontWeight: 'bold'
-                                }}
-                              >
-                                📈 Forecast & Optimize
-                              </button>
+                            {(canApprove || isPlanner) && (
+                              <>
+                                <button onClick={() => handleExportPDF(site)} title="Export PDF Feasibility Report" style={btnStyle('#b91c1c')}>📄 Export PDF</button>
+                                <button onClick={() => handleExportExcel(site)} title="Export Excel Feasibility Data" style={btnStyle('#15803d')}>📊 Export Excel</button>
+                              </>
                             )}
 
                             {canEditGis && (
-                              <button
-                                onClick={() => {
-                                  setActiveSiteForGis(site);
-                                  setGisForm({
-                                    latitude: site.latitude,
-                                    longitude: site.longitude,
-                                    elevation_m: site.elevation_m,
-                                    slope_deg: site.slope_deg || 2.1,
-                                    vegetation_ndvi: site.vegetation_ndvi || 0.18,
-                                    solar_ghi: site.solar_ghi || 5.69,
-                                    avg_temp: site.avg_temp || 28.4
-                                  });
-                                  setShowGisEditModal(true);
-                                }}
-                                style={{ padding: '6px 12px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
-                              >
-                                🗺️ Edit GIS
+                              <button onClick={() => { setActiveSiteForGis(site); setGisForm({ latitude: site.latitude, longitude: site.longitude, elevation_m: site.elevation_m, slope_deg: site.slope_deg || 2.1, vegetation_ndvi: site.vegetation_ndvi || 0.18, solar_ghi: site.solar_ghi || 5.69, avg_temp: site.avg_temp || 28.4 }); setShowGisEditModal(true); }} style={btnStyle('#2563eb')}>
+                                ✏️ Edit GIS
                               </button>
                             )}
-
+                            
                             {canApprove && (
-                              <button
-                                onClick={() => handleToggleApproval(site)}
-                                style={{
-                                  padding: '6px 12px',
-                                  background: site.is_approved ? '#4b5563' : '#10b981',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  fontSize: '12px',
-                                  cursor: 'pointer',
-                                  fontWeight: 600
-                                }}
-                              >
-                                {site.is_approved ? 'Revoke Approval' : '✓ Give Final Approval'}
+                              <button onClick={() => handleToggleApproval(site)} style={btnStyle(site.is_approved ? '#4b5563' : '#10b981')}>
+                                {site.is_approved ? 'Revoke Approval' : '✓ Approve'}
                               </button>
                             )}
-
-                            {canAddSite && (
-                              <button
-                                onClick={() => handleDeleteSite(site.id)}
-                                style={{ padding: '6px 10px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
-                              >
-                                🗑️
-                              </button>
-                            )}
-
-                            <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>
-                              {site.suitability_score || 7.8} / 10 ▲
-                            </span>
+                            {canAddSite && <button onClick={() => handleDeleteSite(site.id)} style={{ ...btnStyle('transparent'), color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}>🗑️</button>}
                           </div>
                         </div>
 
-                        {/* Metric Tiles */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px' }}>
-                          <div style={metricBoxStyle}>
-                            <span style={metricLbl}>Solar (GHI)</span>
-                            <span style={metricVal}>{site.solar_ghi} kWh/m²</span>
-                          </div>
-                          <div style={metricBoxStyle}>
-                            <span style={metricLbl}>Avg Temp</span>
-                            <span style={metricVal}>{site.avg_temp} °C</span>
-                          </div>
-                          <div style={metricBoxStyle}>
-                            <span style={metricLbl}>Rainfall</span>
-                            <span style={metricVal}>{site.rainfall_mm || 133.8} mm</span>
-                          </div>
-                          <div style={metricBoxStyle}>
-                            <span style={metricLbl}>Cloud Cover</span>
-                            <span style={metricVal}>{site.cloud_cover_pct || 70.2} %</span>
-                          </div>
-                          <div style={metricBoxStyle}>
-                            <span style={metricLbl}>Capacity Factor</span>
-                            <span style={metricVal}>{site.capacity_factor || 17} %</span>
-                          </div>
-                          <div style={metricBoxStyle}>
-                            <span style={metricLbl}>Est Yield</span>
-                            <span style={metricVal}>{site.est_yield_gwh || 1485.6}</span>
-                          </div>
+                          <div style={metricBoxStyle}><span style={metricLbl}>Solar (GHI)</span><span style={metricVal}>{site.solar_ghi || 0} kWh/m²</span></div>
+                          <div style={metricBoxStyle}><span style={metricLbl}>Avg Temp</span><span style={metricVal}>{site.avg_temp || 0} °C</span></div>
+                          <div style={metricBoxStyle}><span style={metricLbl}>Rainfall</span><span style={metricVal}>{site.rainfall_mm || 0} mm</span></div>
+                          <div style={metricBoxStyle}><span style={metricLbl}>Cloud Cover</span><span style={metricVal}>{site.cloud_cover_pct || 0} %</span></div>
+                          <div style={metricBoxStyle}><span style={metricLbl}>Capacity Factor</span><span style={metricVal}>{site.capacity_factor || 0} %</span></div>
+                          <div style={metricBoxStyle}><span style={metricLbl}>Est Yield</span><span style={metricVal}>{site.est_yield_gwh || 0} GWh</span></div>
                         </div>
+
+                        {/* ============================================================== */}
+                        {/* INLINE FEATURE RESULTS CARDS (Replacing the alerts entirely) */}
+                        {/* ============================================================== */}
+                        {featureResults[site.id] && (
+                          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            
+                            {featureResults[site.id].nasa && (
+                              <div style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #0284c7', borderRadius: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <h4 style={{ margin: '0 0 8px 0', color: '#38bdf8' }}>🛰️ NASA POWER Telemetry</h4>
+                                  <button onClick={() => closeFeatureResult(site.id, 'nasa')} style={closeBtnStyle}>✕</button>
+                                </div>
+                                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].nasa.message}</p>
+                                <div style={resultGridStyle}>
+                                  <div><strong>Solar GHI:</strong> {featureResults[site.id].nasa.details.solar_ghi} kWh/m²</div>
+                                  <div><strong>Avg Temp:</strong> {featureResults[site.id].nasa.details.avg_temp}°C</div>
+                                  <div><strong>Rainfall:</strong> {featureResults[site.id].nasa.details.rainfall_mm} mm</div>
+                                  <div><strong>Cloud Cover:</strong> {featureResults[site.id].nasa.details.cloud_cover_pct}%</div>
+                                </div>
+                              </div>
+                            )}
+
+                            {featureResults[site.id].osm && (
+                              <div style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #059669', borderRadius: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <h4 style={{ margin: '0 0 8px 0', color: '#10b981' }}>🗺️ OSM Spatial Intelligence</h4>
+                                  <button onClick={() => closeFeatureResult(site.id, 'osm')} style={closeBtnStyle}>✕</button>
+                                </div>
+                                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].osm.message}</p>
+                                <div style={resultGridStyle}>
+                                  <div><strong>Substation:</strong> {featureResults[site.id].osm.details.substation_dist_km} km</div>
+                                  <div><strong>Transmission:</strong> {featureResults[site.id].osm.details.transmission_line_dist_km} km</div>
+                                  <div><strong>Access Road:</strong> {featureResults[site.id].osm.details.access_road_dist_km} km</div>
+                                  <div><strong>Risk:</strong> {featureResults[site.id].osm.details.interconnect_risk}</div>
+                                </div>
+                              </div>
+                            )}
+
+                            {featureResults[site.id].solar && (
+                              <div style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #d97706', borderRadius: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <h4 style={{ margin: '0 0 8px 0', color: '#f59e0b' }}>☀️ Solar ML Predictor</h4>
+                                  <button onClick={() => closeFeatureResult(site.id, 'solar')} style={closeBtnStyle}>✕</button>
+                                </div>
+                                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].solar.message}</p>
+                                <div style={resultGridStyle}>
+                                  <div><strong>Capacity Factor:</strong> {featureResults[site.id].solar.details.predicted_capacity_factor}%</div>
+                                  <div><strong>Annual Yield:</strong> {featureResults[site.id].solar.details.annual_yield_gwh} GWh</div>
+                                  <div><strong>Cell Temp:</strong> {featureResults[site.id].solar.details.t_cell_celsius}°C</div>
+                                  <div><strong>Thermal Derate:</strong> -{featureResults[site.id].solar.details.temp_derate_loss_pct}%</div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {featureResults[site.id].wind && (
+                              <div style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #0284c7', borderRadius: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <h4 style={{ margin: '0 0 8px 0', color: '#38bdf8' }}>💨 Wind ML Predictor</h4>
+                                  <button onClick={() => closeFeatureResult(site.id, 'wind')} style={closeBtnStyle}>✕</button>
+                                </div>
+                                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].wind.message}</p>
+                                <div style={resultGridStyle}>
+                                  <div><strong>50m Speed:</strong> {featureResults[site.id].wind.details.wind_speed_50m} m/s</div>
+                                  <div><strong>100m Hub:</strong> {featureResults[site.id].wind.details.wind_speed_100m} m/s</div>
+                                  <div><strong>Capacity Factor:</strong> {featureResults[site.id].wind.details.predicted_capacity_factor}%</div>
+                                  <div><strong>Annual Yield:</strong> {featureResults[site.id].wind.details.annual_yield_gwh} GWh</div>
+                                </div>
+                              </div>
+                            )}
+
+                            {featureResults[site.id].suitability && (
+                              <div style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #10b981', borderRadius: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <h4 style={{ margin: '0 0 8px 0', color: '#34d399' }}>📊 Suitability Engine</h4>
+                                  <button onClick={() => closeFeatureResult(site.id, 'suitability')} style={closeBtnStyle}>✕</button>
+                                </div>
+                                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].suitability.message}</p>
+                                <div style={resultGridStyle}>
+                                  <div><strong>Score:</strong> {featureResults[site.id].suitability.details.composite_score} / 10</div>
+                                  <div><strong>Category:</strong> {featureResults[site.id].suitability.details.category}</div>
+                                </div>
+                              </div>
+                            )}
+
+                            {featureResults[site.id].optimize && (
+                              <div style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #8b5cf6', borderRadius: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <h4 style={{ margin: '0 0 8px 0', color: '#c084fc' }}>📈 Optimization Engine</h4>
+                                  <button onClick={() => closeFeatureResult(site.id, 'optimize')} style={closeBtnStyle}>✕</button>
+                                </div>
+                                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].optimize.message}</p>
+                                <div style={resultGridStyle}>
+                                  <div><strong>Recommended:</strong> {featureResults[site.id].optimize.details.recommended_technology}</div>
+                                  <div><strong>LCOE:</strong> ${featureResults[site.id].optimize.details.lcoe_usd_per_mwh} / MWh</div>
+                                  <div><strong>Payback:</strong> {featureResults[site.id].optimize.details.payback_period_years} Yrs</div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {/* ============================================================== */}
                       </div>
                     );
                   })}
@@ -1004,7 +759,10 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 1: Create Project */}
+      {/* Analytics Modal */}
+      {analyticsSite && <SiteAnalyticsModal site={analyticsSite} onClose={() => setAnalyticsSite(null)} />}
+
+      {/* Project Creation Modal */}
       {showProjectModal && (
         <div style={modalBackdrop}>
           <div style={modalBox}>
@@ -1027,55 +785,34 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 2: Add Site with Map Picker */}
+      {/* Add Site Modal */}
       {showSiteModal && (
         <div style={modalBackdrop}>
           <div style={{ ...modalBox, maxWidth: '640px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <h3 style={{ margin: 0 }}>Add Candidate Site</h3>
-              <button
-                type="button"
-                onClick={() => setShowMapModal(!showMapModal)}
-                style={{ padding: '6px 12px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}
-              >
+              <button type="button" onClick={() => setShowMapModal(!showMapModal)} style={{ padding: '6px 12px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
                 {showMapModal ? 'Hide Map' : '🗺️ Pick on Map'}
               </button>
             </div>
-
             {showMapModal && (
               <div style={{ height: '240px', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px', border: '1px solid #1e293b' }}>
                 <MapContainer center={[newSite.latitude, newSite.longitude]} zoom={6} style={{ height: '100%', width: '100%' }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  <LocationPicker
-                    position={[newSite.latitude, newSite.longitude]}
-                    onPositionChange={(lat, lng) => setNewSite(prev => ({ ...prev, latitude: parseFloat(lat.toFixed(4)), longitude: parseFloat(lng.toFixed(4)) }))}
-                  />
+                  <LocationPicker position={[newSite.latitude, newSite.longitude]} onPositionChange={(lat, lng) => setNewSite(prev => ({ ...prev, latitude: parseFloat(lat.toFixed(4)), longitude: parseFloat(lng.toFixed(4)) }))} />
                 </MapContainer>
               </div>
             )}
-
             <form onSubmit={handleCreateSite}>
               <label style={lbl}>Site Name</label>
               <input style={inp} required placeholder="e.g. Bareilly Solar Array" value={newSite.site_name} onChange={e => setNewSite({ ...newSite, site_name: e.target.value })} />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={lbl}>Latitude (°N)</label>
-                  <input style={inp} type="number" step="0.0001" required value={newSite.latitude} onChange={e => setNewSite({ ...newSite, latitude: e.target.value })} />
-                </div>
-                <div>
-                  <label style={lbl}>Longitude (°E)</label>
-                  <input style={inp} type="number" step="0.0001" required value={newSite.longitude} onChange={e => setNewSite({ ...newSite, longitude: e.target.value })} />
-                </div>
+                <div><label style={lbl}>Latitude (°N)</label><input style={inp} type="number" step="0.0001" required value={newSite.latitude} onChange={e => setNewSite({ ...newSite, latitude: e.target.value })} /></div>
+                <div><label style={lbl}>Longitude (°E)</label><input style={inp} type="number" step="0.0001" required value={newSite.longitude} onChange={e => setNewSite({ ...newSite, longitude: e.target.value })} /></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={lbl}>Elevation (m)</label>
-                  <input style={inp} type="number" required value={newSite.elevation_m} onChange={e => setNewSite({ ...newSite, elevation_m: e.target.value })} />
-                </div>
-                <div>
-                  <label style={lbl}>Land Area (km²)</label>
-                  <input style={inp} type="number" step="0.1" required value={newSite.land_area_sqkm} onChange={e => setNewSite({ ...newSite, land_area_sqkm: e.target.value })} />
-                </div>
+                <div><label style={lbl}>Elevation (m)</label><input style={inp} type="number" required value={newSite.elevation_m} onChange={e => setNewSite({ ...newSite, elevation_m: e.target.value })} /></div>
+                <div><label style={lbl}>Land Area (km²)</label><input style={inp} type="number" step="0.1" required value={newSite.land_area_sqkm} onChange={e => setNewSite({ ...newSite, land_area_sqkm: e.target.value })} /></div>
               </div>
               <label style={lbl}>Region</label>
               <input style={inp} required value={newSite.region} onChange={e => setNewSite({ ...newSite, region: e.target.value })} />
@@ -1088,41 +825,23 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 3: GIS Editor */}
+      {/* Edit GIS Modal */}
       {showGisEditModal && (
         <div style={modalBackdrop}>
           <div style={{ ...modalBox, maxWidth: '520px' }}>
             <h3 style={{ margin: '0 0 8px 0', color: '#38bdf8' }}>GIS & Terrain Editor</h3>
             <form onSubmit={handleSaveGis}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={lbl}>Latitude</label>
-                  <input style={inp} type="number" step="0.0001" value={gisForm.latitude} onChange={e => setGisForm({ ...gisForm, latitude: e.target.value })} />
-                </div>
-                <div>
-                  <label style={lbl}>Longitude</label>
-                  <input style={inp} type="number" step="0.0001" value={gisForm.longitude} onChange={e => setGisForm({ ...gisForm, longitude: e.target.value })} />
-                </div>
+                <div><label style={lbl}>Latitude</label><input style={inp} type="number" step="0.0001" value={gisForm.latitude} onChange={e => setGisForm({ ...gisForm, latitude: e.target.value })} /></div>
+                <div><label style={lbl}>Longitude</label><input style={inp} type="number" step="0.0001" value={gisForm.longitude} onChange={e => setGisForm({ ...gisForm, longitude: e.target.value })} /></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={lbl}>Elevation (m)</label>
-                  <input style={inp} type="number" value={gisForm.elevation_m} onChange={e => setGisForm({ ...gisForm, elevation_m: e.target.value })} />
-                </div>
-                <div>
-                  <label style={lbl}>Slope Angle (°)</label>
-                  <input style={inp} type="number" step="0.1" value={gisForm.slope_deg} onChange={e => setGisForm({ ...gisForm, slope_deg: e.target.value })} />
-                </div>
+                <div><label style={lbl}>Elevation (m)</label><input style={inp} type="number" value={gisForm.elevation_m} onChange={e => setGisForm({ ...gisForm, elevation_m: e.target.value })} /></div>
+                <div><label style={lbl}>Slope Angle (°)</label><input style={inp} type="number" step="0.1" value={gisForm.slope_deg} onChange={e => setGisForm({ ...gisForm, slope_deg: e.target.value })} /></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={lbl}>Solar GHI (kWh/m²)</label>
-                  <input style={inp} type="number" step="0.01" value={gisForm.solar_ghi} onChange={e => setGisForm({ ...gisForm, solar_ghi: e.target.value })} />
-                </div>
-                <div>
-                  <label style={lbl}>Avg Temp (°C)</label>
-                  <input style={inp} type="number" step="0.1" value={gisForm.avg_temp} onChange={e => setGisForm({ ...gisForm, avg_temp: e.target.value })} />
-                </div>
+                <div><label style={lbl}>Solar GHI (kWh/m²)</label><input style={inp} type="number" step="0.01" value={gisForm.solar_ghi} onChange={e => setGisForm({ ...gisForm, solar_ghi: e.target.value })} /></div>
+                <div><label style={lbl}>Avg Temp (°C)</label><input style={inp} type="number" step="0.1" value={gisForm.avg_temp} onChange={e => setGisForm({ ...gisForm, avg_temp: e.target.value })} /></div>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                 <button type="submit" style={{ flex: 1, padding: '10px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Update GIS Data</button>
@@ -1133,69 +852,82 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 4: Multi-Site Comparison Matrix */}
+      {/* Comparison Modal */}
       {showComparisonModal && (
         <div style={modalBackdrop}>
           <div style={{ ...modalBox, maxWidth: '960px', width: '90vw' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, color: '#f59e0b', fontSize: '20px' }}>
-                ⚖️ Multi-Site Comparison Matrix
-              </h3>
-              <button
-                onClick={() => setShowComparisonModal(false)}
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '18px', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
+              <h3 style={{ margin: 0, color: '#f59e0b', fontSize: '20px' }}>⚖️ Multi-Site Comparison Matrix</h3>
+              <button onClick={() => setShowComparisonModal(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '18px', cursor: 'pointer' }}>✕</button>
             </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${comparisonSites.length}, 1fr)`, gap: '16px' }}>
               {comparisonSites.map(s => (
                 <div key={s.id} style={{ background: '#070d19', border: '1px solid #1e293b', borderRadius: '8px', padding: '16px' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#38bdf8', marginBottom: '8px' }}>
-                    {s.site_name}
-                  </div>
-                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>Coordinates</span>
-                    <div style={{ fontSize: '13px' }}>{s.latitude?.toFixed(4)}°N, {s.longitude?.toFixed(4)}°E</div>
-                  </div>
-                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>Elevation & Slope</span>
-                    <div style={{ fontSize: '13px' }}>{s.elevation_m}m • {s.slope_deg || 2.1}° slope</div>
-                  </div>
-                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>Land Area & Ownership</span>
-                    <div style={{ fontSize: '13px' }}>{s.land_area_sqkm} km² • {s.land_ownership}</div>
-                  </div>
-                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>Solar GHI / Avg Temp</span>
-                    <div style={{ fontSize: '13px', color: '#f59e0b' }}>{s.solar_ghi} kWh/m² • {s.avg_temp}°C</div>
-                  </div>
-                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>Capacity Factor / Est Yield</span>
-                    <div style={{ fontSize: '13px', color: '#10b981' }}>{s.capacity_factor || 17}% • {s.est_yield_gwh || 1450} GWh</div>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>Approval Status</span>
-                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: s.is_approved ? '#10b981' : '#f59e0b' }}>
-                      {s.is_approved ? 'APPROVED' : 'PENDING'}
-                    </div>
-                  </div>
+                  <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#38bdf8', marginBottom: '8px' }}>{s.site_name}</div>
+                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}><span style={{ fontSize: '11px', color: '#64748b' }}>Coordinates</span><div style={{ fontSize: '13px' }}>{s.latitude?.toFixed(4)}°N, {s.longitude?.toFixed(4)}°E</div></div>
+                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}><span style={{ fontSize: '11px', color: '#64748b' }}>Elevation & Slope</span><div style={{ fontSize: '13px' }}>{s.elevation_m}m • {s.slope_deg || 2.1}° slope</div></div>
+                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}><span style={{ fontSize: '11px', color: '#64748b' }}>Land Area & Ownership</span><div style={{ fontSize: '13px' }}>{s.land_area_sqkm} km² • {s.land_ownership}</div></div>
+                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}><span style={{ fontSize: '11px', color: '#64748b' }}>Solar GHI / Avg Temp</span><div style={{ fontSize: '13px', color: '#f59e0b' }}>{s.solar_ghi} kWh/m² • {s.avg_temp}°C</div></div>
+                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}><span style={{ fontSize: '11px', color: '#64748b' }}>Capacity Factor / Est Yield</span><div style={{ fontSize: '13px', color: '#10b981' }}>{s.capacity_factor || 17}% • {s.est_yield_gwh || 1450} GWh</div></div>
+                  <div><span style={{ fontSize: '11px', color: '#64748b' }}>Approval Status</span><div style={{ fontSize: '13px', fontWeight: 'bold', color: s.is_approved ? '#10b981' : '#f59e0b' }}>{s.is_approved ? 'APPROVED' : 'PENDING'}</div></div>
                 </div>
               ))}
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
 
+function SiteAnalyticsModal({ site, onClose }) {
+  if (!site) return null;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const baseSolar = (site.solar_ghi || 5.5) * 20;
+  const baseWind = 120;
+  const timeSeriesData = months.map((m, idx) => {
+    const sFactor = [6, 7].includes(idx) ? 0.75 : [2, 3, 4].includes(idx) ? 1.15 : 1.0;
+    const wFactor = [5, 6, 7].includes(idx) ? 1.3 : 0.85;
+    const solar = Math.round(baseSolar * sFactor);
+    const wind = Math.round(baseWind * wFactor);
+    return { month: m, Solar: solar, Wind: wind, HybridCombined: solar + wind };
+  });
+
+  const financialData = [
+    { tech: 'Solar PV', lcoe: 36.5, capex: 145 }, { tech: 'Wind Farm', lcoe: 41.0, capex: 185 }, { tech: 'Hybrid System', lcoe: 33.8, capex: 290 }
+  ];
+
+  const factorData = [
+    { factor: 'Resource (35%)', score: 8.8 }, { factor: 'Terrain (25%)', score: 7.9 }, { factor: 'Infra (15%)', score: 8.4 }, { factor: 'Environment (15%)', score: 9.1 }, { factor: 'Economic (10%)', score: 8.0 }
+  ];
+
+  return (
+    <div style={modalBackdrop}>
+      <div style={{ ...modalBox, maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+          <div><h2 style={{ margin: '0 0 16px 0', color: '#f8fafc' }}>📊 Site Analytics & Performance Telemetry: {site.site_name}</h2><span style={{ fontSize: '12px', color: '#94a3b8' }}>Module 11 Live Interactive Analytics Engine</span></div>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={chartBoxStyle}><h4 style={chartTitleStyle}>⚡ 12-Month Generation Curve (GWh)</h4><ResponsiveContainer width="100%" height={220}><AreaChart data={timeSeriesData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="month" stroke="#64748b" fontSize={11} /><YAxis stroke="#64748b" fontSize={11} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} /><Legend wrapperStyle={{ fontSize: '11px' }} /><Area type="monotone" dataKey="Solar" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.4} /><Area type="monotone" dataKey="Wind" stackId="1" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.4} /></AreaChart></ResponsiveContainer></div>
+          <div style={chartBoxStyle}><h4 style={chartTitleStyle}>💰 Technology LCOE ($/MWh) vs CAPEX ($M)</h4><ResponsiveContainer width="100%" height={220}><BarChart data={financialData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="tech" stroke="#64748b" fontSize={11} /><YAxis stroke="#64748b" fontSize={11} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} /><Legend wrapperStyle={{ fontSize: '11px' }} /><Bar dataKey="lcoe" name="LCOE ($/MWh)" fill="#10b981" radius={[4, 4, 0, 0]} /><Bar dataKey="capex" name="CAPEX ($M)" fill="#8b5cf6" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
+        </div>
+        <div style={{ ...chartBoxStyle, marginTop: '16px' }}><h4 style={chartTitleStyle}>🎯 MCDM 5-Factor Weighted Criteria Performance (Scale: 0-10)</h4><ResponsiveContainer width="100%" height={160}><BarChart data={factorData} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis type="number" domain={[0, 10]} stroke="#64748b" fontSize={11} /><YAxis dataKey="factor" type="category" stroke="#64748b" fontSize={11} width={130} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} /><Bar dataKey="score" fill="#38bdf8" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></div>
+      </div>
+    </div>
+  );
+}
+
+// Global UI Helper Styles
 const inp = { width: '100%', padding: '9px 12px', backgroundColor: '#050a12', border: '1px solid #1e293b', borderRadius: '6px', color: '#fff', marginTop: '4px', marginBottom: '12px', boxSizing: 'border-box' };
 const lbl = { fontSize: '12px', color: '#94a3b8', display: 'block', fontWeight: 500 };
-const modalBackdrop = { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '20px' };
-const modalBox = { backgroundColor: '#0d1526', border: '1px solid #1e293b', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '440px' };
+const modalBackdrop = { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '20px' };
+const modalBox = { backgroundColor: '#0a101d', border: '1px solid #1e293b', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '440px' };
 const metricBoxStyle = { backgroundColor: '#060c16', border: '1px solid #132034', borderRadius: '6px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '4px' };
 const metricLbl = { fontSize: '11px', color: '#64748b' };
 const metricVal = { fontSize: '13px', fontWeight: 'bold', color: '#e2e8f0' };
+const chartBoxStyle = { backgroundColor: '#0d1526', border: '1px solid #142033', borderRadius: '8px', padding: '12px' };
+const chartTitleStyle = { margin: '0 0 10px 0', fontSize: '13px', color: '#e2e8f0' };
+const btnStyle = (bg) => ({ padding: '6px 12px', background: bg, color: bg === 'transparent' ? 'inherit' : '#fff', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' });
+const closeBtnStyle = { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' };
+const resultGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '11px', color: '#94a3b8' };
