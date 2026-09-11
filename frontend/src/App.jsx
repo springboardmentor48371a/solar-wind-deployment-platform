@@ -1,4 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+
+// Fix default Leaflet icon paths
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
 
 const ROLES = [
   "Renewable Energy Planner",
@@ -9,6 +19,15 @@ const ROLES = [
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
 
+function LocationPicker({ position, onPositionChange }) {
+  useMapEvents({
+    click(e) {
+      onPositionChange(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return position ? <Marker position={position}><Popup>Selected Coordinates</Popup></Marker> : null;
+}
+
 export default function App() {
   const [isLogin, setIsLogin] = useState(true);
   const [user, setUser] = useState(null);
@@ -16,16 +35,25 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Data
+  // Admin Data
+  const [adminUserList, setAdminUserList] = useState([]);
+
+  // Projects & Sites Data
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [sites, setSites] = useState([]);
+
+  // Selection & Comparison Engine State
+  const [selectedSiteIds, setSelectedSiteIds] = useState([]);
+  const [comparisonSites, setComparisonSites] = useState([]);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
 
   // Modals
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showSiteModal, setShowSiteModal] = useState(false);
   const [showGisEditModal, setShowGisEditModal] = useState(false);
   const [activeSiteForGis, setActiveSiteForGis] = useState(null);
+  const [showMapModal, setShowMapModal] = useState(false);
 
   // Forms
   const [newProject, setNewProject] = useState({
@@ -45,7 +73,7 @@ export default function App() {
     land_area_sqkm: 12.5,
     region: 'Rajasthan',
     land_ownership: 'Government Lease',
-    existing_infrastructure: '400kV line within 4km'
+    existing_infrastructure: '400kV corridor within 4km'
   });
 
   const [gisForm, setGisForm] = useState({
@@ -59,10 +87,10 @@ export default function App() {
   });
 
   const [authData, setAuthData] = useState({
-    email: 'planner@energygrid.gov',
-    password: 'planner123',
-    full_name: 'Elena Rostova',
-    role: ROLES[0]
+    email: 'pm@energygrid.gov',
+    password: 'pm123',
+    full_name: 'Sarah Jenkins',
+    role: ROLES[2]
   });
 
   useEffect(() => {
@@ -74,7 +102,11 @@ export default function App() {
         .then(res => res.ok ? res.json() : Promise.reject())
         .then(userData => {
           setUser(userData);
-          fetchProjects(token);
+          if (userData.role === 'Administrator') {
+            fetchAdminUsers(token);
+          } else {
+            fetchProjects(token);
+          }
         })
         .catch(() => {
           localStorage.removeItem('token');
@@ -82,6 +114,18 @@ export default function App() {
         });
     }
   }, []);
+
+  const fetchAdminUsers = async (token) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) setAdminUserList(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchProjects = async (token) => {
     try {
@@ -109,6 +153,7 @@ export default function App() {
       });
       const data = await res.json();
       setSites(Array.isArray(data) ? data : []);
+      setSelectedSiteIds([]);
     } catch (e) {
       console.error(e);
     }
@@ -120,39 +165,24 @@ export default function App() {
     fetchSitesForProject(id, token);
   };
 
-  // 1. Create Project (Planner, PM, Admin)
   const handleCreateProject = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
-    if (!token) {
-      alert("Session token missing. Please sign out and sign in again.");
-      return;
-    }
-
-    const payload = {
-      name: newProject.name.trim(),
-      description: newProject.description || "Renewable project portfolio",
-      target_capacity_mw: parseFloat(newProject.target_capacity_mw) || 100.0,
-      region: newProject.region.trim() || "Rajasthan",
-      status: newProject.status || "Active",
-      timeline_cod: newProject.timeline_cod || "Q3 2027"
-    };
-
     try {
-      const res = await fetch('http://127.0.0.1:8000/projects', {
+      const payload = {
+        name: newProject.name.trim(),
+        description: newProject.description || "Renewable project portfolio",
+        target_capacity_mw: parseFloat(newProject.target_capacity_mw) || 100.0,
+        region: newProject.region.trim() || "Rajasthan",
+        status: newProject.status || "Active",
+        timeline_cod: newProject.timeline_cod || "Q3 2027"
+      };
+      const res = await fetch(`${API_BASE_URL}/projects`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Server returned HTTP ${res.status}`);
-      }
-
+      if (!res.ok) throw new Error("Failed to create project");
       const created = await res.json();
       setProjects(prev => [...prev, created]);
       setSelectedProjectId(created.id);
@@ -160,12 +190,33 @@ export default function App() {
       setShowProjectModal(false);
       setNewProject({ name: '', description: '', target_capacity_mw: 150, region: 'Rajasthan', status: 'Active', timeline_cod: 'Q3 2027' });
     } catch (err) {
-      console.error("Project creation error:", err);
-      alert(`Project Creation Failed: ${err.message}`);
+      alert(err.message);
     }
   };
 
-  // 2. Add Site (Planner, GIS Analyst, Admin)
+  const handleDeleteProject = async (e, projectId) => {
+    e.stopPropagation();
+    if (!window.confirm("Delete this project and all associated sites?")) return;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Deletion failed");
+      const remaining = projects.filter(p => p.id !== projectId);
+      setProjects(remaining);
+      if (selectedProjectId === projectId) {
+        const nextId = remaining.length > 0 ? remaining[0].id : null;
+        setSelectedProjectId(nextId);
+        if (nextId) fetchSitesForProject(nextId, token);
+        else setSites([]);
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const handleCreateSite = async (e) => {
     e.preventDefault();
     if (!selectedProjectId) return alert("Select a project first!");
@@ -184,9 +235,8 @@ export default function App() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
+      if (!res.ok) throw new Error("Failed to register site");
       const created = await res.json();
-      if (!res.ok) throw new Error(created.detail || 'Failed to register site');
-
       setSites(prev => [...prev, created]);
       setShowSiteModal(false);
       fetchProjects(token);
@@ -195,7 +245,22 @@ export default function App() {
     }
   };
 
-  // 3. Edit GIS Data (GIS Analyst, Admin only)
+  const handleDeleteSite = async (siteId) => {
+    if (!window.confirm("Are you sure you want to delete this candidate site?")) return;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_BASE_URL}/projects/sites/${siteId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to delete site");
+      setSites(prev => prev.filter(s => s.id !== siteId));
+      setSelectedSiteIds(prev => prev.filter(id => id !== siteId));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const handleSaveGis = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token');
@@ -213,9 +278,8 @@ export default function App() {
           avg_temp: parseFloat(gisForm.avg_temp)
         })
       });
+      if (!res.ok) throw new Error("Failed to update GIS data");
       const updated = await res.json();
-      if (!res.ok) throw new Error(updated.detail || 'Failed to update GIS data');
-
       setSites(prev => prev.map(s => s.id === updated.id ? updated : s));
       setShowGisEditModal(false);
     } catch (err) {
@@ -223,23 +287,53 @@ export default function App() {
     }
   };
 
-  // 4. Final Site Approval (Project Manager, Admin only)
+  // -----------------------------------------------------------------
+  // SITE APPROVAL HANDLER (Project Manager Exclusive)
+  // -----------------------------------------------------------------
   const handleToggleApproval = async (site) => {
     const token = localStorage.getItem('token');
+    const newStatus = !site.is_approved;
     try {
       const res = await fetch(`${API_BASE_URL}/projects/sites/${site.id}/approval`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          is_approved: !site.is_approved,
+          is_approved: newStatus,
           is_shortlisted: true,
-          approval_notes: site.is_approved ? "Revoked approval" : "Authorized by Project Manager for Phase 1 construction"
+          approval_notes: newStatus 
+            ? "Approved for Phase 1 construction by Project Manager" 
+            : "Approval revoked by Project Manager"
         })
       });
+      if (!res.ok) throw new Error("Approval update failed");
       const updated = await res.json();
-      if (!res.ok) throw new Error(updated.detail || 'Approval failed');
-
       setSites(prev => prev.map(s => s.id === updated.id ? updated : s));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const toggleSiteSelection = (siteId) => {
+    setSelectedSiteIds(prev =>
+      prev.includes(siteId) ? prev.filter(id => id !== siteId) : [...prev, siteId]
+    );
+  };
+
+  const handleRunComparison = async () => {
+    if (selectedSiteIds.length < 2) {
+      alert("Please select at least 2 candidate sites to compare.");
+      return;
+    }
+    const token = localStorage.getItem('token');
+    const query = selectedSiteIds.map(id => `site_ids=${id}`).join('&');
+    try {
+      const res = await fetch(`${API_BASE_URL}/projects/sites/compare?${query}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Comparison failed");
+      setComparisonSites(data);
+      setShowComparisonModal(true);
     } catch (err) {
       alert(err.message);
     }
@@ -263,7 +357,11 @@ export default function App() {
 
       localStorage.setItem('token', data.access_token);
       setUser(data.user);
-      fetchProjects(data.access_token);
+      if (data.user.role === 'Administrator') {
+        fetchAdminUsers(data.access_token);
+      } else {
+        fetchProjects(data.access_token);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -271,22 +369,20 @@ export default function App() {
     }
   };
 
-  // Role Permission Flags
+  // Role Flags
   const isPlanner = user?.role === 'Renewable Energy Planner';
   const isGis = user?.role === 'GIS Analyst';
   const isPM = user?.role === 'Project Manager';
   const isAdmin = user?.role === 'Administrator';
 
-  const canCreateProject = isPlanner || isPM || isAdmin;
-  const canAddSite = isPlanner || isGis || isAdmin;
-  const canEditGis = isGis || isAdmin;
-  const canApprove = isPM || isAdmin;
+  // Permission Logic
+  const canCreateProject = isPlanner || isPM;
+  const canAddSite = isPlanner || isGis;
+  const canEditGis = isGis;
+  const canApprove = isPM; // Strictly Project Manager
 
   const activeProject = projects.find(p => p.id === selectedProjectId);
 
-  // -------------------------------------------------------------
-  // AUTH VIEW
-  // -------------------------------------------------------------
   if (!user) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#070d19', color: '#fff', fontFamily: 'system-ui, sans-serif' }}>
@@ -294,7 +390,7 @@ export default function App() {
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
             <div style={{ fontSize: '32px' }}>☀️ 💨</div>
             <h2 style={{ margin: '8px 0 4px 0' }}>Solar & Wind Intelligence</h2>
-            <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>Milestone 1 — Core Intelligence Workspace</p>
+            <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>Milestone 1 — Core Workspace</p>
           </div>
 
           {error && <div style={{ background: '#450a0a', border: '1px solid #dc2626', color: '#f87171', padding: '10px', borderRadius: '6px', fontSize: '12px', marginBottom: '14px' }}>{error}</div>}
@@ -339,7 +435,7 @@ export default function App() {
 
           <p style={{ textAlign: 'center', fontSize: '13px', color: '#94a3b8', marginTop: '18px' }}>
             {isLogin ? "Need an account? " : "Already have an account? "}
-            <span onClick={() => setIsLogin(!isLogin)} style={{ color: '#38bdf8', cursor: 'pointer', textDecoration: 'underline' }}>
+            <span onClick={() => { setIsLogin(!isLogin); setError(''); }} style={{ color: '#38bdf8', cursor: 'pointer', textDecoration: 'underline' }}>
               {isLogin ? 'Sign up' : 'Log in'}
             </span>
           </p>
@@ -348,18 +444,18 @@ export default function App() {
     );
   }
 
-  // -------------------------------------------------------------
-  // WORKSPACE VIEW
-  // -------------------------------------------------------------
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#070d18', color: '#f8fafc', fontFamily: 'system-ui, sans-serif' }}>
-      {/* Top Banner with Role Badges */}
+      
+      {/* Top Banner */}
       <div style={{ padding: '20px 36px', borderBottom: '1px solid #142033', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ textTransform: 'uppercase', fontSize: '11px', letterSpacing: '1px', color: '#38bdf8', fontWeight: 'bold' }}>
+          <div style={{ textTransform: 'uppercase', fontSize: '11px', letterSpacing: '1px', color: isAdmin ? '#ef4444' : '#38bdf8', fontWeight: 'bold' }}>
             {user.role} WORKSPACE
           </div>
-          <h1 style={{ margin: '4px 0 0 0', fontSize: '24px', fontWeight: 'bold' }}>Projects & Sites Registry</h1>
+          <h1 style={{ margin: '4px 0 0 0', fontSize: '24px', fontWeight: 'bold' }}>
+            {isAdmin ? 'System Governance & Platform Administration' : 'Projects & Sites Registry'}
+          </h1>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -376,205 +472,284 @@ export default function App() {
         </div>
       </div>
 
-      {/* Two Column Layout matching reference screenshot */}
-      <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', minHeight: 'calc(100vh - 85px)' }}>
-        
-        {/* LEFT COLUMN: Project Portfolios */}
-        <div style={{ borderRight: '1px solid #142033', padding: '24px 20px', backgroundColor: '#09101d' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.5px', color: '#94a3b8', textTransform: 'uppercase' }}>
-              Project Portfolios ({projects.length})
-            </span>
-            {canCreateProject ? (
-              <button
-                onClick={() => setShowProjectModal(true)}
-                style={{ padding: '5px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                + New
-              </button>
-            ) : (
-              <span style={{ fontSize: '10px', color: '#64748b' }}>Project Creation Locked</span>
-            )}
-          </div>
+      {/* 1. ADMIN DASHBOARD */}
+      {isAdmin ? (
+        <div style={{ padding: '32px 36px', maxWidth: '1240px', margin: '0 auto' }}>
+          <h3 style={{ margin: '0 0 4px 0', fontSize: '20px', color: '#f8fafc' }}>
+            🛡️ Platform Security & User Governance
+          </h3>
+          <p style={{ color: '#94a3b8', fontSize: '13px', margin: '0 0 24px 0' }}>
+            Live directory of registered users, RBAC roles, and infrastructure status.
+          </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {projects.map((proj) => {
-              const isSelected = proj.id === selectedProjectId;
-              return (
-                <div
-                  key={proj.id}
-                  onClick={() => handleSelectProject(proj.id)}
-                  style={{
-                    backgroundColor: isSelected ? '#101c30' : '#0d1626',
-                    border: isSelected ? '1px solid #1e3a5f' : '1px solid #142033',
-                    borderRadius: '10px',
-                    padding: '16px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected ? '#38bdf8' : '#e2e8f0', marginBottom: '4px' }}>
-                    {proj.name}
-                  </div>
-                  <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '12px' }}>
-                    {proj.description || 'Target: ' + proj.target_capacity_mw + ' MW • ' + proj.region}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
-                      {proj.status || 'Active'}
-                    </span>
-                    <span style={{ fontSize: '12px', color: '#64748b' }}>
-                      Timeline: {proj.timeline_cod || 'Q3 2027'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+          <div style={{ background: '#0d1526', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #334155', color: '#94a3b8' }}>
+                  <th style={{ padding: '10px' }}>UID</th>
+                  <th style={{ padding: '10px' }}>Full Name</th>
+                  <th style={{ padding: '10px' }}>Login Email</th>
+                  <th style={{ padding: '10px' }}>Assigned Role</th>
+                  <th style={{ padding: '10px' }}>Organization</th>
+                  <th style={{ padding: '10px' }}>Department</th>
+                  <th style={{ padding: '10px' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adminUserList.map((u) => (
+                  <tr key={u.id} style={{ borderBottom: '1px solid #142033' }}>
+                    <td style={{ padding: '10px', color: '#64748b' }}>#{u.id}</td>
+                    <td style={{ padding: '10px', fontWeight: 'bold' }}>{u.full_name}</td>
+                    <td style={{ padding: '10px', color: '#38bdf8' }}>{u.email}</td>
+                    <td style={{ padding: '10px', fontWeight: 'bold', color: '#ef4444' }}>{u.role}</td>
+                    <td style={{ padding: '10px', color: '#cbd5e1' }}>{u.organization}</td>
+                    <td style={{ padding: '10px', color: '#94a3b8' }}>{u.department}</td>
+                    <td style={{ padding: '10px', color: '#10b981' }}>● Active</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
+      ) : (
+        /* 2. OPERATIONAL PROJECTS & SITES VIEW */
+        <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', minHeight: 'calc(100vh - 85px)' }}>
+          
+          {/* Left Column: Portfolios */}
+          <div style={{ borderRight: '1px solid #142033', padding: '24px 20px', backgroundColor: '#09101d' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.5px', color: '#94a3b8', textTransform: 'uppercase' }}>
+                Project Portfolios ({projects.length})
+              </span>
+              {canCreateProject ? (
+                <button
+                  onClick={() => setShowProjectModal(true)}
+                  style={{ padding: '5px 14px', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  + New
+                </button>
+              ) : (
+                <span style={{ fontSize: '10px', color: '#64748b' }}>Creation Locked</span>
+              )}
+            </div>
 
-        {/* RIGHT COLUMN: Sites for the Selected Project */}
-        <div style={{ padding: '24px 32px' }}>
-          {activeProject ? (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 'bold' }}>{activeProject.name}</h2>
-                  <span style={{ fontSize: '13px', color: '#64748b' }}>
-                    Region: {activeProject.region} • Target Capacity: {activeProject.target_capacity_mw} MW
-                  </span>
-                </div>
-                {canAddSite && (
-                  <button
-                    onClick={() => setShowSiteModal(true)}
-                    style={{ padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
-                  >
-                    + Add Site
-                  </button>
-                )}
-              </div>
-
-              {/* Sites Cards List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {sites.map((site) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {projects.map((proj) => {
+                const isSelected = proj.id === selectedProjectId;
+                return (
                   <div
-                    key={site.id}
+                    key={proj.id}
+                    onClick={() => handleSelectProject(proj.id)}
                     style={{
-                      backgroundColor: '#0c1524',
-                      border: site.is_approved ? '1px solid #10b981' : '1px solid #16243b',
-                      borderRadius: '12px',
-                      padding: '20px'
+                      backgroundColor: isSelected ? '#101c30' : '#0d1626',
+                      border: isSelected ? '1px solid #1e3a5f' : '1px solid #142033',
+                      borderRadius: '10px',
+                      padding: '16px',
+                      cursor: 'pointer'
                     }}
                   >
-                    {/* Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#13233c', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
-                          ⚡
-                        </div>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>{site.site_name}</h3>
-                            {site.is_approved && (
-                              <span style={{ backgroundColor: '#065f46', color: '#6ee7b7', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
-                                APPROVED
-                              </span>
-                            )}
-                          </div>
-                          <span style={{ fontSize: '12px', color: '#64748b' }}>
-                            solar • {site.latitude?.toFixed(4)}°, {site.longitude?.toFixed(4)}° • {site.elevation_m}m
-                          </span>
-                        </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '15px', color: isSelected ? '#38bdf8' : '#e2e8f0' }}>
+                        {proj.name}
                       </div>
-
-                      {/* Role Actions */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {/* GIS Analyst Action */}
-                        {canEditGis && (
-                          <button
-                            onClick={() => {
-                              setActiveSiteForGis(site);
-                              setGisForm({
-                                latitude: site.latitude,
-                                longitude: site.longitude,
-                                elevation_m: site.elevation_m,
-                                slope_deg: site.slope_deg || 2.1,
-                                vegetation_ndvi: site.vegetation_ndvi || 0.18,
-                                solar_ghi: site.solar_ghi || 5.69,
-                                avg_temp: site.avg_temp || 28.4
-                              });
-                              setShowGisEditModal(true);
-                            }}
-                            style={{ padding: '6px 12px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
-                          >
-                            🗺️ Edit GIS / Terrain
-                          </button>
-                        )}
-
-                        {/* Project Manager Action */}
-                        {canApprove && (
-                          <button
-                            onClick={() => handleToggleApproval(site)}
-                            style={{
-                              padding: '6px 12px',
-                              background: site.is_approved ? '#4b5563' : '#10b981',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              cursor: 'pointer',
-                              fontWeight: 600
-                            }}
-                          >
-                            {site.is_approved ? 'Revoke Approval' : '✓ Give Final Approval'}
-                          </button>
-                        )}
-
-                        <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>
-                          {site.suitability_score || 7.8} / 10 ▲
-                        </span>
-                      </div>
+                      {canCreateProject && (
+                        <button
+                          onClick={(e) => handleDeleteProject(e, proj.id)}
+                          title="Delete Project"
+                          style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px' }}
+                        >
+                          🗑️
+                        </button>
+                      )}
                     </div>
-
-                    {/* Metric Tiles matching reference image */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px' }}>
-                      <div style={metricBoxStyle}>
-                        <span style={metricLbl}>Solar (GHI)</span>
-                        <span style={metricVal}>{site.solar_ghi} kWh/m²</span>
-                      </div>
-                      <div style={metricBoxStyle}>
-                        <span style={metricLbl}>Avg Temp</span>
-                        <span style={metricVal}>{site.avg_temp} °C</span>
-                      </div>
-                      <div style={metricBoxStyle}>
-                        <span style={metricLbl}>Rainfall</span>
-                        <span style={metricVal}>{site.rainfall_mm || 133.8} mm</span>
-                      </div>
-                      <div style={metricBoxStyle}>
-                        <span style={metricLbl}>Cloud Cover</span>
-                        <span style={metricVal}>{site.cloud_cover_pct || 70.2} %</span>
-                      </div>
-                      <div style={metricBoxStyle}>
-                        <span style={metricLbl}>Capacity Factor</span>
-                        <span style={metricVal}>{site.capacity_factor || 17} %</span>
-                      </div>
-                      <div style={metricBoxStyle}>
-                        <span style={metricLbl}>Est Yield</span>
-                        <span style={metricVal}>{site.est_yield_gwh || 1485.6}</span>
-                      </div>
+                    <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '12px' }}>
+                      Target: {proj.target_capacity_mw} MW • {proj.region}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                        {proj.status || 'Active'}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#64748b' }}>
+                        Timeline: {proj.timeline_cod || 'Q3 2027'}
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b' }}>
-              Select a project from the left panel to manage sites.
-            </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* MODAL 1: Create Project (Planner, PM, Admin) */}
+          {/* Right Column: Sites */}
+          <div style={{ padding: '24px 32px' }}>
+            {activeProject ? (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 'bold' }}>{activeProject.name}</h2>
+                    <span style={{ fontSize: '13px', color: '#64748b' }}>
+                      Region: {activeProject.region} • Target Capacity: {activeProject.target_capacity_mw} MW
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    {selectedSiteIds.length >= 2 && (
+                      <button
+                        onClick={handleRunComparison}
+                        style={{ padding: '8px 16px', background: '#f59e0b', color: '#000', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        ⚖️ Compare Selected ({selectedSiteIds.length})
+                      </button>
+                    )}
+                    {canAddSite && (
+                      <button
+                        onClick={() => setShowSiteModal(true)}
+                        style={{ padding: '8px 18px', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        + Add Site
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sites List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {sites.map((site) => {
+                    const isSelected = selectedSiteIds.includes(site.id);
+                    return (
+                      <div
+                        key={site.id}
+                        style={{
+                          backgroundColor: '#0c1524',
+                          border: isSelected ? '1.5px solid #38bdf8' : site.is_approved ? '1px solid #10b981' : '1px solid #16243b',
+                          borderRadius: '12px',
+                          padding: '20px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSiteSelection(site.id)}
+                              style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                            />
+                            <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#13233c', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                              ⚡
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>{site.site_name}</h3>
+                                {site.is_approved && (
+                                  <span style={{ backgroundColor: '#065f46', color: '#6ee7b7', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                    APPROVED
+                                  </span>
+                                )}
+                              </div>
+                              <span style={{ fontSize: '12px', color: '#64748b' }}>
+                                solar • {site.latitude?.toFixed(4)}°N, {site.longitude?.toFixed(4)}°E • {site.elevation_m}m • {site.land_area_sqkm} km²
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {canEditGis && (
+                              <button
+                                onClick={() => {
+                                  setActiveSiteForGis(site);
+                                  setGisForm({
+                                    latitude: site.latitude,
+                                    longitude: site.longitude,
+                                    elevation_m: site.elevation_m,
+                                    slope_deg: site.slope_deg || 2.1,
+                                    vegetation_ndvi: site.vegetation_ndvi || 0.18,
+                                    solar_ghi: site.solar_ghi || 5.69,
+                                    avg_temp: site.avg_temp || 28.4
+                                  });
+                                  setShowGisEditModal(true);
+                                }}
+                                style={{ padding: '6px 12px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                              >
+                                🗺️ Edit GIS
+                              </button>
+                            )}
+
+                            {/* ------------------------------------------------------------- */}
+                            {/* PROJECT MANAGER APPROVAL BUTTON                               */}
+                            {/* ------------------------------------------------------------- */}
+                            {canApprove && (
+                              <button
+                                onClick={() => handleToggleApproval(site)}
+                                style={{
+                                  padding: '6px 12px',
+                                  background: site.is_approved ? '#4b5563' : '#10b981',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  fontWeight: 600
+                                }}
+                              >
+                                {site.is_approved ? 'Revoke Approval' : '✓ Give Final Approval'}
+                              </button>
+                            )}
+
+                            {canAddSite && (
+                              <button
+                                onClick={() => handleDeleteSite(site.id)}
+                                style={{ padding: '6px 10px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
+                              >
+                                🗑️
+                              </button>
+                            )}
+
+                            <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>
+                              {site.suitability_score || 7.8} / 10 ▲
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Metric Tiles */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px' }}>
+                          <div style={metricBoxStyle}>
+                            <span style={metricLbl}>Solar (GHI)</span>
+                            <span style={metricVal}>{site.solar_ghi} kWh/m²</span>
+                          </div>
+                          <div style={metricBoxStyle}>
+                            <span style={metricLbl}>Avg Temp</span>
+                            <span style={metricVal}>{site.avg_temp} °C</span>
+                          </div>
+                          <div style={metricBoxStyle}>
+                            <span style={metricLbl}>Rainfall</span>
+                            <span style={metricVal}>{site.rainfall_mm || 133.8} mm</span>
+                          </div>
+                          <div style={metricBoxStyle}>
+                            <span style={metricLbl}>Cloud Cover</span>
+                            <span style={metricVal}>{site.cloud_cover_pct || 70.2} %</span>
+                          </div>
+                          <div style={metricBoxStyle}>
+                            <span style={metricLbl}>Capacity Factor</span>
+                            <span style={metricVal}>{site.capacity_factor || 17} %</span>
+                          </div>
+                          <div style={metricBoxStyle}>
+                            <span style={metricLbl}>Est Yield</span>
+                            <span style={metricVal}>{site.est_yield_gwh || 1485.6}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748b' }}>
+                Select a project from the left panel to manage sites.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: Create Project */}
       {showProjectModal && (
         <div style={modalBackdrop}>
           <div style={modalBox}>
@@ -597,14 +772,36 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 2: Add Site (Planner, GIS, Admin) */}
+      {/* MODAL 2: Add Site with Map Picker */}
       {showSiteModal && (
         <div style={modalBackdrop}>
-          <div style={{ ...modalBox, maxWidth: '520px' }}>
-            <h3 style={{ margin: '0 0 16px 0' }}>Add Site to {activeProject?.name}</h3>
+          <div style={{ ...modalBox, maxWidth: '640px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ margin: 0 }}>Add Candidate Site</h3>
+              <button
+                type="button"
+                onClick={() => setShowMapModal(!showMapModal)}
+                style={{ padding: '6px 12px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                {showMapModal ? 'Hide Map' : '🗺️ Pick on Map'}
+              </button>
+            </div>
+
+            {showMapModal && (
+              <div style={{ height: '240px', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px', border: '1px solid #1e293b' }}>
+                <MapContainer center={[newSite.latitude, newSite.longitude]} zoom={6} style={{ height: '100%', width: '100%' }}>
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <LocationPicker
+                    position={[newSite.latitude, newSite.longitude]}
+                    onPositionChange={(lat, lng) => setNewSite(prev => ({ ...prev, latitude: parseFloat(lat.toFixed(4)), longitude: parseFloat(lng.toFixed(4)) }))}
+                  />
+                </MapContainer>
+              </div>
+            )}
+
             <form onSubmit={handleCreateSite}>
               <label style={lbl}>Site Name</label>
-              <input style={inp} required placeholder="e.g. Bareilly Site" value={newSite.site_name} onChange={e => setNewSite({ ...newSite, site_name: e.target.value })} />
+              <input style={inp} required placeholder="e.g. Bareilly Solar Array" value={newSite.site_name} onChange={e => setNewSite({ ...newSite, site_name: e.target.value })} />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
                   <label style={lbl}>Latitude (°N)</label>
@@ -636,14 +833,11 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 3: GIS / Terrain Editor (GIS Analyst & Admin ONLY) */}
+      {/* MODAL 3: GIS Editor */}
       {showGisEditModal && (
         <div style={modalBackdrop}>
           <div style={{ ...modalBox, maxWidth: '520px' }}>
             <h3 style={{ margin: '0 0 8px 0', color: '#38bdf8' }}>GIS & Terrain Editor</h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#94a3b8' }}>
-              Authorized for GIS Analyst & System Administrator only.
-            </p>
             <form onSubmit={handleSaveGis}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
@@ -683,6 +877,62 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* MODAL 4: Multi-Site Comparison Matrix */}
+      {showComparisonModal && (
+        <div style={modalBackdrop}>
+          <div style={{ ...modalBox, maxWidth: '960px', width: '90vw' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, color: '#f59e0b', fontSize: '20px' }}>
+                ⚖️ Multi-Site Comparison Matrix (Module 2)
+              </h3>
+              <button
+                onClick={() => setShowComparisonModal(false)}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '18px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${comparisonSites.length}, 1fr)`, gap: '16px' }}>
+              {comparisonSites.map(s => (
+                <div key={s.id} style={{ background: '#070d19', border: '1px solid #1e293b', borderRadius: '8px', padding: '16px' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#38bdf8', marginBottom: '8px' }}>
+                    {s.site_name}
+                  </div>
+                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>Coordinates</span>
+                    <div style={{ fontSize: '13px' }}>{s.latitude?.toFixed(4)}°N, {s.longitude?.toFixed(4)}°E</div>
+                  </div>
+                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>Elevation & Slope</span>
+                    <div style={{ fontSize: '13px' }}>{s.elevation_m}m • {s.slope_deg || 2.1}° slope</div>
+                  </div>
+                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>Land Area & Ownership</span>
+                    <div style={{ fontSize: '13px' }}>{s.land_area_sqkm} km² • {s.land_ownership}</div>
+                  </div>
+                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>Solar GHI / Avg Temp</span>
+                    <div style={{ fontSize: '13px', color: '#f59e0b' }}>{s.solar_ghi} kWh/m² • {s.avg_temp}°C</div>
+                  </div>
+                  <div style={{ borderBottom: '1px solid #142033', paddingBottom: '6px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>Capacity Factor / Est Yield</span>
+                    <div style={{ fontSize: '13px', color: '#10b981' }}>{s.capacity_factor || 17}% • {s.est_yield_gwh || 1450} GWh</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#64748b' }}>Approval Status</span>
+                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: s.is_approved ? '#10b981' : '#f59e0b' }}>
+                      {s.is_approved ? 'APPROVED' : 'PENDING'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

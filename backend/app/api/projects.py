@@ -21,7 +21,9 @@ def get_db():
         db.close()
 
 # -------------------------------------------------------------
-# Project creation route accepting both "/" and ""
+# 1. PROJECT MANAGEMENT
+# Allowed: Energy Planner, Project Manager, Admin (GIS Analyst Denied)
+# -------------------------------------------------------------
 @router.post("", response_model=ProjectResponse)
 @router.post("/", response_model=ProjectResponse)
 def create_project(
@@ -52,26 +54,42 @@ def create_project(
 def get_projects(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return db.query(Project).all()
 
-    project = Project(
-        name=payload.name,
-        description=payload.description,
-        target_capacity_mw=payload.target_capacity_mw,
-        region=payload.region,
-        status=payload.status,
-        timeline_cod=payload.timeline_cod,
-        owner_id=current_user.id
-    )
-    db.add(project)
-    db.commit()
-    db.refresh(project)
-    return project
+# -------------------------------------------------------------
+# 2. REGION SUMMARY & MULTI-SITE COMPARISON (Module 2 Completion)
+# -------------------------------------------------------------
+@router.get("/regions/summary")
+def get_region_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    projects = db.query(Project).all()
+    regions = {}
+    for p in projects:
+        if p.region not in regions:
+            regions[p.region] = {"projects_count": 0, "total_target_mw": 0.0, "sites_count": 0}
+        regions[p.region]["projects_count"] += 1
+        regions[p.region]["total_target_mw"] += (p.target_capacity_mw or 0.0)
+        regions[p.region]["sites_count"] += len(p.sites)
+    return regions
 
-@router.get("/", response_model=List[ProjectResponse])
-def get_projects(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return db.query(Project).all()
+@router.get("/sites/compare", response_model=List[SiteResponse])
+def compare_sites(
+    site_ids: List[int] = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if len(site_ids) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Select at least 2 sites to run side-by-side comparison"
+        )
+    sites = db.query(Site).filter(Site.id.in_(site_ids)).all()
+    if not sites:
+        raise HTTPException(status_code=404, detail="No matching sites found for comparison")
+    return sites
 
 # -------------------------------------------------------------
-# 2. SITE REGISTRATION
+# 3. SITE REGISTRATION & RETRIEVAL
 # Allowed: Energy Planner, GIS Analyst, Admin
 # -------------------------------------------------------------
 @router.post("/sites", response_model=SiteResponse)
@@ -115,7 +133,7 @@ def get_sites(
     return db.query(Site).all()
 
 # -------------------------------------------------------------
-# 3. GIS & TERRAIN DATA EDITING
+# 4. GIS & TERRAIN DATA EDITING
 # Allowed: GIS Analyst, Admin (Energy Planner and PM strictly forbidden)
 # -------------------------------------------------------------
 @router.put("/sites/{site_id}/gis-data", response_model=SiteResponse)
@@ -140,7 +158,7 @@ def update_gis_data(
     return site
 
 # -------------------------------------------------------------
-# 4. FINAL APPROVAL & SHORTLISTING
+# 5. FINAL APPROVAL & SHORTLISTING
 # Allowed: Project Manager, Admin (Planner and GIS Analyst strictly forbidden)
 # -------------------------------------------------------------
 @router.put("/sites/{site_id}/approval", response_model=SiteResponse)
@@ -166,3 +184,47 @@ def approve_site(
     db.commit()
     db.refresh(site)
     return site
+
+# -------------------------------------------------------------
+# 6. DELETE PROJECT (Cascade deletes linked sites)
+# Allowed: Planner, Project Manager, Admin (GIS Analyst Denied)
+# -------------------------------------------------------------
+@router.delete("/{project_id}", status_code=status.HTTP_200_OK)
+def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([
+        UserRole.PLANNER.value,
+        UserRole.PROJECT_MANAGER.value,
+        UserRole.ADMIN.value
+    ]))
+):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    db.delete(project)
+    db.commit()
+    return {"message": f"Project '{project.name}' and its candidate sites deleted successfully"}
+
+# -------------------------------------------------------------
+# 7. DELETE SITE
+# Allowed: Planner, GIS Analyst, Admin (Project Manager Denied)
+# -------------------------------------------------------------
+@router.delete("/sites/{site_id}", status_code=status.HTTP_200_OK)
+def delete_site(
+    site_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([
+        UserRole.PLANNER.value,
+        UserRole.GIS_ANALYST.value,
+        UserRole.ADMIN.value
+    ]))
+):
+    site = db.query(Site).filter(Site.id == site_id).first()
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    db.delete(site)
+    db.commit()
+    return {"message": f"Site '{site.site_name}' deleted successfully"}
