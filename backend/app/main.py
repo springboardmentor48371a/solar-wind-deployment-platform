@@ -8,6 +8,8 @@ from app.api.environmental import router as environmental_router
 from app.api.gis import router as gis_router
 from app.api.solar import router as solar_router
 from app.api.wind import router as wind_router
+from app.api.suitability import router as suitability_router
+from app.api.forecasting import router as forecasting_router
 
 # Ensure all database tables exist (users, projects, sites)
 Base.metadata.create_all(bind=engine)
@@ -17,7 +19,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Explicit CORS configuration to guarantee all headers and preflight (OPTIONS) requests pass
+# Explicit CORS configuration
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -28,7 +30,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origin_regex=r"http://(localhost|127.0.0.1)(:\d+)?",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
@@ -42,6 +44,8 @@ app.include_router(environmental_router)
 app.include_router(gis_router)
 app.include_router(solar_router)
 app.include_router(wind_router)
+app.include_router(suitability_router)
+app.include_router(forecasting_router)
 
 @app.get("/")
 def health_check():
@@ -54,6 +58,8 @@ def health_check():
             "Environmental Engine",
             "GIS Intelligence",
             "Solar ML Prediction",
-            "Wind Resource Prediction"
+            "Wind Resource Prediction",
+            "Site Suitability & Scoring Engine",
+            "Forecasting & Optimization Engine"
         ]
     }

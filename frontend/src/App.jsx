@@ -297,8 +297,8 @@ export default function App() {
         body: JSON.stringify({
           is_approved: newStatus,
           is_shortlisted: true,
-          approval_notes: newStatus 
-            ? "Approved for Phase 1 construction by Project Manager" 
+          approval_notes: newStatus
+            ? "Approved for Phase 1 construction by Project Manager"
             : "Approval revoked by Project Manager"
         })
       });
@@ -400,6 +400,57 @@ export default function App() {
     }
   };
 
+  // Module 7 & 10: Site Suitability & Scoring Engine
+  const handleCalculateSuitability = async (siteId) => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_BASE_URL}/suitability/score/${siteId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Suitability scoring failed");
+
+      setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
+      alert(
+        `📊 ${data.message}\n` +
+        `• Composite Score: ${data.suitability_analytics.composite_score} / 10\n` +
+        `• Category: ${data.suitability_analytics.category}\n` +
+        `• Resource (35%): ${data.suitability_analytics.factor_breakdown.resource_score_35pct}\n` +
+        `• Terrain (25%): ${data.suitability_analytics.factor_breakdown.terrain_score_25pct}\n` +
+        `• Infrastructure (15%): ${data.suitability_analytics.factor_breakdown.infra_score_15pct}\n` +
+        `• Environment (15%): ${data.suitability_analytics.factor_breakdown.environment_score_15pct}\n` +
+        `• Economic (10%): ${data.suitability_analytics.factor_breakdown.economic_score_10pct}`
+      );
+    } catch (err) {
+      alert(`Suitability Calculation Failed: ${err.message}`);
+    }
+  };
+
+  // Frontend Optimization & Forecasting Trigger
+  const handleRunOptimization = async (siteId) => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_BASE_URL}/forecasting/optimize/${siteId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Optimization failed");
+
+      alert(
+        `⚡ ${data.message}\n` +
+        `• Recommended Tech: ${data.forecasting_analytics.recommended_technology}\n` +
+        `• LCOE: $${data.forecasting_analytics.lcoe_usd_per_mwh} / MWh\n` +
+        `• Est. CAPEX: $${data.forecasting_analytics.estimated_capex_million_usd}M\n` +
+        `• Payback Period: ${data.forecasting_analytics.payback_period_years} Years\n` +
+        `• Peak Hybrid Month Yield: ${Math.max(...data.forecasting_analytics.monthly_generation_gwh.hybrid_combined_gwh)} GWh`
+      );
+    } catch (err) {
+      alert(`Forecasting Error: ${err.message}`);
+    }
+  };
+
   const toggleSiteSelection = (siteId) => {
     setSelectedSiteIds(prev =>
       prev.includes(siteId) ? prev.filter(id => id !== siteId) : [...prev, siteId]
@@ -477,7 +528,7 @@ export default function App() {
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
             <div style={{ fontSize: '32px' }}>☀️ 💨</div>
             <h2 style={{ margin: '8px 0 4px 0' }}>Solar & Wind Intelligence</h2>
-            <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>Milestone 1 & 2 — Operational Platform</p>
+            <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>Operational Platform</p>
           </div>
 
           {error && <div style={{ background: '#450a0a', border: '1px solid #dc2626', color: '#f87171', padding: '10px', borderRadius: '6px', fontSize: '12px', marginBottom: '14px' }}>{error}</div>}
@@ -737,7 +788,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                             {/* MODULE 3: NASA POWER CLIMATE SYNC */}
                             {canAddSite && (
                               <button
@@ -815,6 +866,46 @@ export default function App() {
                                 }}
                               >
                                 💨 Predict Wind
+                              </button>
+                            )}
+
+                            {/* MODULE 7 & 10: SITE SUITABILITY & SCORING */}
+                            {canAddSite && (
+                              <button
+                                onClick={() => handleCalculateSuitability(site.id)}
+                                title="Execute 5-factor weighted suitability and scoring algorithm"
+                                style={{
+                                  padding: '6px 12px',
+                                  background: 'linear-gradient(to right, #10b981, #34d399)',
+                                  color: '#000',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                📊 Score Suitability
+                              </button>
+                            )}
+
+                            {/* FORECAST & HYBRID OPTIMIZATION TRIGGER */}
+                            {canAddSite && (
+                              <button
+                                onClick={() => handleRunOptimization(site.id)}
+                                title="Execute 12-month time-series forecasting & hybrid optimization model"
+                                style={{
+                                  padding: '6px 12px',
+                                  background: 'linear-gradient(to right, #8b5cf6, #ec4899)',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                📈 Forecast & Optimize
                               </button>
                             )}
 
@@ -1048,7 +1139,7 @@ export default function App() {
           <div style={{ ...modalBox, maxWidth: '960px', width: '90vw' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, color: '#f59e0b', fontSize: '20px' }}>
-                ⚖️ Multi-Site Comparison Matrix (Module 2)
+                ⚖️ Multi-Site Comparison Matrix
               </h3>
               <button
                 onClick={() => setShowComparisonModal(false)}
