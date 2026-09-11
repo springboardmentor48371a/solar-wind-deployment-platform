@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { 
   Sun, Wind, LogOut, CheckCircle2, User, Mail, 
-  Calculator, Activity, PlusCircle, History, Landmark, Compass, AlertTriangle, MapPin, Ruler, FileText
+  Calculator, Activity, PlusCircle, History, Landmark, Compass, AlertTriangle, MapPin, Ruler, FileText, Shield
 } from 'lucide-react';
 import { SiteMapPicker, type LocationData } from './SiteMapPicker';
 import { FeasibilityReportModal } from './FeasibilityReportModal';
@@ -222,7 +222,18 @@ export const PlatformDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3 sm:space-x-4">
+            {/* User Role Badge */}
+            <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-extrabold border border-slate-800 bg-slate-900 shadow-sm">
+              {user?.role === 'admin' ? (
+                <span className="text-rose-400 flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-rose-500" /> Admin System View</span>
+              ) : user?.role === 'gis_analyst' ? (
+                <span className="text-cyan-400 flex items-center gap-1.5"><Compass className="w-3.5 h-3.5 text-cyan-500" /> GIS Specialist</span>
+              ) : (
+                <span className="text-amber-400 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-amber-500" /> Energy Planner</span>
+              )}
+            </div>
+
             <button
               onClick={() => setActiveTab(activeTab === 'assess' ? 'settings' : 'assess')}
               className="px-3.5 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-900 text-xs font-semibold text-slate-300 transition-all"
@@ -251,6 +262,11 @@ export const PlatformDashboard: React.FC = () => {
                 <Wind className="w-48 h-48 text-emerald-500" />
               </div>
               <div className="relative z-10">
+                <div className="flex items-center space-x-3 mb-2">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-amber-500/30 bg-amber-500/10 text-amber-400">
+                    {user?.role === 'admin' ? '👑 Admin Mode: Full System Access & Audit' : user?.role === 'gis_analyst' ? '🗺️ GIS Specialist Workstation (Spatial Canvas Active)' : '⚡ Energy Planner View'}
+                  </span>
+                </div>
                 <h2 className="text-3xl font-extrabold text-white mb-2">
                   Solar & Wind Site Suitability Assessment
                 </h2>
@@ -710,6 +726,12 @@ export const PlatformDashboard: React.FC = () => {
                   <span className="text-slate-400 font-bold">Email Address</span>
                   <span className="text-white font-semibold">{user?.email}</span>
                 </div>
+                <div className="flex justify-between border-b border-slate-850 pb-2.5">
+                  <span className="text-slate-400 font-bold">Assigned Platform Role</span>
+                  <span className="text-amber-400 font-extrabold uppercase tracking-wide">
+                    {user?.role || 'gis_analyst'}
+                  </span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-bold">Member Since</span>
                   <span className="text-white font-semibold">
@@ -718,6 +740,68 @@ export const PlatformDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Admin Access Control Table (Visible for Admin role) */}
+            {user?.role === 'admin' && (
+              <div className="glass-card rounded-2xl p-6 sm:p-8 border border-rose-900/30 shadow-xl bg-slate-950/60">
+                <h3 className="text-lg font-bold text-white mb-2 flex items-center space-x-2">
+                  <Shield className="w-5 h-5 text-rose-400" />
+                  <span>Admin System Portal - Platform Roles & Access Control</span>
+                </h3>
+                <p className="text-xs text-slate-400 mb-6">
+                  Manage active user permissions, GIS spatial layers, and enterprise access levels across the organization.
+                </p>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider">
+                        <th className="py-3 px-4">Role Title</th>
+                        <th className="py-3 px-4">Demo Email</th>
+                        <th className="py-3 px-4">Access Level</th>
+                        <th className="py-3 px-4">GIS Workstation Rights</th>
+                        <th className="py-3 px-4 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/40 text-slate-300 font-medium">
+                      <tr className="bg-rose-950/10">
+                        <td className="py-3.5 px-4 font-bold text-rose-400 flex items-center gap-1.5">
+                          <Shield className="w-4 h-4" /> System Administrator
+                        </td>
+                        <td className="py-3.5 px-4 font-mono">admin@solarwind.ai</td>
+                        <td className="py-3.5 px-4">Superuser (Full Read/Write/Deploy)</td>
+                        <td className="py-3.5 px-4">All Layers + Model Calibration</td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">Active</span>
+                        </td>
+                      </tr>
+                      <tr className="bg-cyan-950/10">
+                        <td className="py-3.5 px-4 font-bold text-cyan-400 flex items-center gap-1.5">
+                          <Compass className="w-4 h-4" /> GIS Specialist
+                        </td>
+                        <td className="py-3.5 px-4 font-mono">gis.specialist@solarwind.ai</td>
+                        <td className="py-3.5 px-4">Spatial Analyst (Leaflet, Buffer & Geometry)</td>
+                        <td className="py-3.5 px-4">Full Spatial Vector & Grid Editing</td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">Active</span>
+                        </td>
+                      </tr>
+                      <tr className="bg-amber-950/10">
+                        <td className="py-3.5 px-4 font-bold text-amber-400 flex items-center gap-1.5">
+                          <Activity className="w-4 h-4" /> Energy Planner
+                        </td>
+                        <td className="py-3.5 px-4 font-mono">planner@solarwind.ai</td>
+                        <td className="py-3.5 px-4">Feasibility Analyst (Scoring & Financial Reports)</td>
+                        <td className="py-3.5 px-4">Standard Site Assessment</td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">Active</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -103,6 +103,50 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
         )}
       </button>
 
+      {/* Quick Role Demo Accounts (For Springboard Presentation) */}
+      <div className="pt-2 border-t border-slate-800/80 mt-4">
+        <span className="text-[11px] font-semibold text-slate-400 block mb-2 text-center">
+          1-Click Mentor Demo Role Logins:
+        </span>
+        <div className="grid grid-cols-3 gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('admin@solarwind.ai');
+              setPassword('Madurga@26');
+              login({ email: 'admin@solarwind.ai', password: 'Madurga@26' });
+            }}
+            className="px-2 py-1.5 rounded-lg bg-slate-900 border border-amber-500/40 hover:bg-amber-500/20 text-[11px] font-bold text-amber-300 transition-all text-center truncate"
+          >
+            👑 Admin
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('gis.specialist@solarwind.ai');
+              setPassword('Madurga@26');
+              login({ email: 'gis.specialist@solarwind.ai', password: 'Madurga@26' });
+            }}
+            className="px-2 py-1.5 rounded-lg bg-slate-900 border border-emerald-500/40 hover:bg-emerald-500/20 text-[11px] font-bold text-emerald-300 transition-all text-center truncate"
+          >
+            🗺️ GIS Specialist
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('planner@solarwind.ai');
+              setPassword('Madurga@26');
+              login({ email: 'planner@solarwind.ai', password: 'Madurga@26' });
+            }}
+            className="px-2 py-1.5 rounded-lg bg-slate-900 border border-cyan-500/40 hover:bg-cyan-500/20 text-[11px] font-bold text-cyan-300 transition-all text-center truncate"
+          >
+            ⚡ Energy Planner
+          </button>
+        </div>
+      </div>
+
       {/* Link to Register */}
       <div className="text-center text-xs text-slate-400 font-medium pt-2">
         Don't have an account?{' '}

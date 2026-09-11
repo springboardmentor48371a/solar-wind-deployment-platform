@@ -7,6 +7,7 @@ class UserRegister(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=100, example="Jane Doe")
     email: EmailStr = Field(..., example="jane.doe@renewable-ai.com")
     password: str = Field(..., min_length=6, max_length=100, example="SecretPassword123")
+    role: Optional[str] = Field("gis_analyst", example="gis_analyst")
     confirm_password: Optional[str] = Field(None, example="SecretPassword123")
 
     @field_validator("confirm_password")
@@ -23,6 +24,7 @@ class UserResponse(BaseModel):
     id: UUID
     full_name: str
     email: EmailStr
+    role: str = "gis_analyst"
     created_at: datetime
 
     class Config:
