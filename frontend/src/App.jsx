@@ -87,10 +87,10 @@ export default function App() {
   });
 
   const [authData, setAuthData] = useState({
-    email: 'pm@energygrid.gov',
-    password: 'pm123',
-    full_name: 'Sarah Jenkins',
-    role: ROLES[2]
+    email: 'planner@energygrid.gov',
+    password: 'planner123',
+    full_name: 'Elena Rostova',
+    role: ROLES[0]
   });
 
   useEffect(() => {
@@ -287,9 +287,6 @@ export default function App() {
     }
   };
 
-  // -----------------------------------------------------------------
-  // SITE APPROVAL HANDLER (Project Manager Exclusive)
-  // -----------------------------------------------------------------
   const handleToggleApproval = async (site) => {
     const token = localStorage.getItem('token');
     const newStatus = !site.is_approved;
@@ -310,6 +307,42 @@ export default function App() {
       setSites(prev => prev.map(s => s.id === updated.id ? updated : s));
     } catch (err) {
       alert(err.message);
+    }
+  };
+
+  // Module 3: NASA POWER Climate Sync
+  const handleSyncNasa = async (siteId) => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_BASE_URL}/environmental/sync/${siteId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "NASA sync failed");
+
+      setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
+      alert(`🛰️ ${data.message}\n• Solar GHI: ${data.telemetry.solar_ghi} kWh/m²\n• Avg Temp: ${data.telemetry.avg_temp}°C\n• Rainfall: ${data.telemetry.rainfall_mm} mm\n• Cloud Cover: ${data.telemetry.cloud_cover_pct}%`);
+    } catch (err) {
+      alert(`NASA Sync Failed: ${err.message}`);
+    }
+  };
+
+  // Module 4: OpenStreetMap Spatial Proximity Scan
+  const handleScanOsm = async (siteId) => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_BASE_URL}/gis/scan/${siteId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "OSM Scan failed");
+
+      setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
+      alert(`🗺️ ${data.message}\n• Substation: ${data.spatial_analytics.substation_dist_km} km\n• Transmission Line: ${data.spatial_analytics.transmission_line_dist_km} km\n• Access Road: ${data.spatial_analytics.access_road_dist_km} km\n• Risk Index: ${data.spatial_analytics.interconnect_risk}`);
+    } catch (err) {
+      alert(`OSM Scan Failed: ${err.message}`);
     }
   };
 
@@ -378,8 +411,8 @@ export default function App() {
   // Permission Logic
   const canCreateProject = isPlanner || isPM;
   const canAddSite = isPlanner || isGis;
-  const canEditGis = isGis;
-  const canApprove = isPM; // Strictly Project Manager
+  const canEditGis = isGis || isAdmin;
+  const canApprove = isPM;
 
   const activeProject = projects.find(p => p.id === selectedProjectId);
 
@@ -390,7 +423,7 @@ export default function App() {
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
             <div style={{ fontSize: '32px' }}>☀️ 💨</div>
             <h2 style={{ margin: '8px 0 4px 0' }}>Solar & Wind Intelligence</h2>
-            <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>Milestone 1 — Core Workspace</p>
+            <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>Milestone 1 & 2 — Operational Platform</p>
           </div>
 
           {error && <div style={{ background: '#450a0a', border: '1px solid #dc2626', color: '#f87171', padding: '10px', borderRadius: '6px', fontSize: '12px', marginBottom: '14px' }}>{error}</div>}
@@ -479,7 +512,7 @@ export default function App() {
             🛡️ Platform Security & User Governance
           </h3>
           <p style={{ color: '#94a3b8', fontSize: '13px', margin: '0 0 24px 0' }}>
-            Live directory of registered users, RBAC roles, and infrastructure status.
+            Live directory of registered users, RBAC roles, and infrastructure status[cite: 1].
           </p>
 
           <div style={{ background: '#0d1526', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px' }}>
@@ -651,6 +684,46 @@ export default function App() {
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {/* MODULE 3: NASA POWER CLIMATE SYNC */}
+                            {canAddSite && (
+                              <button
+                                onClick={() => handleSyncNasa(site.id)}
+                                title="Fetch live NASA POWER irradiance and weather data"
+                                style={{
+                                  padding: '6px 12px',
+                                  background: 'linear-gradient(to right, #0284c7, #06b6d4)',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  fontWeight: 600
+                                }}
+                              >
+                                🛰️ Sync NASA Data
+                              </button>
+                            )}
+
+                            {/* MODULE 4: OPENSTREETMAP SPATIAL GRID SCAN */}
+                            {canEditGis && (
+                              <button
+                                onClick={() => handleScanOsm(site.id)}
+                                title="Query OpenStreetMap for nearby substations, transmission lines, and roads"
+                                style={{
+                                  padding: '6px 12px',
+                                  background: 'linear-gradient(to right, #059669, #10b981)',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  fontWeight: 600
+                                }}
+                              >
+                                🗺️ Scan OSM Grid
+                              </button>
+                            )}
+
                             {canEditGis && (
                               <button
                                 onClick={() => {
@@ -672,9 +745,6 @@ export default function App() {
                               </button>
                             )}
 
-                            {/* ------------------------------------------------------------- */}
-                            {/* PROJECT MANAGER APPROVAL BUTTON                               */}
-                            {/* ------------------------------------------------------------- */}
                             {canApprove && (
                               <button
                                 onClick={() => handleToggleApproval(site)}

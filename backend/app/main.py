@@ -4,6 +4,8 @@ from app.models.user import engine, Base
 import app.models.project_site
 from app.api.auth import router as auth_router
 from app.api.projects import router as projects_router
+from app.api.environmental import router as environmental_router
+from app.api.gis import router as gis_router
 
 # Ensure all database tables exist
 Base.metadata.create_all(bind=engine)
@@ -28,8 +30,11 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# Register all modular routers
 app.include_router(auth_router)
 app.include_router(projects_router)
+app.include_router(environmental_router)
+app.include_router(gis_router)
 
 @app.get("/")
 def health_check():
