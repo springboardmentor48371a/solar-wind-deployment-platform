@@ -790,7 +790,7 @@ export default function App() {
                             {featureResults[site.id].solar && (
                               <div style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #d97706', borderRadius: '8px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <h4 style={{ margin: '0 0 8px 0', color: '#f59e0b' }}>☀️ Solar ML Predictor</h4>
+                                  <h4 style={{ margin: '0 0 8px 0', color: '#f59e0b' }}>☀️ Solar Predictor</h4>
                                   <button onClick={() => closeFeatureResult(site.id, 'solar')} style={closeBtnStyle}>✕</button>
                                 </div>
                                 <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].solar.message}</p>
@@ -806,7 +806,7 @@ export default function App() {
                             {featureResults[site.id].wind && (
                               <div style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #0284c7', borderRadius: '8px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <h4 style={{ margin: '0 0 8px 0', color: '#38bdf8' }}>💨 Wind ML Predictor</h4>
+                                  <h4 style={{ margin: '0 0 8px 0', color: '#38bdf8' }}>💨 Wind Predictor</h4>
                                   <button onClick={() => closeFeatureResult(site.id, 'wind')} style={closeBtnStyle}>✕</button>
                                 </div>
                                 <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].wind.message}</p>
