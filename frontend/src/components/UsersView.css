@@ -1,0 +1,128 @@
+.users-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.users-view__table-wrapper {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.users-view__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+  text-align: left;
+}
+
+.users-view__table thead {
+  background-color: var(--color-surface-alt);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.users-view__table th {
+  padding: 12px 18px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  border: none;
+}
+
+.users-view__table tbody tr {
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color 150ms ease;
+}
+
+.users-view__table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.users-view__table tbody tr:hover {
+  background-color: var(--color-surface-alt);
+}
+
+.users-view__table td {
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  border: none;
+  vertical-align: middle;
+}
+
+.users-view__role-select {
+  padding: 6px 10px;
+  background-color: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  font-size: 12px;
+  color: var(--color-text-primary);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+
+.users-view__role-select:focus {
+  border-color: var(--color-accent-rust);
+}
+
+.users-view__status-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.users-view__status-pill--active {
+  background-color: var(--color-pill-green-bg);
+  color: var(--color-pill-green-text);
+}
+
+.users-view__status-pill--inactive {
+  background-color: var(--color-pill-red-bg);
+  color: var(--color-pill-red-text);
+}
+
+.btn-destructive {
+  padding: 6px 12px;
+  background-color: transparent;
+  color: var(--color-pill-red-text);
+  border: 1px solid var(--color-pill-red-bg);
+  border-radius: var(--radius-input);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.btn-destructive:hover {
+  background-color: var(--color-pill-red-bg);
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  font-size: 13px;
+  color: var(--color-text-primary);
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  box-sizing: border-box;
+}
+
+.search-input:focus {
+  border-color: var(--color-accent-rust);
+  box-shadow: 0 0 0 3px rgba(180, 87, 58, 0.12);
+}
+
+.search-input::placeholder {
+  color: var(--color-text-secondary);
+}

@@ -1,0 +1,212 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg);
+  padding: 24px 16px;
+}
+
+.login-page__brand {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-page__brand-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.login-page__brand-subtitle {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 36px 32px;
+}
+
+.login-card__tabs {
+  display: flex;
+  background-color: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  padding: 3px;
+  margin-bottom: 24px;
+  gap: 2px;
+}
+
+.login-card__tab {
+  flex: 1;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-input) - 2px);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.login-card__tab--active {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.login-card__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-card__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.login-card__input,
+.login-card__select {
+  width: 100%;
+  padding: 10px 12px;
+  background-color: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.login-card__input:focus,
+.login-card__select:focus {
+  border-color: var(--color-accent-rust);
+  box-shadow: 0 0 0 3px rgba(180, 87, 58, 0.12);
+}
+
+.login-card__password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-card__password-wrap .login-card__input {
+  padding-right: 40px;
+}
+
+.login-card__password-toggle {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-badge);
+}
+
+.login-card__password-toggle:hover {
+  color: var(--color-text-primary);
+}
+
+.login-card__error {
+  background-color: var(--color-pill-red-bg);
+  color: var(--color-pill-red-text);
+  padding: 9px 12px;
+  border-radius: var(--radius-badge);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.login-card__submit-btn {
+  width: 100%;
+  padding: 11px 16px;
+  background-color: var(--color-accent-rust);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-input);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: filter 150ms ease, opacity 150ms ease;
+}
+
+.login-card__submit-btn:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+.login-card__submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-card__divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.login-card__divider::before,
+.login-card__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: var(--color-border);
+}
+
+.login-card__divider span {
+  padding: 0 12px;
+}
+
+.login-card__google-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.login-card__google-btn:hover {
+  background-color: var(--color-surface-alt);
+  border-color: var(--color-text-secondary);
+}

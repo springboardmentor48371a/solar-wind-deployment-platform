@@ -1,0 +1,116 @@
+.env-summary {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.env-summary__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.env-summary__title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.env-summary__btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-input);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.env-summary__btn:hover:not(:disabled) {
+  background-color: var(--color-surface-alt);
+  border-color: var(--color-text-secondary);
+}
+
+.env-summary__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.env-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.env-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.env-card__label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.env-card__value {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.1;
+}
+
+.env-card__value--solar {
+  color: var(--color-accent-rust);
+}
+
+.env-card__value--wind {
+  color: var(--color-accent-steel);
+}
+
+.env-card__value--olive {
+  color: var(--color-accent-olive);
+}
+
+.env-card__unit {
+  font-size: 10px;
+  font-family: var(--font-body);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.env-summary__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding: 12px 0;
+}
+
+.env-summary__spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent-rust);
+  border-radius: 50%;
+  animation: envSpin 600ms linear infinite;
+}
+
+@keyframes envSpin {
+  to { transform: rotate(360deg); }
+}

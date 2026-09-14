@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 
 from ..database import get_db
 from ..models.environmental import EnvironmentalData
@@ -24,6 +24,18 @@ async def collect_data(
     site = db.query(Site).filter(Site.id == site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
+
+    # 24-hour cache check — skip re-fetching if data was collected recently
+    latest = db.query(func.max(EnvironmentalData.fetched_at)).filter(
+        EnvironmentalData.site_id == site_id
+    ).scalar()
+    if latest:
+        age = datetime.now(timezone.utc) - latest.replace(tzinfo=timezone.utc)
+        if age.total_seconds() < 86400:
+            count = db.query(func.count(EnvironmentalData.id)).filter(
+                EnvironmentalData.site_id == site_id
+            ).scalar()
+            return {"message": "Data already up to date", "site_id": site_id, "days": count}
 
     records = await collect_environmental_data(site.latitude, site.longitude, days, site.elevation)
 

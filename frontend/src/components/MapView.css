@@ -1,0 +1,196 @@
+.map-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.map-view__panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.map-view__panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.map-view__legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.map-view__legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all 150ms ease;
+  user-select: none;
+}
+
+.map-view__legend-chip:hover {
+  background-color: var(--color-surface-alt);
+  border-color: var(--color-text-secondary);
+}
+
+.map-view__legend-chip--active {
+  background-color: var(--color-surface-alt);
+  border-color: var(--color-accent-rust);
+  font-weight: 600;
+}
+
+.map-view__legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.map-view__legend-dot--solar {
+  background-color: var(--color-accent-rust);
+}
+
+.map-view__legend-dot--wind {
+  background-color: var(--color-accent-steel);
+}
+
+.map-view__legend-dot--hybrid {
+  background-color: var(--color-accent-olive);
+}
+
+.map-view__container {
+  width: 100%;
+  height: calc(100vh - 210px);
+  min-height: 520px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  background-color: var(--color-map-bg);
+  box-shadow: var(--shadow-card);
+}
+
+/* Custom Editorial Leaflet Popup */
+.leaflet-popup-content-wrapper {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-card) !important;
+  box-shadow: 0 4px 16px rgba(43, 42, 38, 0.12) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-tip {
+  background-color: var(--color-surface) !important;
+}
+
+.leaflet-popup-content {
+  margin: 14px 16px !important;
+  line-height: 1.4 !important;
+}
+
+.map-popup {
+  min-width: 200px;
+  font-family: var(--font-body);
+}
+
+.map-popup__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 2px;
+}
+
+.map-popup__subtitle {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  text-transform: capitalize;
+  margin-bottom: 8px;
+}
+
+.map-popup__score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.map-popup__score-val {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.map-popup__score-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.map-popup__score-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.map-popup__details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-text-primary);
+}
+
+.map-popup__coords {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Custom Marker Styling */
+.editorial-map-marker {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 150ms ease;
+}
+
+.editorial-map-marker:hover {
+  transform: scale(1.2);
+}
+
+.editorial-map-marker--solar {
+  border: 3px solid var(--color-accent-rust);
+}
+
+.editorial-map-marker--wind {
+  border: 3px solid var(--color-accent-steel);
+}
+
+.editorial-map-marker--hybrid {
+  border: 3px solid var(--color-accent-olive);
+}

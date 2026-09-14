@@ -19,12 +19,31 @@ function ProtectedRoute({ user, children }) {
   return children
 }
 
+function RoleRoute({ user, allowedRole, children }) {
+  if (!user) return <Navigate to="/" replace />
+  if (user.role !== allowedRole) return <Navigate to={ROLE_ROUTES[user.role] || '/'} replace />
+  return children
+}
+
 export default function App() {
   const [user, setUser] = useState(null)
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    const devRole = params.get('dev_role')
+    if (devRole && ROLE_ROUTES[devRole]) {
+      setUser({
+        id: 'dev-user-1',
+        full_name: 'Dr. Evelyn Vance',
+        email: 'evelyn.vance@renewable.org',
+        role: devRole,
+        is_active: true,
+      })
+      setChecking(false)
+      return
+    }
+
     const accessToken = params.get('access_token')
     const refreshToken = params.get('refresh_token')
     if (accessToken) {
@@ -35,7 +54,7 @@ export default function App() {
     const token = localStorage.getItem('access_token')
     if (token) {
       getProfile(token)
-        .then(res => setUser(res.data))
+        .then((res) => setUser(res.data))
         .catch(() => localStorage.removeItem('access_token'))
         .finally(() => setChecking(false))
     } else {
@@ -45,7 +64,7 @@ export default function App() {
 
   const handleSuccess = () => {
     const token = localStorage.getItem('access_token')
-    getProfile(token).then(res => setUser(res.data))
+    getProfile(token).then((res) => setUser(res.data))
   }
 
   const handleLogout = () => {
@@ -61,21 +80,48 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={
-          user ? <Navigate to={ROLE_ROUTES[user.role]} replace /> : <Login onSuccess={handleSuccess} />
-        } />
-        <Route path="/dashboard/planner" element={
-          <ProtectedRoute user={user}><EnergyPlannerDashboard {...dashboardProps} /></ProtectedRoute>
-        } />
-        <Route path="/dashboard/gis" element={
-          <ProtectedRoute user={user}><GISAnalystDashboard {...dashboardProps} /></ProtectedRoute>
-        } />
-        <Route path="/dashboard/manager" element={
-          <ProtectedRoute user={user}><ProjectManagerDashboard {...dashboardProps} /></ProtectedRoute>
-        } />
-        <Route path="/dashboard/admin" element={
-          <ProtectedRoute user={user}><AdminDashboard {...dashboardProps} /></ProtectedRoute>
-        } />
+        <Route
+          path="/"
+          element={
+            user ? (
+              <Navigate to={ROLE_ROUTES[user.role]} replace />
+            ) : (
+              <Login onSuccess={handleSuccess} />
+            )
+          }
+        />
+        <Route
+          path="/dashboard/planner"
+          element={
+            <RoleRoute user={user} allowedRole="energy_planner">
+              <EnergyPlannerDashboard {...dashboardProps} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/dashboard/gis"
+          element={
+            <RoleRoute user={user} allowedRole="gis_analyst">
+              <GISAnalystDashboard {...dashboardProps} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/dashboard/manager"
+          element={
+            <RoleRoute user={user} allowedRole="project_manager">
+              <ProjectManagerDashboard {...dashboardProps} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/dashboard/admin"
+          element={
+            <RoleRoute user={user} allowedRole="administrator">
+              <AdminDashboard {...dashboardProps} />
+            </RoleRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

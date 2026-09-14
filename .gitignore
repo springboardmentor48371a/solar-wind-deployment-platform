@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Google Earth Engine service account key
+*gee-key*.json
+*gee_key*.json
+*service-account*.json
+*service_account*.json

@@ -49,6 +49,9 @@ services:
       - "8001:8001"
     environment:
       DATABASE_URL: postgresql://solarwind:solarwind123@db:5432/solarwind_db
+      GEE_SERVICE_ACCOUNT: ${GEE_SERVICE_ACCOUNT:-}
+      GEE_KEY_PATH: ${GEE_KEY_FILE:-}
+      GEE_PROJECT: ${GEE_PROJECT:-astral-pipe-508512-s9}
     depends_on:
       db:
         condition: service_healthy

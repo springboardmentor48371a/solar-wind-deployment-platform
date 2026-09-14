@@ -12,26 +12,31 @@ def load_model():
     if MODEL_PATH.exists():
         model = joblib.load(MODEL_PATH)
 
-def predict_wind(wind_speed: float, wind_direction: float, temperature_avg: float = None) -> dict:
+def predict_wind(wind_speed: float, wind_speed_50m: float | None, wind_direction: float, temperature_avg: float = None) -> dict:
     if model is None:
         return {"wind_power_kw": None, "wind_capacity_factor": None, "wind_score": None}
+
+    # Use 50 m wind speed if available — closer to turbine hub height (~80–100 m).
+    # 10 m wind speed (WS10M) is too low and produces near-zero scores.
+    effective_speed = wind_speed_50m if wind_speed_50m is not None else wind_speed
 
     now = datetime.utcnow()
     hour  = now.hour
     month = now.month
 
     # Engineered features — must match training order exactly
-    wind_speed_cubed     = wind_speed ** 3
-    theoretical_power    = wind_speed_cubed * 0.5 * 1.225 * (41.0 ** 2) * np.pi / 4 / 1000  # Betz limit estimate
+    wind_speed_cubed     = effective_speed ** 3
+    # Rotor area = π × r²  where r = 41 m → A ≈ 5,281 m²
+    theoretical_power    = wind_speed_cubed * 0.5 * 1.225 * (np.pi * 41.0**2) / 1000
     sin_wind_dir         = np.sin(np.radians(wind_direction))
     cos_wind_dir         = np.cos(np.radians(wind_direction))
     sin_hour             = np.sin(2 * np.pi * hour / 24)
     cos_hour             = np.cos(2 * np.pi * hour / 24)
-    wind_speed_lag_1     = wind_speed       # no history at prediction time — use current as proxy
-    wind_speed_roll_mean = wind_speed       # no rolling window at prediction time — use current as proxy
+    wind_speed_lag_1     = effective_speed
+    wind_speed_roll_mean = effective_speed
 
     features = np.array([[
-        wind_speed,
+        effective_speed,
         wind_speed_cubed,
         theoretical_power,
         sin_wind_dir,
@@ -48,8 +53,7 @@ def predict_wind(wind_speed: float, wind_direction: float, temperature_avg: floa
     # Model predicts negative below cut-in speed (~9 m/s for the SCADA turbine).
     # Fall back to Betz-limit power curve for low wind speeds.
     if power_kw < 0:
-        # P = 0.5 * Cp * rho * A * v^3, Cp=0.35 (realistic), rotor radius=41m
-        power_kw = max(0.0, 0.35 * 0.5 * 1.225 * (np.pi * 41.0**2) * wind_speed**3 / 1000)
+        power_kw = max(0.0, 0.35 * 0.5 * 1.225 * (np.pi * 41.0**2) * effective_speed**3 / 1000)
     capacity_factor = min(power_kw / 2000.0, 1.0)
     score           = min(round(capacity_factor / 0.35 * 100, 2), 100.0)
 

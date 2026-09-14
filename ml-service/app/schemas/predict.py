@@ -33,6 +33,7 @@ class SitePredictionResponse(BaseModel):
     environmental_score: Optional[float]
     economic_score: Optional[float]
     predicted_at: Optional[datetime]
+    updated_at: Optional[datetime]
     model_config = {"from_attributes": True}
 
 class EnergyForecastResponse(BaseModel):

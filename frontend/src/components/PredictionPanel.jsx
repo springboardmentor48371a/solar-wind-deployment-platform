@@ -1,38 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getPrediction, runPrediction } from '../api'
+import './PredictionPanel.css'
 
-const CATEGORY_COLORS = {
-  'Excellent':           '#16a34a',
-  'Highly Suitable':     '#65a30d',
-  'Moderately Suitable': '#ca8a04',
-  'Low Suitability':     '#ea580c',
-  'Unsuitable':          '#dc2626',
-}
-
-const ScoreBar = ({ value, color }) => (
-  <div style={{ height: 6, background: '#e5e7eb', borderRadius: 3, marginTop: 4 }}>
-    <div style={{ height: '100%', width: `${Math.min(value ?? 0, 100)}%`, background: color || '#6b7280', borderRadius: 3, transition: 'width 0.4s' }} />
-  </div>
-)
-
-const ScoreCard = ({ label, value, color, unit = 'pts' }) => (
-  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 12px', minWidth: 110 }}>
-    <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>{label}</div>
-    <div style={{ fontSize: 20, fontWeight: 700, color: color || '#111' }}>
-      {value != null ? Math.round(value) : '—'}
-      {value != null && <span style={{ fontSize: 11, fontWeight: 400, color: '#9ca3af', marginLeft: 2 }}>{unit}</span>}
-    </div>
-    {value != null && <ScoreBar value={value} color={color} />}
-  </div>
-)
-
-const LandCoverBadge = ({ cls }) => {
-  const colors = { vegetation: '#16a34a', cropland: '#65a30d', barren: '#ca8a04', urban: '#6b7280', water: '#2563eb' }
-  const color = colors[cls] || '#6b7280'
+function ProgressBar({ value, variant = 'rust' }) {
+  const pct = Math.min(Math.max(value ?? 0, 0), 100)
   return (
-    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: color + '20', color, fontWeight: 600, textTransform: 'capitalize' }}>
-      {cls || '—'}
-    </span>
+    <div style={{ height: '4px', background: 'var(--color-border)', borderRadius: 'var(--radius-pill)', width: '100%', marginTop: '6px', overflow: 'hidden' }}>
+      <div
+        style={{
+          height: '100%',
+          width: `${pct}%`,
+          background: variant === 'olive' ? 'var(--color-accent-olive)' : variant === 'steel' ? 'var(--color-accent-steel)' : 'var(--color-accent-rust)',
+          borderRadius: 'var(--radius-pill)',
+          transition: 'width 250ms ease',
+        }}
+      />
+    </div>
   )
 }
 
@@ -42,21 +25,23 @@ export default function PredictionPanel({ siteId, energyType }) {
   const [running, setRunning] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => { load() }, [siteId])
-
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
       const res = await getPrediction(siteId)
       setPred(res.data)
     } catch (e) {
-      if (e.response?.status === 404) setError('No predictions yet.')
-      else setError('Failed to load predictions.')
+      if (e.response?.status === 404) setError('No ML predictions calculated yet.')
+      else setError('Failed to retrieve predictions.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [siteId])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   const run = async () => {
     setRunning(true)
@@ -65,108 +50,177 @@ export default function PredictionPanel({ siteId, energyType }) {
       const res = await runPrediction(siteId)
       setPred(res.data)
     } catch (e) {
-      setError(e.response?.data?.detail || 'Prediction failed.')
+      setError(e.response?.data?.detail || 'Inference engine failed. Check coordinates.')
     } finally {
       setRunning(false)
     }
   }
 
-  const catColor = pred ? (CATEGORY_COLORS[pred.suitability_category] || '#6b7280') : '#6b7280'
+  const isSolar = energyType === 'solar' || energyType === 'hybrid'
+  const isWind = energyType === 'wind' || energyType === 'hybrid'
+
+  const cat = pred?.suitability_category || ''
+  const isGreen = cat === 'Excellent' || cat === 'Highly Suitable'
+  const isRed = cat === 'Unsuitable'
+  const tierClass = isGreen
+    ? 'pred-panel__hero-tier--green'
+    : isRed
+    ? 'pred-panel__hero-tier--red'
+    : 'pred-panel__hero-tier--peach'
+
+  const scoreVariant = isGreen ? 'olive' : isRed ? 'rust' : 'rust'
 
   return (
-    <div style={{ marginTop: 14, borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>ML Predictions</span>
-        <button onClick={run} disabled={running}
-          style={{ padding: '3px 10px', fontSize: 11, border: '1px solid #e5e7eb', borderRadius: 4, cursor: 'pointer', background: '#fff', color: '#6b7280' }}>
-          {running ? 'Running...' : pred ? 'Re-run' : 'Run Now'}
+    <div className="pred-panel">
+      <div className="pred-panel__header">
+        <span className="pred-panel__title">ML Suitability Assessment</span>
+        <button
+          type="button"
+          onClick={run}
+          disabled={running}
+          className="pred-panel__btn"
+        >
+          {running ? 'Running ML Models...' : pred ? 'Recalculate' : 'Run Model'}
         </button>
       </div>
 
-      {loading && <p style={{ fontSize: 12, color: '#9ca3af' }}>Loading predictions...</p>}
+      {loading && (
+        <div style={{ padding: '12px 0', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+          Retrieving suitability metrics...
+        </div>
+      )}
 
       {!loading && error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <p style={{ fontSize: 12, color: '#9ca3af' }}>{error}</p>
-          <button onClick={run} disabled={running}
-            style={{ padding: '3px 10px', fontSize: 11, border: '1px solid #e5e7eb', borderRadius: 4, cursor: 'pointer', background: '#fff' }}>
-            {running ? 'Running...' : 'Run Predictions'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 0', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={run}
+            disabled={running}
+            className="pred-panel__btn"
+          >
+            {running ? 'Running...' : 'Generate Prediction'}
           </button>
         </div>
       )}
 
       {pred && (
         <div>
-          {/* Suitability header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, padding: '10px 14px', background: catColor + '10', border: `1px solid ${catColor}40`, borderRadius: 8 }}>
-            <div>
-              <div style={{ fontSize: 11, color: '#6b7280' }}>Overall Suitability</div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: catColor, lineHeight: 1.1 }}>
+          {/* Overall Hero Banner */}
+          <div className="pred-panel__hero">
+            <div className="pred-panel__hero-score">
+              <span className={`pred-panel__hero-number ${isGreen ? 'pred-panel__hero-number--olive' : ''}`}>
                 {pred.suitability_score != null ? Math.round(pred.suitability_score) : '—'}
-                <span style={{ fontSize: 13, fontWeight: 400, color: '#9ca3af', marginLeft: 2 }}>/100</span>
+              </span>
+              <span className="pred-panel__hero-total">/100</span>
+            </div>
+            <div className="pred-panel__hero-info">
+              <span className={`pred-panel__hero-tier ${tierClass}`}>
+                {pred.suitability_category || 'Assessed'}
+              </span>
+              <ProgressBar value={pred.suitability_score} variant={scoreVariant} />
+            </div>
+          </div>
+
+          {/* Primary Factor Cards */}
+          <div className="pred-panel__scores-grid">
+            {isSolar && (
+              <div className="pred-panel__score-card">
+                <div className="pred-panel__score-card-label">Solar Resource</div>
+                <div className="pred-panel__score-card-val pred-panel__score-card-val--solar">
+                  {pred.solar_score != null ? Math.round(pred.solar_score) : '—'}
+                </div>
+                <ProgressBar value={pred.solar_score} variant="rust" />
               </div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: catColor }}>{pred.suitability_category || '—'}</span>
-              <ScoreBar value={pred.suitability_score} color={catColor} />
-            </div>
-          </div>
-
-          {/* Resource scores */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-            {(energyType === 'solar' || energyType === 'hybrid') && (
-              <ScoreCard label="Solar Score" value={pred.solar_score} color="#f59e0b" />
             )}
-            {(energyType === 'wind' || energyType === 'hybrid') && (
-              <ScoreCard label="Wind Score" value={pred.wind_score} color="#3b82f6" />
+            {isWind && (
+              <div className="pred-panel__score-card">
+                <div className="pred-panel__score-card-label">Wind Resource</div>
+                <div className="pred-panel__score-card-val pred-panel__score-card-val--wind">
+                  {pred.wind_score != null ? Math.round(pred.wind_score) : '—'}
+                </div>
+                <ProgressBar value={pred.wind_score} variant="steel" />
+              </div>
             )}
-            <ScoreCard label="Land Cover" value={pred.land_cover_score} color="#10b981" />
+            <div className="pred-panel__score-card">
+              <div className="pred-panel__score-card-label">Terrain &amp; Land</div>
+              <div className="pred-panel__score-card-val pred-panel__score-card-val--olive">
+                {pred.land_cover_score != null ? Math.round(pred.land_cover_score) : '—'}
+              </div>
+              <ProgressBar value={pred.land_cover_score} variant="olive" />
+            </div>
           </div>
 
-          {/* Solar details */}
-          {pred.solar_capacity_factor != null && (energyType === 'solar' || energyType === 'hybrid') && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
-              ☀️ Capacity Factor: <strong>{(pred.solar_capacity_factor * 100).toFixed(1)}%</strong>
-              {' · '}Est. Yield: <strong>{pred.solar_yield_kwh?.toFixed(1)} kWh/day</strong> per kWp
+          {/* Environmental and Engineering Details */}
+          <div className="pred-panel__details">
+            {isSolar && pred.solar_capacity_factor != null && (
+              <div>
+                Solar Capacity Factor: <strong>{(pred.solar_capacity_factor * 100).toFixed(1)}%</strong>
+                {' · '}Estimated Yield: <strong>{pred.solar_yield_kwh?.toFixed(1)} kWh/day</strong> per kWp
+              </div>
+            )}
+            {isWind && pred.wind_power_kw != null && (
+              <div>
+                Wind Turbine Potential: <strong>{pred.wind_power_kw?.toFixed(0)} kW</strong>
+                {' · '}Capacity Factor: <strong>{(pred.wind_capacity_factor * 100).toFixed(1)}%</strong>
+              </div>
+            )}
+            <div>
+              Land Classification:{' '}
+              <strong style={{ textTransform: 'capitalize' }}>
+                {pred.land_cover_class || 'General'}
+              </strong>
+              {pred.vegetation_index != null && (
+                <span> &middot; NDVI: <strong>{pred.vegetation_index.toFixed(2)}</strong></span>
+              )}
+              {pred.land_slope != null && (
+                <span> &middot; Slope: <strong>{pred.land_slope.toFixed(1)}&deg;</strong></span>
+              )}
             </div>
-          )}
-
-          {/* Wind details */}
-          {pred.wind_power_kw != null && (energyType === 'wind' || energyType === 'hybrid') && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
-              💨 Power Output: <strong>{pred.wind_power_kw?.toFixed(0)} kW</strong>
-              {' · '}Capacity Factor: <strong>{(pred.wind_capacity_factor * 100).toFixed(1)}%</strong>
-            </div>
-          )}
-
-          {/* Land cover */}
-          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
-            🌍 Land Cover: <LandCoverBadge cls={pred.land_cover_class} />
-            {pred.vegetation_index != null && <span style={{ marginLeft: 8 }}>NDVI: <strong>{pred.vegetation_index?.toFixed(2)}</strong></span>}
-            {pred.land_slope != null && <span style={{ marginLeft: 8 }}>Slope: <strong>{pred.land_slope?.toFixed(1)}°</strong></span>}
           </div>
 
-          {/* Sub-scores breakdown */}
-          <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Score Breakdown</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {[
-              { label: 'Resource (35%)',       value: pred.resource_score,        color: '#f59e0b' },
-              { label: 'Geographic (25%)',     value: pred.geographic_score,      color: '#8b5cf6' },
-              { label: 'Infrastructure (15%)', value: pred.infrastructure_score,  color: '#6b7280' },
-              { label: 'Environmental (15%)',  value: pred.environmental_score,   color: '#10b981' },
-              { label: 'Economic (10%)',       value: pred.economic_score,        color: '#3b82f6' },
-            ].map(({ label, value, color }) => (
-              <div key={label} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '6px 10px', minWidth: 130 }}>
-                <div style={{ fontSize: 10, color: '#9ca3af' }}>{label}</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color }}>{value != null ? Math.round(value) : '—'}</div>
-                <ScoreBar value={value} color={color} />
+          {/* Weighted Sub-Scores Breakdown */}
+          <div className="pred-panel__breakdown-title">Multi-Criteria Score Breakdown</div>
+          <div className="pred-panel__breakdown-grid">
+            {(energyType === 'solar'
+              ? [
+                  { label: 'Resource (43%)', val: pred.resource_score, variant: 'rust' },
+                  { label: 'Geographic (19%)', val: pred.geographic_score, variant: 'steel' },
+                  { label: 'Infrastructure (16%)', val: pred.infrastructure_score, variant: 'olive' },
+                  { label: 'Environmental (12%)', val: pred.environmental_score, variant: 'olive' },
+                  { label: 'Economic (10%)', val: pred.economic_score, variant: 'steel' },
+                ]
+              : energyType === 'wind'
+              ? [
+                  { label: 'Resource (36%)', val: pred.resource_score, variant: 'rust' },
+                  { label: 'Geographic (31%)', val: pred.geographic_score, variant: 'steel' },
+                  { label: 'Infrastructure (19%)', val: pred.infrastructure_score, variant: 'olive' },
+                  { label: 'Environmental (4%)', val: pred.environmental_score, variant: 'olive' },
+                  { label: 'Economic (10%)', val: pred.economic_score, variant: 'steel' },
+                ]
+              : [
+                  { label: 'Resource (40%)', val: pred.resource_score, variant: 'rust' },
+                  { label: 'Geographic (25%)', val: pred.geographic_score, variant: 'steel' },
+                  { label: 'Infrastructure (18%)', val: pred.infrastructure_score, variant: 'olive' },
+                  { label: 'Environmental (8%)', val: pred.environmental_score, variant: 'olive' },
+                  { label: 'Economic (10%)', val: pred.economic_score, variant: 'steel' },
+                ]
+            ).map((item) => (
+              <div key={item.label} className="pred-panel__breakdown-item">
+                <div className="pred-panel__breakdown-label">{item.label}</div>
+                <div className="pred-panel__breakdown-val">
+                  {item.val != null ? Math.round(item.val) : '—'}
+                </div>
+                <ProgressBar value={item.val} variant={item.variant} />
               </div>
             ))}
           </div>
 
-          <div style={{ fontSize: 10, color: '#d1d5db', marginTop: 8 }}>
-            Last predicted: {pred.predicted_at ? new Date(pred.predicted_at).toLocaleString() : '—'}
-          </div>
+          {pred.updated_at && (
+            <div className="pred-panel__timestamp">
+              Last calculated {new Date(pred.updated_at).toLocaleDateString()} at {new Date(pred.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -6,7 +6,10 @@ from typing import List
 from ..database import get_db
 from ..models import SitePrediction, EnergyForecast, LandCover
 from ..schemas.predict import PredictRequest, SitePredictionResponse, EnergyForecastResponse, LandCoverResponse
-from ..services import solar, wind, land_cover, suitability, forecast
+from ..services import solar, wind, land_cover, suitability, forecast, earth_engine
+from datetime import datetime, timezone
+
+EE_CACHE_DAYS = earth_engine.EE_CACHE_DAYS
 
 router = APIRouter(prefix="/predict", tags=["Predictions"])
 
@@ -50,38 +53,73 @@ def predict_all(payload: PredictRequest, db: Session = Depends(get_db)):
     if not env:
         raise HTTPException(status_code=404, detail="No environmental data found for this site. Collect env data first.")
 
-    # Solar
+    energy_type = payload.energy_type
+
+    # Only run the models relevant to the site's energy type.
+    # Solar sites don't need a wind score; wind sites don't need a solar score.
     solar_result = solar.predict_solar(
         solar_irradiance=env.get("solar_irradiance") or 0.0,
         temperature_avg=env.get("temperature_avg") or 25.0,
         cloud_cover=env.get("cloud_cover") or 0.0,
         peak_sun_hours=env.get("peak_sun_hours") or 0.0,
-    )
+    ) if energy_type in ("solar", "hybrid") else {"solar_yield_kwh": None, "solar_capacity_factor": None, "solar_score": None}
 
-    # Wind
     wind_result = wind.predict_wind(
         wind_speed=env.get("wind_speed") or 0.0,
+        wind_speed_50m=env.get("wind_speed_50m"),
         wind_direction=env.get("wind_direction") or 0.0,
         temperature_avg=env.get("temperature_avg") or 25.0,
-    )
+    ) if energy_type in ("wind", "hybrid") else {"wind_power_kw": None, "wind_capacity_factor": None, "wind_score": None}
 
-    # Land cover — use real NDVI and slope from environmental_data
+    # Land cover — fetch features from Earth Engine (cached per site for EE_CACHE_DAYS)
     ndvi      = env.get("vegetation_index") or 0.3
     slope_deg = env.get("land_slope") or 2.0
+    elevation = env.get("elevation") or 0.0
+
+    ee_features = None
+    if earth_engine.is_ready():
+        existing_lc_cache = db.query(LandCover).filter(LandCover.site_id == payload.site_id).first()
+        cache_stale = (
+            existing_lc_cache is None
+            or existing_lc_cache.ee_features_fetched_at is None
+            or (datetime.now(timezone.utc) - existing_lc_cache.ee_features_fetched_at.replace(tzinfo=timezone.utc)).days >= EE_CACHE_DAYS
+        )
+        if cache_stale:
+            ee_features = earth_engine.extract_features(payload.latitude, payload.longitude)
+        else:
+            # Re-use cached EE features stored on the LandCover row
+            if existing_lc_cache and existing_lc_cache.ndvi is not None:
+                ee_features = {
+                    "ndvi":                    existing_lc_cache.ndvi,
+                    "ndbi":                    0.0,   # not stored separately — will re-fetch next cycle
+                    "elevation":               elevation,
+                    "slope_deg":               existing_lc_cache.slope_deg or slope_deg,
+                    "ndvi_seasonal_std":       0.0,
+                    "ndvi_seasonal_amplitude": 0.0,
+                    "ndvi_texture":            0.0,
+                    "night_lights_log":        0.0,
+                }
+                # Force a fresh EE fetch so cached rows get full features on next recalculate
+                ee_features = earth_engine.extract_features(payload.latitude, payload.longitude)
+
     lc_result = land_cover.predict_land_cover(
         ndvi=ndvi,
         slope_deg=slope_deg,
-        elevation=env.get("elevation") or 0.0,
+        elevation=elevation,
+        ee_features=ee_features,
     )
 
     # Save land cover separately
     existing_lc = db.query(LandCover).filter(LandCover.site_id == payload.site_id).first()
+    lc_save = {k: v for k, v in lc_result.items() if k != "land_cover_score"}
+    if ee_features is not None:
+        lc_save["ee_features_fetched_at"] = datetime.now(timezone.utc)
     if existing_lc:
-        for k, v in lc_result.items():
+        for k, v in lc_save.items():
             if hasattr(existing_lc, k):
                 setattr(existing_lc, k, v)
     else:
-        db.add(LandCover(site_id=payload.site_id, **{k: v for k, v in lc_result.items() if k != "land_cover_score"}))
+        db.add(LandCover(site_id=payload.site_id, **{k: v for k, v in lc_save.items() if hasattr(LandCover, k)}))
 
     # Infrastructure score — computed in backend (has internet), passed in payload
     infra_score = payload.infrastructure_score
@@ -97,6 +135,7 @@ def predict_all(payload: PredictRequest, db: Session = Depends(get_db)):
         land_ownership=payload.land_ownership,
         slope_deg=env.get("land_slope"),
         aspect_deg=env.get("aspect_deg"),
+        wind_direction=env.get("wind_direction"),
     )
 
     # Upsert site prediction

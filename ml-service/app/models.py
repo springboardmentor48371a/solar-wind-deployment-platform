@@ -65,3 +65,4 @@ class LandCover(Base):
     aspect_deg = Column(Float, nullable=True)
     notes = Column(Text, nullable=True)
     analyzed_at = Column(DateTime, default=datetime.utcnow)
+    ee_features_fetched_at = Column(DateTime, nullable=True)  # NULL = never fetched from EE

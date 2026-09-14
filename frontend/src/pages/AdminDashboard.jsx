@@ -1,29 +1,43 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
-import ProjectsView from '../components/ProjectsView'
-import MapView from '../components/MapView'
 import UsersView from '../components/UsersView'
-import AnalyticsView from '../components/AnalyticsView'
-import { listProjects, listSites } from '../api'
+import './AdminDashboard.css'
+
+const PAGE_META = {
+  projects: {
+    eyebrow: 'Administrator · System Governance',
+    title: 'Projects & Sites',
+  },
+  map: {
+    eyebrow: 'Administrator · Global Coverage',
+    title: 'Asset Map',
+  },
+  analytics: {
+    eyebrow: 'Administrator · Enterprise Intelligence',
+    title: 'Site Analytics & Rankings',
+  },
+  users: {
+    eyebrow: 'Administrator · Access Governance',
+    title: 'User Management',
+  },
+}
 
 export default function AdminDashboard({ user, onLogout }) {
-  const [page, setPage] = useState('projects')
-  const [allSites, setAllSites] = useState([])
-
-  useEffect(() => { loadAllSites() }, [])
-
-  const loadAllSites = async () => {
-    const res = await listProjects()
-    const sitesArr = await Promise.all(res.data.map(p => listSites(p.id).then(r => r.data)))
-    setAllSites(sitesArr.flat())
-  }
+  const [page, setPage] = useState('users')
+  const meta = PAGE_META[page] || PAGE_META.users
 
   return (
-    <Layout user={user} onLogout={onLogout} activePage={page} onNavigate={setPage}>
-      {page === 'projects' && <ProjectsView user={user} />}
-      {page === 'map' && <MapView sites={allSites} />}
-      {page === 'analytics' && <AnalyticsView />}
-      {page === 'users' && <UsersView />}
+    <Layout
+      user={user}
+      onLogout={onLogout}
+      activePage={page}
+      onNavigate={setPage}
+      eyebrow={meta.eyebrow}
+      title={meta.title}
+    >
+      <div className="admin-dashboard">
+        {page === 'users' && <UsersView />}
+      </div>
     </Layout>
   )
 }

@@ -14,7 +14,7 @@ region_router = APIRouter(prefix="/regions", tags=["Regions"])
 # --- Regions ---
 
 @region_router.post("/", response_model=RegionResponse, status_code=201)
-def create_region(payload: RegionCreate, db: Session = Depends(get_db), _: User = Depends(require_roles(UserRole.administrator))):
+def create_region(payload: RegionCreate, db: Session = Depends(get_db), _: User = Depends(require_roles(UserRole.energy_planner, UserRole.project_manager))):
     region = Region(**payload.model_dump())
     db.add(region)
     db.commit()
@@ -26,7 +26,7 @@ def list_regions(db: Session = Depends(get_db), _: User = Depends(get_current_us
     return db.query(Region).all()
 
 @region_router.delete("/{region_id}", status_code=204)
-def delete_region(region_id: int, db: Session = Depends(get_db), _: User = Depends(require_roles(UserRole.administrator))):
+def delete_region(region_id: int, db: Session = Depends(get_db), _: User = Depends(require_roles(UserRole.energy_planner, UserRole.project_manager))):
     region = db.query(Region).filter(Region.id == region_id).first()
     if not region:
         raise HTTPException(status_code=404, detail="Region not found")
@@ -36,7 +36,7 @@ def delete_region(region_id: int, db: Session = Depends(get_db), _: User = Depen
 # --- Projects ---
 
 @router.post("/", response_model=ProjectResponse, status_code=201)
-def create_project(payload: ProjectCreate, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.administrator, UserRole.energy_planner, UserRole.project_manager))):
+def create_project(payload: ProjectCreate, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.energy_planner, UserRole.project_manager))):
     project = Project(**payload.model_dump(), created_by=current_user.id)
     db.add(project)
     db.commit()
@@ -55,11 +55,11 @@ def get_project(project_id: int, db: Session = Depends(get_db), _: User = Depend
     return project
 
 @router.patch("/{project_id}", response_model=ProjectResponse)
-def update_project(project_id: int, payload: ProjectUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.administrator, UserRole.energy_planner, UserRole.project_manager))):
+def update_project(project_id: int, payload: ProjectUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.energy_planner, UserRole.project_manager))):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    if project.created_by != current_user.id and current_user.role != UserRole.administrator:
+    if current_user.role != UserRole.project_manager and project.created_by != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(project, field, value)
@@ -68,9 +68,11 @@ def update_project(project_id: int, payload: ProjectUpdate, db: Session = Depend
     return project
 
 @router.delete("/{project_id}", status_code=204)
-def delete_project(project_id: int, db: Session = Depends(get_db), _: User = Depends(require_roles(UserRole.administrator))):
+def delete_project(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.energy_planner, UserRole.project_manager))):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    if current_user.role != UserRole.project_manager and project.created_by != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     db.delete(project)
     db.commit()

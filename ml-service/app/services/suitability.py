@@ -1,9 +1,15 @@
-def _geographic_score(elevation: float | None, slope_deg: float | None, aspect_deg: float | None, energy_type: str) -> float:
+def _geographic_score(
+    elevation: float | None,
+    slope_deg: float | None,
+    aspect_deg: float | None,
+    energy_type: str,
+    wind_direction: float | None = None,
+) -> float:
     """
     Geographic suitability (0-100):
       slope_score     (50%) — flat land is easiest to build on
       elevation_score (30%) — lower elevation = easier access, milder conditions
-      aspect_score    (20%) — south-facing benefits solar; neutral for wind
+      aspect_score    (20%) — south-facing benefits solar; upwind-facing benefits wind
     """
     # Slope: 0° = 100, ≥15° = 0
     if slope_deg is not None:
@@ -17,7 +23,7 @@ def _geographic_score(elevation: float | None, slope_deg: float | None, aspect_d
     else:
         elevation_score = 50.0
 
-    # Aspect: only meaningful for solar; wind and hybrid get neutral 70
+    # Aspect scoring
     if aspect_deg is not None and energy_type == "solar":
         # South-facing (135°–225°) = 100, north-facing (315°–360° or 0°–45°) = 20, east/west = 60
         if 135 <= aspect_deg <= 225:
@@ -26,8 +32,24 @@ def _geographic_score(elevation: float | None, slope_deg: float | None, aspect_d
             aspect_score = 20.0
         else:
             aspect_score = 60.0
+    elif aspect_deg is not None and energy_type == "wind" and wind_direction is not None:
+        # Upwind-facing slope accelerates airflow; lee-facing creates turbulence/wind shadow.
+        # Score based on angular difference between slope aspect and prevailing wind direction:
+        #   ≤45° difference (slope faces into wind)  → 100
+        #   45°–90°                                  → 70
+        #   90°–135°                                 → 40
+        #   >135° (slope faces away from wind)       → 10
+        diff = abs((aspect_deg - wind_direction + 180) % 360 - 180)
+        if diff <= 45:
+            aspect_score = 100.0
+        elif diff <= 90:
+            aspect_score = 70.0
+        elif diff <= 135:
+            aspect_score = 40.0
+        else:
+            aspect_score = 10.0
     else:
-        aspect_score = 70.0  # neutral for wind/hybrid or unknown
+        aspect_score = 70.0  # neutral for hybrid, unknown aspect, or missing wind direction
 
     return round(slope_score * 0.5 + elevation_score * 0.3 + aspect_score * 0.2, 2)
 
@@ -62,6 +84,7 @@ def predict_suitability(
     land_ownership: str | None = None,
     slope_deg: float | None = None,
     aspect_deg: float | None = None,
+    wind_direction: float | None = None,
 ) -> dict:
     """
     Weighted suitability score:
@@ -85,19 +108,35 @@ def predict_suitability(
     elif energy_type == "wind":
         resource_score = wind_score or 0.0
     else:
-        resource_score = ((solar_score or 0.0) + (wind_score or 0.0)) / 2
+        # Geometric mean: penalises imbalanced solar/wind pairs — a weak score in
+        # one dimension can't be fully offset by a strong score in the other.
+        # Analogous to the UN HDI switch from arithmetic to geometric mean (2010).
+        resource_score = ((solar_score or 0.0) * (wind_score or 0.0)) ** 0.5
 
-    geographic_score    = _geographic_score(elevation, slope_deg, aspect_deg, energy_type)
+    geographic_score    = _geographic_score(elevation, slope_deg, aspect_deg, energy_type, wind_direction)
     infra_score         = infrastructure_score if infrastructure_score is not None else 50.0
     environmental_score = land_cover_score if land_cover_score is not None else 50.0
     economic_score      = _economic_score(land_ownership, elevation, slope_deg, resource_score)
 
+    # Deployment-type-specific AHP weights.
+    # Wind: Frontiers in Energy Research 2024 (Burundi F-AHP wind-siting study).
+    # Solar: ISPRS Int. J. Geo-Information 2025 (Thoothukudi coastal solar MCDA study).
+    # Hybrid: arithmetic average of wind and solar weights — interim value only,
+    #   NOT backed by a dedicated hybrid AHP study. Replace if one is found.
+    if energy_type == "solar":
+        weights = (0.43, 0.19, 0.16, 0.12, 0.10)
+    elif energy_type == "wind":
+        weights = (0.36, 0.31, 0.19, 0.04, 0.10)
+    else:  # hybrid
+        weights = (0.40, 0.25, 0.18, 0.08, 0.10)
+
+    w_res, w_geo, w_inf, w_env, w_eco = weights
     final_score = round(
-        resource_score      * 0.35 +
-        geographic_score    * 0.25 +
-        infra_score         * 0.15 +
-        environmental_score * 0.15 +
-        economic_score      * 0.10,
+        resource_score      * w_res +
+        geographic_score    * w_geo +
+        infra_score         * w_inf +
+        environmental_score * w_env +
+        economic_score      * w_eco,
         2
     )
 

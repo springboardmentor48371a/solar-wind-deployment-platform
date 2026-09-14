@@ -58,7 +58,7 @@ async def preview_location(
     )
 
 @router.post("/", response_model=SiteResponse, status_code=201)
-async def create_site(payload: SiteCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def create_site(payload: SiteCreate, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.gis_analyst, UserRole.energy_planner, UserRole.project_manager))):
     if not db.query(Project).filter(Project.id == payload.project_id).first():
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -151,11 +151,11 @@ def get_site(site_id: int, db: Session = Depends(get_db), _: User = Depends(get_
     return site
 
 @router.patch("/{site_id}", response_model=SiteResponse)
-def update_site(site_id: int, payload: SiteUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def update_site(site_id: int, payload: SiteUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.gis_analyst, UserRole.energy_planner, UserRole.project_manager))):
     site = db.query(Site).filter(Site.id == site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
-    if site.created_by != current_user.id and current_user.role != UserRole.administrator:
+    if current_user.role != UserRole.project_manager and site.created_by != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(site, field, value)
@@ -164,7 +164,7 @@ def update_site(site_id: int, payload: SiteUpdate, db: Session = Depends(get_db)
     return site
 
 @router.patch("/{site_id}/status", response_model=SiteResponse)
-def update_site_status(site_id: int, payload: SiteStatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.administrator, UserRole.energy_planner, UserRole.project_manager))):
+def update_site_status(site_id: int, payload: SiteStatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.project_manager))):
     site = db.query(Site).filter(Site.id == site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
@@ -189,12 +189,12 @@ def get_site_history(site_id: int, db: Session = Depends(get_db), _: User = Depe
     return site.history
 
 @router.delete("/{site_id}", status_code=204)
-def delete_site(site_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_site(site_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.energy_planner, UserRole.project_manager))):
     from sqlalchemy import text
     site = db.query(Site).filter(Site.id == site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
-    if site.created_by != current_user.id and current_user.role != UserRole.administrator:
+    if current_user.role != UserRole.project_manager and site.created_by != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
     # Delete all related data across both backend and ml-service tables
     db.execute(text("DELETE FROM energy_forecasts WHERE site_id = :id"), {"id": site_id})

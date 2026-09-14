@@ -4,6 +4,7 @@ from .database import Base, engine
 from .models import SitePrediction, EnergyForecast, LandCover
 from .routers import predict
 from .services import solar, wind, land_cover, forecast
+from .services import earth_engine
 
 Base.metadata.create_all(bind=engine)
 
@@ -22,6 +23,7 @@ def load_models():
     wind.load_model()
     land_cover.load_model()
     forecast.load_model()
+    earth_engine.init_ee()
 
 app.include_router(predict.router)
 

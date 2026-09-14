@@ -1,9 +1,59 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --color-bg: #EDE6D8;             /* app/page background, warm cream */
+  --color-surface: #FBF9F4;        /* card, sidebar, table background */
+  --color-surface-alt: #F6F1E7;    /* table header row, hover state, input fill */
+  --color-border: #E3DCCB;         /* all hairline borders/dividers */
+  --color-text-primary: #2B2A26;   /* headings, primary body text */
+  --color-text-secondary: #8A8172; /* eyebrow labels, captions, muted nav links */
+  --color-accent-rust: #B4573A;    /* primary accent: stat numbers, solar badges, CTAs, active nav */
+  --color-accent-olive: #5B6A4F;   /* secondary accent: hybrid badges, success tone */
+  --color-accent-steel: #4F6C78;   /* tertiary accent: wind badges, info tone */
+  --color-map-bg: #3C4A38;         /* dark olive-green map/visualization panel */
+  --color-pill-green-bg: #E4EBD9; --color-pill-green-text: #55693F;  /* positive status */
+  --color-pill-peach-bg: #F5DFC9; --color-pill-peach-text: #B4573A;  /* neutral/warning status */
+  --color-pill-red-bg: #F3DCD8;   --color-pill-red-text: #A3402F;    /* negative/error status */
+
+  --font-display: 'Fraunces', Georgia, serif;  /* page titles, section H1/H2 only */
+  --font-body: 'Segoe UI', system-ui, sans-serif;       /* everything else, including nav */
+
+  --radius-card: 10px;
+  --radius-pill: 999px;
+  --radius-badge: 6px;
+  --radius-input: 8px;
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.04);
+  --sidebar-width: 232px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 body {
-  font-family: 'Segoe UI', sans-serif;
-  background: #fff;
-  color: #111;
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-body);
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, opacity 150ms ease, transform 150ms ease;
+}
+
+input, select, textarea {
+  font-family: var(--font-body);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 /* Remove browser native password toggle */
@@ -14,4 +64,23 @@ input::-webkit-credentials-auto-fill-button {
   display: none !important;
   visibility: hidden;
   pointer-events: none;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
 }

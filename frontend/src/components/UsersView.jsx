@@ -1,16 +1,31 @@
 import { useState, useEffect } from 'react'
 import { listUsers, updateUserRole, deactivateUser } from '../api'
+import './UsersView.css'
 
-const ROLES = ['energy_planner', 'gis_analyst', 'project_manager', 'administrator']
+const ROLES = [
+  { value: 'energy_planner', label: 'Energy Planner' },
+  { value: 'gis_analyst', label: 'GIS Analyst' },
+  { value: 'project_manager', label: 'Project Manager' },
+  { value: 'administrator', label: 'Administrator' },
+]
 
 export default function UsersView() {
   const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   const load = async () => {
-    const res = await listUsers()
-    setUsers(res.data)
+    setLoading(true)
+    try {
+      const res = await listUsers()
+      setUsers(res.data)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleRoleChange = async (id, role) => {
@@ -19,43 +34,75 @@ export default function UsersView() {
   }
 
   const handleDeactivate = async (id) => {
-    if (!confirm('Deactivate this user?')) return
+    if (!window.confirm('Are you sure you want to deactivate this user account?')) return
     await deactivateUser(id)
     load()
   }
 
+  const filtered = users.filter((u) =>
+    u.full_name.toLowerCase().includes(search.toLowerCase()) ||
+    u.email.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
-    <div>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20 }}>User Management</h2>
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+    <div className="users-view">
+      <input
+        type="text"
+        className="search-input"
+        placeholder="Search by name or email..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{ marginBottom: '16px' }}
+      />
+      <div className="users-view__table-wrapper">
+        <table className="users-view__table">
           <thead>
-            <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-              {['Name', 'Email', 'Role', 'Status', 'Actions'].map(h => (
-                <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, color: '#6b7280', fontSize: 12 }}>{h}</th>
-              ))}
+            <tr>
+              <th>Full Name</th>
+              <th>Email Address</th>
+              <th>Assigned Role</th>
+              <th>Status</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {users.map(u => (
-              <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                <td style={{ padding: '12px 16px', fontWeight: 500 }}>{u.full_name}</td>
-                <td style={{ padding: '12px 16px', color: '#6b7280' }}>{u.email}</td>
-                <td style={{ padding: '12px 16px' }}>
-                  <select value={u.role} onChange={e => handleRoleChange(u.id, e.target.value)}
-                    style={{ fontSize: 12, padding: '4px 8px', border: '1px solid #e5e7eb', borderRadius: 4 }}>
-                    {ROLES.map(r => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
+            {filtered.map((u) => (
+              <tr key={u.id}>
+                <td>
+                  <div style={{ fontWeight: 600 }}>{u.full_name}</div>
+                </td>
+                <td style={{ color: 'var(--color-text-secondary)' }}>{u.email}</td>
+                <td>
+                  <select
+                    className="users-view__role-select"
+                    value={u.role}
+                    onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                  >
+                    {ROLES.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
                   </select>
                 </td>
-                <td style={{ padding: '12px 16px' }}>
-                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: u.is_active ? '#dcfce7' : '#fee2e2', color: u.is_active ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                <td>
+                  <span
+                    className={`users-view__status-pill ${
+                      u.is_active
+                        ? 'users-view__status-pill--active'
+                        : 'users-view__status-pill--inactive'
+                    }`}
+                  >
                     {u.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
-                <td style={{ padding: '12px 16px' }}>
+                <td style={{ textAlign: 'right' }}>
                   {u.is_active && (
-                    <button onClick={() => handleDeactivate(u.id)}
-                      style={{ fontSize: 11, padding: '4px 10px', border: '1px solid #e5e7eb', borderRadius: 4, cursor: 'pointer', background: '#fff', color: '#dc2626' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDeactivate(u.id)}
+                      className="btn-destructive"
+                    >
                       Deactivate
                     </button>
                   )}
@@ -64,6 +111,11 @@ export default function UsersView() {
             ))}
           </tbody>
         </table>
+        {filtered.length === 0 && !loading && (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+            {users.length > 0 ? `No matches for "${search}"` : 'No user accounts found.'}
+          </div>
+        )}
       </div>
     </div>
   )

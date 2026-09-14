@@ -1,43 +1,72 @@
 import { useState, useEffect } from 'react'
 import { listProjects, listSites, getPrediction } from '../api'
+import './AnalyticsView.css'
 
-const CATEGORY_COLORS = {
-  'Excellent':           '#16a34a',
-  'Highly Suitable':     '#65a30d',
-  'Moderately Suitable': '#ca8a04',
-  'Low Suitability':     '#ea580c',
-  'Unsuitable':          '#dc2626',
+function TypeBadge({ energyType }) {
+  const t = (energyType || 'solar').toLowerCase()
+  if (t === 'wind') return <span className="type-badge type-badge--wi">WI</span>
+  if (t === 'hybrid') return <span className="type-badge type-badge--hy">HY</span>
+  return <span className="type-badge type-badge--so">SO</span>
 }
 
-const ScoreBar = ({ value, color }) => (
-  <div style={{ height: 5, background: '#e5e7eb', borderRadius: 3, width: 80 }}>
-    <div style={{ height: '100%', width: `${Math.min(value ?? 0, 100)}%`, background: color || '#6b7280', borderRadius: 3 }} />
-  </div>
-)
+function TableProgressBar({ value, variant = 'rust' }) {
+  const pct = Math.min(Math.max(value ?? 0, 0), 100)
+  return (
+    <div className="progress-bar">
+      <div
+        className={`progress-bar__fill progress-bar__fill--${variant}`}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  )
+}
+
+function CategoryPill({ category }) {
+  if (!category) return <span style={{ color: 'var(--color-text-secondary)' }}>&mdash;</span>
+  const isGreen = category === 'Excellent' || category === 'Highly Suitable'
+  const isRed = category === 'Unsuitable'
+  const pillClass = isGreen
+    ? 'status-pill--green'
+    : isRed
+    ? 'status-pill--red'
+    : 'status-pill--peach'
+  return <span className={`status-pill ${pillClass}`}>{category}</span>
+}
 
 export default function AnalyticsView() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [sortKey, setSortKey] = useState('suitability_score')
   const [sortDir, setSortDir] = useState('desc')
+  const [search, setSearch] = useState('')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   const load = async () => {
     setLoading(true)
     try {
       const projRes = await listProjects()
-      const sitesNested = await Promise.all(projRes.data.map(p => listSites(p.id).then(r => r.data.map(s => ({ ...s, project_name: p.name })))))
+      const sitesNested = await Promise.all(
+        projRes.data.map((p) =>
+          listSites(p.id).then((r) =>
+            r.data.map((s) => ({ ...s, project_name: p.name }))
+          )
+        )
+      )
       const allSites = sitesNested.flat()
 
-      const withPreds = await Promise.all(allSites.map(async site => {
-        try {
-          const r = await getPrediction(site.id)
-          return { ...site, pred: r.data }
-        } catch {
-          return { ...site, pred: null }
-        }
-      }))
+      const withPreds = await Promise.all(
+        allSites.map(async (site) => {
+          try {
+            const r = await getPrediction(site.id)
+            return { ...site, pred: r.data }
+          } catch {
+            return { ...site, pred: null }
+          }
+        })
+      )
       setRows(withPreds)
     } finally {
       setLoading(false)
@@ -45,110 +74,173 @@ export default function AnalyticsView() {
   }
 
   const handleSort = (key) => {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortKey(key); setSortDir('desc') }
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
   }
 
-  const sorted = [...rows].sort((a, b) => {
+  const sorted = [...rows]
+    .filter((r) =>
+      r.name.toLowerCase().includes(search.toLowerCase()) ||
+      r.project_name.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
     const av = a.pred?.[sortKey] ?? -1
     const bv = b.pred?.[sortKey] ?? -1
     return sortDir === 'desc' ? bv - av : av - bv
   })
 
   const SortHeader = ({ label, k }) => (
-    <th onClick={() => handleSort(k)} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none', background: sortKey === k ? '#f3f4f6' : 'transparent' }}>
+    <th
+      onClick={() => handleSort(k)}
+      className={`sortable ${sortKey === k ? 'sorted' : ''}`}
+    >
       {label} {sortKey === k ? (sortDir === 'desc' ? '↓' : '↑') : ''}
     </th>
   )
 
-  if (loading) return <p style={{ fontSize: 13, color: '#9ca3af' }}>Loading analytics...</p>
+  if (loading) {
+    return (
+      <div className="analytics-view">
+        <div className="data-table__empty">
+          <div style={{ color: 'var(--color-accent-rust)', marginBottom: 8, fontSize: 16 }}>&bull; &bull; &bull;</div>
+          Loading site analytics &amp; ML assessments...
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700 }}>Site Analytics & Rankings</h2>
-        <span style={{ fontSize: 12, color: '#9ca3af' }}>{rows.length} sites · click column to sort</span>
-      </div>
-
-      {/* Summary cards */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        {['Excellent', 'Highly Suitable', 'Moderately Suitable', 'Low Suitability', 'Unsuitable'].map(cat => {
-          const count = rows.filter(r => r.pred?.suitability_category === cat).length
-          const color = CATEGORY_COLORS[cat]
-          return (
-            <div key={cat} style={{ background: color + '10', border: `1px solid ${color}30`, borderRadius: 8, padding: '10px 16px', minWidth: 120 }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color }}>{count}</div>
-              <div style={{ fontSize: 11, color, fontWeight: 600 }}>{cat}</div>
-            </div>
-          )
-        })}
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 16px', minWidth: 120 }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#9ca3af' }}>{rows.filter(r => !r.pred).length}</div>
-          <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>No Predictions</div>
+    <div className="analytics-view">
+      {/* Overview stats per category */}
+      <div className="analytics-view__stats">
+        <div className="analytics-card">
+          <div className="analytics-card__num analytics-card__num--olive">
+            {rows.filter((r) => r.pred?.suitability_category === 'Excellent').length}
+          </div>
+          <div className="analytics-card__label">Excellent</div>
+        </div>
+        <div className="analytics-card">
+          <div className="analytics-card__num analytics-card__num--olive">
+            {rows.filter((r) => r.pred?.suitability_category === 'Highly Suitable').length}
+          </div>
+          <div className="analytics-card__label">Highly Suitable</div>
+        </div>
+        <div className="analytics-card">
+          <div className="analytics-card__num analytics-card__num--rust">
+            {rows.filter((r) => r.pred?.suitability_category === 'Moderately Suitable').length}
+          </div>
+          <div className="analytics-card__label">Moderately Suitable</div>
+        </div>
+        <div className="analytics-card">
+          <div className="analytics-card__num analytics-card__num--rust">
+            {rows.filter((r) => r.pred?.suitability_category === 'Low Suitability').length}
+          </div>
+          <div className="analytics-card__label">Low Suitability</div>
+        </div>
+        <div className="analytics-card">
+          <div className="analytics-card__num analytics-card__num--red">
+            {rows.filter((r) => r.pred?.suitability_category === 'Unsuitable').length}
+          </div>
+          <div className="analytics-card__label">Unsuitable</div>
+        </div>
+        <div className="analytics-card">
+          <div className="analytics-card__num analytics-card__num--steel">
+            {rows.filter((r) => !r.pred).length}
+          </div>
+          <div className="analytics-card__label">Unpredicted</div>
         </div>
       </div>
 
-      {/* Rankings table */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead style={{ borderBottom: '1px solid #e5e7eb' }}>
-            <tr>
-              <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280' }}>#</th>
-              <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280' }}>Site</th>
-              <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280' }}>Type</th>
-              <SortHeader label="Suitability" k="suitability_score" />
-              <SortHeader label="Solar" k="solar_score" />
-              <SortHeader label="Wind" k="wind_score" />
-              <SortHeader label="Land Cover" k="land_cover_score" />
-              <SortHeader label="Resource" k="resource_score" />
-              <SortHeader label="Geographic" k="geographic_score" />
-              <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280' }}>Category</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((site, i) => {
-              const p = site.pred
-              const catColor = p ? (CATEGORY_COLORS[p.suitability_category] || '#6b7280') : '#d1d5db'
-              return (
-                <tr key={site.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '10px 12px', fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>{i + 1}</td>
-                  <td style={{ padding: '10px 12px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>{site.name}</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af' }}>{site.project_name}</div>
-                  </td>
-                  <td style={{ padding: '10px 12px', fontSize: 12, color: '#6b7280', textTransform: 'capitalize' }}>{site.energy_type}</td>
-                  <td style={{ padding: '10px 12px' }}>
-                    {p ? (
-                      <>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: catColor }}>{Math.round(p.suitability_score ?? 0)}</div>
-                        <ScoreBar value={p.suitability_score} color={catColor} />
-                      </>
-                    ) : <span style={{ fontSize: 11, color: '#d1d5db' }}>—</span>}
-                  </td>
-                  {['solar_score', 'wind_score', 'land_cover_score', 'resource_score', 'geographic_score'].map(k => (
-                    <td key={k} style={{ padding: '10px 12px' }}>
-                      {p?.[k] != null ? (
-                        <>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{Math.round(p[k])}</div>
-                          <ScoreBar value={p[k]} color="#9ca3af" />
-                        </>
-                      ) : <span style={{ fontSize: 11, color: '#d1d5db' }}>—</span>}
+      {/* Rankings Data Table */}
+      <div className="data-table-wrapper">
+        <input
+          type="text"
+          className="search-input"
+          placeholder="Search by site or project name..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ marginBottom: '12px' }}
+        />
+        <div className="data-table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th style={{ width: '40px' }}>#</th>
+                <th>Type</th>
+                <th>Site Name</th>
+                <th>Project</th>
+                <SortHeader label="Suitability" k="suitability_score" />
+                <SortHeader label="Resource" k="resource_score" />
+                <SortHeader label="Land Cover" k="land_cover_score" />
+                <SortHeader label="Geographic" k="geographic_score" />
+                <SortHeader label="Infrastructure" k="infrastructure_score" />
+                <SortHeader label="Economic" k="economic_score" />
+                <th>Tier</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((site, i) => {
+                const p = site.pred
+                const suitScore = p?.suitability_score
+                const suitVariant =
+                  suitScore >= 75 ? 'olive' : suitScore >= 50 ? 'rust' : 'steel'
+
+                return (
+                  <tr key={site.id}>
+                    <td style={{ color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                      {i + 1}
                     </td>
-                  ))}
-                  <td style={{ padding: '10px 12px' }}>
-                    {p?.suitability_category ? (
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: catColor + '20', color: catColor, fontWeight: 600 }}>
-                        {p.suitability_category}
-                      </span>
-                    ) : <span style={{ fontSize: 11, color: '#d1d5db' }}>—</span>}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                    <td>
+                      <TypeBadge energyType={site.energy_type} />
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{site.name}</div>
+                    </td>
+                    <td style={{ color: 'var(--color-text-secondary)' }}>
+                      {site.project_name}
+                    </td>
+                    <td>
+                      {p ? (
+                        <>
+                          <div style={{ fontWeight: 700, color: `var(--color-accent-${suitVariant})` }}>
+                            {Math.round(suitScore ?? 0)}
+                          </div>
+                          <TableProgressBar value={suitScore} variant={suitVariant} />
+                        </>
+                      ) : (
+                        <span style={{ color: 'var(--color-text-secondary)' }}>&mdash;</span>
+                      )}
+                    </td>
+                    {['resource_score', 'land_cover_score', 'geographic_score', 'infrastructure_score', 'economic_score'].map((k) => (
+                      <td key={k}>
+                        {p?.[k] != null ? (
+                          <>
+                            <div style={{ fontWeight: 500 }}>
+                              {Math.round(p[k])}
+                            </div>
+                            <TableProgressBar value={p[k]} variant="steel" />
+                          </>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-secondary)' }}>&mdash;</span>
+                        )}
+                      </td>
+                    ))}
+                    <td>
+                      <CategoryPill category={p?.suitability_category} />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
         {sorted.length === 0 && (
-          <p style={{ padding: 20, fontSize: 13, color: '#9ca3af', textAlign: 'center' }}>No sites found.</p>
+          <div className="data-table__empty">
+            {rows.length > 0 ? `No matches for "${search}"` : 'No sites available for ranking.'}
+          </div>
         )}
       </div>
     </div>
