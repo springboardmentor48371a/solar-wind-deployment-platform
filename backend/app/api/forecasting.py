@@ -14,15 +14,15 @@ def get_db():
     finally:
         db.close()
 
-@router.post("/optimize/{site_id}")
-def optimize_site_deployment(
+@router.post("/run/{site_id}")
+def run_energy_forecasting_and_optimization(
     site_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles([
-       UserRole.PLANNER.value,
+        UserRole.PLANNER.value,
         UserRole.PROJECT_MANAGER.value,
         UserRole.ADMIN.value,
-        UserRole.GIS_ANALYST.value  # <--- Added GIS Analyst
+        UserRole.GIS_ANALYST.value
     ]))
 ):
     site = db.query(Site).filter(Site.id == site_id).first()

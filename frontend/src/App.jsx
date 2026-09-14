@@ -5,10 +5,12 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, Legend, BarChart, Bar, CartesianGrid
 } from 'recharts';
 
+// Export Libraries
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
+// Fix default Leaflet icon paths
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -24,6 +26,9 @@ const ROLES = [
 ];
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
+
+// Helper to strip unwanted prefix references from backend messages
+const formatMsg = (msg) => msg ? msg.replace(/Module\s*\d+\s*[:-]?\s*/gi, '') : '';
 
 function LocationPicker({ position, onPositionChange }) {
   useMapEvents({
@@ -46,7 +51,7 @@ export default function App() {
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [sites, setSites] = useState([]);
 
-  // NEW: Store feature output results to display as inline cards instead of alerts
+  // Store feature output results to display as inline cards instead of alerts
   const [featureResults, setFeatureResults] = useState({});
 
   const [selectedSiteIds, setSelectedSiteIds] = useState([]);
@@ -59,6 +64,7 @@ export default function App() {
   const [activeSiteForGis, setActiveSiteForGis] = useState(null);
   const [showMapModal, setShowMapModal] = useState(false);
   
+  // Analytics State
   const [analyticsSite, setAnalyticsSite] = useState(null);
 
   const [newProject, setNewProject] = useState({
@@ -99,7 +105,9 @@ export default function App() {
 
   const fetchAdminUsers = async (token) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/users`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE_URL}/auth/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       const data = await res.json();
       if (Array.isArray(data)) setAdminUserList(data);
     } catch (err) { console.error(err); }
@@ -247,9 +255,8 @@ export default function App() {
       if (!res.ok) throw new Error(data.detail || "NASA sync failed");
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
       
-      // Update inline card state instead of alert
       setFeatureResults(prev => ({
-        ...prev, [siteId]: { ...prev[siteId], nasa: { message: data.message, details: data.telemetry } }
+        ...prev, [siteId]: { ...prev[siteId], nasa: { message: formatMsg(data.message), details: data.telemetry } }
       }));
     } catch (err) { alert(`NASA Sync Failed: ${err.message}`); }
   };
@@ -262,9 +269,8 @@ export default function App() {
       if (!res.ok) throw new Error(data.detail || "OSM Scan failed");
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
       
-      // Update inline card state instead of alert
       setFeatureResults(prev => ({
-        ...prev, [siteId]: { ...prev[siteId], osm: { message: data.message, details: data.spatial_analytics } }
+        ...prev, [siteId]: { ...prev[siteId], osm: { message: formatMsg(data.message), details: data.spatial_analytics } }
       }));
     } catch (err) { alert(`OSM Scan Failed: ${err.message}`); }
   };
@@ -277,9 +283,8 @@ export default function App() {
       if (!res.ok) throw new Error(data.detail || "Solar ML prediction failed");
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
       
-      // Update inline card state instead of alert
       setFeatureResults(prev => ({
-        ...prev, [siteId]: { ...prev[siteId], solar: { message: data.message, details: data.solar_analytics } }
+        ...prev, [siteId]: { ...prev[siteId], solar: { message: formatMsg(data.message), details: data.solar_analytics } }
       }));
     } catch (err) { alert(`Solar ML Failed: ${err.message}`); }
   };
@@ -292,9 +297,8 @@ export default function App() {
       if (!res.ok) throw new Error(data.detail || "Wind prediction failed");
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
       
-      // Update inline card state instead of alert
       setFeatureResults(prev => ({
-        ...prev, [siteId]: { ...prev[siteId], wind: { message: data.message, details: data.wind_analytics } }
+        ...prev, [siteId]: { ...prev[siteId], wind: { message: formatMsg(data.message), details: data.wind_analytics } }
       }));
     } catch (err) { alert(`Wind Prediction Failed: ${err.message}`); }
   };
@@ -307,9 +311,8 @@ export default function App() {
       if (!res.ok) throw new Error(data.detail || "Suitability scoring failed");
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
       
-      // Update inline card state instead of alert
       setFeatureResults(prev => ({
-        ...prev, [siteId]: { ...prev[siteId], suitability: { message: data.message, details: data.suitability_analytics } }
+        ...prev, [siteId]: { ...prev[siteId], suitability: { message: formatMsg(data.message), details: data.suitability_analytics } }
       }));
     } catch (err) { alert(`Suitability Calculation Failed: ${err.message}`); }
   };
@@ -317,18 +320,22 @@ export default function App() {
   const handleRunOptimization = async (siteId) => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_BASE_URL}/forecasting/optimize/${siteId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE_URL}/forecasting/run/${siteId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Optimization failed");
       
-      // Update inline card state instead of alert
       setFeatureResults(prev => ({
-        ...prev, [siteId]: { ...prev[siteId], optimize: { message: data.message, details: data.forecasting_analytics } }
+        ...prev, [siteId]: { ...prev[siteId], optimize: { message: formatMsg(data.message), details: data.forecasting_analytics || data } }
       }));
     } catch (err) { alert(`Forecasting Error: ${err.message}`); }
   };
 
-  // Closes an individual feature result card
   const closeFeatureResult = (siteId, featureKey) => {
     setFeatureResults(prev => {
       const updated = { ...prev };
@@ -603,36 +610,6 @@ export default function App() {
                               <span style={{ fontSize: '12px', color: '#64748b' }}>solar • {site.latitude?.toFixed(4)}°N, {site.longitude?.toFixed(4)}°E • {site.elevation_m}m • {site.land_area_sqkm} km²</span>
                             </div>
                           </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            {canAddSite && <button onClick={() => handleSyncNasa(site.id)} style={btnStyle('#0284c7')}>🛰️ Sync NASA</button>}
-                            {canEditGis && <button onClick={() => handleScanOsm(site.id)} style={btnStyle('#059669')}>🗺️ Scan OSM</button>}
-                            {canAddSite && <button onClick={() => handlePredictSolar(site.id)} style={btnStyle('#d97706')}>☀️ Predict Solar</button>}
-                            {canAddSite && <button onClick={() => handlePredictWind(site.id)} style={btnStyle('#0284c7')}>💨 Predict Wind</button>}
-                            {canAddSite && <button onClick={() => handleCalculateSuitability(site.id)} style={btnStyle('#10b981')}>📊 Score Suitability</button>}
-                            {canAddSite && <button onClick={() => handleRunOptimization(site.id)} style={btnStyle('#8b5cf6')}>📈 Forecast & Optimize</button>}
-                            {canAddSite && <button onClick={() => setAnalyticsSite(site)} style={btnStyle('#3b82f6')}>📊 View Charts</button>}
-
-                            {(canApprove || isPlanner) && (
-                              <>
-                                <button onClick={() => handleExportPDF(site)} title="Export PDF Feasibility Report" style={btnStyle('#b91c1c')}>📄 Export PDF</button>
-                                <button onClick={() => handleExportExcel(site)} title="Export Excel Feasibility Data" style={btnStyle('#15803d')}>📊 Export Excel</button>
-                              </>
-                            )}
-
-                            {canEditGis && (
-                              <button onClick={() => { setActiveSiteForGis(site); setGisForm({ latitude: site.latitude, longitude: site.longitude, elevation_m: site.elevation_m, slope_deg: site.slope_deg || 2.1, vegetation_ndvi: site.vegetation_ndvi || 0.18, solar_ghi: site.solar_ghi || 5.69, avg_temp: site.avg_temp || 28.4 }); setShowGisEditModal(true); }} style={btnStyle('#2563eb')}>
-                                ✏️ Edit GIS
-                              </button>
-                            )}
-                            
-                            {canApprove && (
-                              <button onClick={() => handleToggleApproval(site)} style={btnStyle(site.is_approved ? '#4b5563' : '#10b981')}>
-                                {site.is_approved ? 'Revoke Approval' : '✓ Approve'}
-                              </button>
-                            )}
-                            {canAddSite && <button onClick={() => handleDeleteSite(site.id)} style={{ ...btnStyle('transparent'), color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}>🗑️</button>}
-                          </div>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px' }}>
@@ -644,9 +621,137 @@ export default function App() {
                           <div style={metricBoxStyle}><span style={metricLbl}>Est Yield</span><span style={metricVal}>{site.est_yield_gwh || 0} GWh</span></div>
                         </div>
 
-                        {/* ============================================================== */}
-                        {/* INLINE FEATURE RESULTS CARDS (Replacing the alerts entirely) */}
-                        {/* ============================================================== */}
+                        {/* DEDICATED AI & GEOSPATIAL ANALYSIS SUITE */}
+                        <div style={analysisToolbarStyle}>
+                          <div style={toolbarHeaderStyle}>
+                            <span>Site Evaluation Models</span>
+                            <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 500 }}>Click to execute live simulation</span>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            {canAddSite && (
+                              <button 
+                                onClick={() => handlePredictSolar(site.id)} 
+                                title="Execute solar irradiance cell temp derating and yield ML model"
+                                style={analysisBtn('linear-gradient(135deg, #d97706, #b45309)', '#f59e0b')}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 14px rgba(245, 158, 11, 0.45)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(245, 158, 11, 0.25)'; }}
+                              >
+                                <span style={{ fontSize: '13px' }}>☀️</span> Analyze Solar ML
+                              </button>
+                            )}
+
+                            {canAddSite && (
+                              <button 
+                                onClick={() => handlePredictWind(site.id)} 
+                                title="Run 100m hub-height wind shear, turbulence intensity, and yield estimation"
+                                style={analysisBtn('linear-gradient(135deg, #0284c7, #0369a1)', '#38bdf8')}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 14px rgba(56, 189, 248, 0.45)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(56, 189, 248, 0.25)'; }}
+                              >
+                                <span style={{ fontSize: '13px' }}>🌪️</span> Analyze Wind Resource
+                              </button>
+                            )}
+
+                            {canAddSite && (
+                              <button 
+                                onClick={() => handleCalculateSuitability(site.id)} 
+                                title="Calculate 5-factor weighted MCDM site suitability score"
+                                style={analysisBtn('linear-gradient(135deg, #059669, #047857)', '#10b981')}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 14px rgba(16, 185, 129, 0.45)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.25)'; }}
+                              >
+                                <span style={{ fontSize: '13px' }}>🎯</span> Evaluate Suitability
+                              </button>
+                            )}
+
+                            {canAddSite && (
+                              <button 
+                                onClick={() => handleRunOptimization(site.id)} 
+                                title="Compute 12-month generation dispatch, LCOE, and financial payback"
+                                style={analysisBtn('linear-gradient(135deg, #7c3aed, #6d28d9)', '#a855f7')}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 14px rgba(168, 85, 247, 0.45)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(168, 85, 247, 0.25)'; }}
+                              >
+                                <span style={{ fontSize: '13px' }}>⚡</span> Forecast & Optimize
+                              </button>
+                            )}
+
+                            {canAddSite && (
+                              <button 
+                                onClick={() => setAnalyticsSite(site)} 
+                                title="Open interactive multi-chart telemetry dashboard"
+                                style={analysisBtn('linear-gradient(135deg, #2563eb, #1d4ed8)', '#60a5fa')}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 14px rgba(96, 165, 250, 0.45)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(96, 165, 250, 0.25)'; }}
+                              >
+                                <span style={{ fontSize: '13px' }}>📊</span> Telemetry Charts
+                              </button>
+                            )}
+                          </div>
+
+                          {/* SECONDARY PIPELINE UTILITIES */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #142033', paddingTop: '8px', marginTop: '4px', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '11px', color: '#64748b' }}>Data Feeds:</span>
+                              {canAddSite && (
+                                <button onClick={() => handleSyncNasa(site.id)} title="Sync NASA POWER climatology" style={utilityBtn('#0284c7', '#38bdf8')}>
+                                  🛰️ Refresh
+                                </button>
+                              )}
+                              {canEditGis && (
+                                <button onClick={() => handleScanOsm(site.id)} title="Scan OpenStreetMap infrastructure distances" style={utilityBtn('#059669', '#34d399')}>
+                                  🗺️ Scan OSM Grid
+                                </button>
+                              )}
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {(canApprove || isPlanner) && (
+                                <>
+                                  <button onClick={() => handleExportPDF(site)} title="Export PDF feasibility report" style={utilityBtn('#b91c1c', '#f87171')}>
+                                    📄 PDF Export
+                                  </button>
+                                  <button onClick={() => handleExportExcel(site)} title="Export raw spreadsheet data" style={utilityBtn('#15803d', '#4ade80')}>
+                                    📊 Excel Export
+                                  </button>
+                                </>
+                              )}
+                              {canEditGis && (
+                                <button 
+                                  onClick={() => { 
+                                    setActiveSiteForGis(site); 
+                                    setGisForm({ 
+                                      latitude: site.latitude, 
+                                      longitude: site.longitude, 
+                                      elevation_m: site.elevation_m, 
+                                      slope_deg: site.slope_deg || 2.1, 
+                                      vegetation_ndvi: site.vegetation_ndvi || 0.18, 
+                                      solar_ghi: site.solar_ghi || 5.69, 
+                                      avg_temp: site.avg_temp || 28.4 
+                                    }); 
+                                    setShowGisEditModal(true); 
+                                  }} 
+                                  style={utilityBtn('#2563eb', '#60a5fa')}
+                                >
+                                  ✏️ Edit GIS
+                                </button>
+                              )}
+                              {canApprove && (
+                                <button onClick={() => handleToggleApproval(site)} style={utilityBtn(site.is_approved ? '#4b5563' : '#10b981', site.is_approved ? '#9ca3af' : '#34d399')}>
+                                  {site.is_approved ? 'Revoke Approval' : '✓ Approve Site'}
+                                </button>
+                              )}
+                              {canAddSite && (
+                                <button onClick={() => handleDeleteSite(site.id)} title="Delete candidate site" style={utilityBtn('rgba(239, 68, 68, 0.4)', '#ef4444')}>
+                                  🗑️
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* INLINE FEATURE RESULTS CARDS */}
                         {featureResults[site.id] && (
                           <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             
@@ -658,10 +763,10 @@ export default function App() {
                                 </div>
                                 <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].nasa.message}</p>
                                 <div style={resultGridStyle}>
-                                  <div><strong>Solar GHI:</strong> {featureResults[site.id].nasa.details.solar_ghi} kWh/m²</div>
-                                  <div><strong>Avg Temp:</strong> {featureResults[site.id].nasa.details.avg_temp}°C</div>
-                                  <div><strong>Rainfall:</strong> {featureResults[site.id].nasa.details.rainfall_mm} mm</div>
-                                  <div><strong>Cloud Cover:</strong> {featureResults[site.id].nasa.details.cloud_cover_pct}%</div>
+                                  <div><strong>Solar GHI:</strong> {featureResults[site.id].nasa.details?.solar_ghi} kWh/m²</div>
+                                  <div><strong>Avg Temp:</strong> {featureResults[site.id].nasa.details?.avg_temp}°C</div>
+                                  <div><strong>Rainfall:</strong> {featureResults[site.id].nasa.details?.rainfall_mm} mm</div>
+                                  <div><strong>Cloud Cover:</strong> {featureResults[site.id].nasa.details?.cloud_cover_pct}%</div>
                                 </div>
                               </div>
                             )}
@@ -674,10 +779,10 @@ export default function App() {
                                 </div>
                                 <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].osm.message}</p>
                                 <div style={resultGridStyle}>
-                                  <div><strong>Substation:</strong> {featureResults[site.id].osm.details.substation_dist_km} km</div>
-                                  <div><strong>Transmission:</strong> {featureResults[site.id].osm.details.transmission_line_dist_km} km</div>
-                                  <div><strong>Access Road:</strong> {featureResults[site.id].osm.details.access_road_dist_km} km</div>
-                                  <div><strong>Risk:</strong> {featureResults[site.id].osm.details.interconnect_risk}</div>
+                                  <div><strong>Substation:</strong> {featureResults[site.id].osm.details?.substation_dist_km} km</div>
+                                  <div><strong>Transmission:</strong> {featureResults[site.id].osm.details?.transmission_line_dist_km} km</div>
+                                  <div><strong>Access Road:</strong> {featureResults[site.id].osm.details?.access_road_dist_km} km</div>
+                                  <div><strong>Risk:</strong> {featureResults[site.id].osm.details?.interconnect_risk}</div>
                                 </div>
                               </div>
                             )}
@@ -690,10 +795,10 @@ export default function App() {
                                 </div>
                                 <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].solar.message}</p>
                                 <div style={resultGridStyle}>
-                                  <div><strong>Capacity Factor:</strong> {featureResults[site.id].solar.details.predicted_capacity_factor}%</div>
-                                  <div><strong>Annual Yield:</strong> {featureResults[site.id].solar.details.annual_yield_gwh} GWh</div>
-                                  <div><strong>Cell Temp:</strong> {featureResults[site.id].solar.details.t_cell_celsius}°C</div>
-                                  <div><strong>Thermal Derate:</strong> -{featureResults[site.id].solar.details.temp_derate_loss_pct}%</div>
+                                  <div><strong>Capacity Factor:</strong> {featureResults[site.id].solar.details?.predicted_capacity_factor}%</div>
+                                  <div><strong>Annual Yield:</strong> {featureResults[site.id].solar.details?.annual_yield_gwh} GWh</div>
+                                  <div><strong>Cell Temp:</strong> {featureResults[site.id].solar.details?.t_cell_celsius}°C</div>
+                                  <div><strong>Thermal Derate:</strong> -{featureResults[site.id].solar.details?.temp_derate_loss_pct}%</div>
                                 </div>
                               </div>
                             )}
@@ -706,10 +811,10 @@ export default function App() {
                                 </div>
                                 <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].wind.message}</p>
                                 <div style={resultGridStyle}>
-                                  <div><strong>50m Speed:</strong> {featureResults[site.id].wind.details.wind_speed_50m} m/s</div>
-                                  <div><strong>100m Hub:</strong> {featureResults[site.id].wind.details.wind_speed_100m} m/s</div>
-                                  <div><strong>Capacity Factor:</strong> {featureResults[site.id].wind.details.predicted_capacity_factor}%</div>
-                                  <div><strong>Annual Yield:</strong> {featureResults[site.id].wind.details.annual_yield_gwh} GWh</div>
+                                  <div><strong>50m Speed:</strong> {featureResults[site.id].wind.details?.wind_speed_50m} m/s</div>
+                                  <div><strong>100m Hub:</strong> {featureResults[site.id].wind.details?.wind_speed_100m} m/s</div>
+                                  <div><strong>Capacity Factor:</strong> {featureResults[site.id].wind.details?.predicted_capacity_factor}%</div>
+                                  <div><strong>Annual Yield:</strong> {featureResults[site.id].wind.details?.annual_yield_gwh} GWh</div>
                                 </div>
                               </div>
                             )}
@@ -722,8 +827,8 @@ export default function App() {
                                 </div>
                                 <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].suitability.message}</p>
                                 <div style={resultGridStyle}>
-                                  <div><strong>Score:</strong> {featureResults[site.id].suitability.details.composite_score} / 10</div>
-                                  <div><strong>Category:</strong> {featureResults[site.id].suitability.details.category}</div>
+                                  <div><strong>Score:</strong> {featureResults[site.id].suitability.details?.composite_score} / 10</div>
+                                  <div><strong>Category:</strong> {featureResults[site.id].suitability.details?.category}</div>
                                 </div>
                               </div>
                             )}
@@ -736,15 +841,14 @@ export default function App() {
                                 </div>
                                 <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].optimize.message}</p>
                                 <div style={resultGridStyle}>
-                                  <div><strong>Recommended:</strong> {featureResults[site.id].optimize.details.recommended_technology}</div>
-                                  <div><strong>LCOE:</strong> ${featureResults[site.id].optimize.details.lcoe_usd_per_mwh} / MWh</div>
-                                  <div><strong>Payback:</strong> {featureResults[site.id].optimize.details.payback_period_years} Yrs</div>
+                                  <div><strong>Recommended:</strong> {featureResults[site.id].optimize.details?.recommended_technology || 'Hybrid Solar/Wind'}</div>
+                                  <div><strong>LCOE:</strong> ${featureResults[site.id].optimize.details?.lcoe_usd_per_mwh ?? '--'} / MWh</div>
+                                  <div><strong>Payback:</strong> {featureResults[site.id].optimize.details?.payback_period_years ?? '--'} Yrs</div>
                                 </div>
                               </div>
                             )}
                           </div>
                         )}
-                        {/* ============================================================== */}
                       </div>
                     );
                   })}
@@ -770,8 +874,6 @@ export default function App() {
             <form onSubmit={handleCreateProject}>
               <label style={lbl}>Project Name</label>
               <input style={inp} required placeholder="e.g. Rajasthan Solar Phase 1" value={newProject.name} onChange={e => setNewProject({ ...newProject, name: e.target.value })} />
-              <label style={lbl}>Target Capacity (MW)</label>
-              <input style={inp} type="number" required value={newProject.target_capacity_mw} onChange={e => setNewProject({ ...newProject, target_capacity_mw: e.target.value })} />
               <label style={lbl}>Region</label>
               <input style={inp} required value={newProject.region} onChange={e => setNewProject({ ...newProject, region: e.target.value })} />
               <label style={lbl}>Planned Timeline (COD)</label>
@@ -880,6 +982,7 @@ export default function App() {
   );
 }
 
+// RECHARTS ANALYTICS MODAL
 function SiteAnalyticsModal({ site, onClose }) {
   if (!site) return null;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -905,12 +1008,12 @@ function SiteAnalyticsModal({ site, onClose }) {
     <div style={modalBackdrop}>
       <div style={{ ...modalBox, maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-          <div><h2 style={{ margin: '0 0 16px 0', color: '#f8fafc' }}>📊 Site Analytics & Performance Telemetry: {site.site_name}</h2><span style={{ fontSize: '12px', color: '#94a3b8' }}>Module 11 Live Interactive Analytics Engine</span></div>
+          <div><h2 style={{ margin: '0 0 16px 0', color: '#f8fafc' }}>📊 Site Analytics & Performance Telemetry: {site.site_name}</h2><span style={{ fontSize: '12px', color: '#94a3b8' }}>Live Interactive Analytics Engine</span></div>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '18px', cursor: 'pointer' }}>✕</button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div style={chartBoxStyle}><h4 style={chartTitleStyle}>⚡ 12-Month Generation Curve (GWh)</h4><ResponsiveContainer width="100%" height={220}><AreaChart data={timeSeriesData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="month" stroke="#64748b" fontSize={11} /><YAxis stroke="#64748b" fontSize={11} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} /><Legend wrapperStyle={{ fontSize: '11px' }} /><Area type="monotone" dataKey="Solar" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.4} /><Area type="monotone" dataKey="Wind" stackId="1" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.4} /></AreaChart></ResponsiveContainer></div>
-          <div style={chartBoxStyle}><h4 style={chartTitleStyle}>💰 Technology LCOE ($/MWh) vs CAPEX ($M)</h4><ResponsiveContainer width="100%" height={220}><BarChart data={financialData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="tech" stroke="#64748b" fontSize={11} /><YAxis stroke="#64748b" fontSize={11} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} /><Legend wrapperStyle={{ fontSize: '11px' }} /><Bar dataKey="lcoe" name="LCOE ($/MWh)" fill="#10b981" radius={[4, 4, 0, 0]} /><Bar dataKey="capex" name="CAPEX ($M)" fill="#8b5cf6" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
+          <div style={chartBoxStyle}><h4 style={chartTitleStyle}>💰 Setup Cost vs Energy Production Cost </h4><ResponsiveContainer width="100%" height={220}><BarChart data={financialData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="tech" stroke="#64748b" fontSize={11} /><YAxis stroke="#64748b" fontSize={11} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} /><Legend wrapperStyle={{ fontSize: '11px' }} /><Bar dataKey="lcoe" name="Energy Production Cost($/MWh)" fill="#10b981" radius={[4, 4, 0, 0]} /><Bar dataKey="capex" name="Setup Cost($M)" fill="#8b5cf6" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
         </div>
         <div style={{ ...chartBoxStyle, marginTop: '16px' }}><h4 style={chartTitleStyle}>🎯 MCDM 5-Factor Weighted Criteria Performance (Scale: 0-10)</h4><ResponsiveContainer width="100%" height={160}><BarChart data={factorData} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis type="number" domain={[0, 10]} stroke="#64748b" fontSize={11} /><YAxis dataKey="factor" type="category" stroke="#64748b" fontSize={11} width={130} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} /><Bar dataKey="score" fill="#38bdf8" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></div>
       </div>
@@ -928,6 +1031,63 @@ const metricLbl = { fontSize: '11px', color: '#64748b' };
 const metricVal = { fontSize: '13px', fontWeight: 'bold', color: '#e2e8f0' };
 const chartBoxStyle = { backgroundColor: '#0d1526', border: '1px solid #142033', borderRadius: '8px', padding: '12px' };
 const chartTitleStyle = { margin: '0 0 10px 0', fontSize: '13px', color: '#e2e8f0' };
-const btnStyle = (bg) => ({ padding: '6px 12px', background: bg, color: bg === 'transparent' ? 'inherit' : '#fff', border: 'none', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' });
 const closeBtnStyle = { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' };
 const resultGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '11px', color: '#94a3b8' };
+
+// Dedicated Analysis Toolbar & Interactive Button Styles
+const analysisToolbarStyle = {
+  marginTop: '16px',
+  padding: '12px 14px',
+  backgroundColor: '#091322',
+  border: '1px solid #1a2c47',
+  borderRadius: '10px',
+  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 12px rgba(0, 0, 0, 0.35)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '10px'
+};
+
+const toolbarHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  fontSize: '11px',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.8px',
+  color: '#38bdf8'
+};
+
+const analysisBtn = (bgGradient, borderGlow) => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '6px',
+  padding: '7px 14px',
+  background: bgGradient,
+  border: `1px solid ${borderGlow}`,
+  borderRadius: '7px',
+  color: '#ffffff',
+  fontSize: '12px',
+  fontWeight: 700,
+  letterSpacing: '0.3px',
+  cursor: 'pointer',
+  boxShadow: `0 2px 8px ${borderGlow}33`,
+  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+  whiteSpace: 'nowrap'
+});
+
+const utilityBtn = (borderColor = '#1e293b', textColor = '#94a3b8') => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '5px',
+  padding: '5px 10px',
+  backgroundColor: '#0f172a',
+  border: `1px solid ${borderColor}`,
+  borderRadius: '6px',
+  color: textColor,
+  fontSize: '11px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  transition: 'background 0.2s ease',
+  whiteSpace: 'nowrap'
+});
