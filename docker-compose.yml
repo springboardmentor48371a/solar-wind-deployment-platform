@@ -27,6 +27,7 @@ services:
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      ML_SERVICE_URL: ${ML_SERVICE_URL:-http://ml-service:8001}
     depends_on:
       db:
         condition: service_healthy
@@ -36,10 +37,7 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
+      - "5173:80"
     depends_on:
       - backend
 

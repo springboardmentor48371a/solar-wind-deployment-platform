@@ -1,10 +1,11 @@
+import os
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from ..models.user import User
 from ..core.dependencies import get_current_user
 from ..services.infrastructure import fetch_infrastructure_score
 
-ML_SERVICE = "http://ml-service:8001"
+ML_SERVICE = os.getenv("ML_SERVICE_URL", "http://ml-service:8001")
 
 router = APIRouter(prefix="/predictions", tags=["Predictions"])
 

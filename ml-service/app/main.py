@@ -34,7 +34,7 @@ def health():
         "models": {
             "solar":      solar.model is not None,
             "wind":       wind.model is not None,
-            "land_cover": land_cover.model is not None,
-            "forecast":   forecast.model is not None,
+            "land_cover": land_cover._model is not None,
+            "forecast":   False,  # paused — model not trained yet
         }
     }
