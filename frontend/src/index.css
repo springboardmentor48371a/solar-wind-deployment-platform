@@ -1,6 +1,8 @@
 /* ========================================================= */
 /* FULL-SCREEN & RESET BASE STYLES                           */
 /* ========================================================= */
+@import 'leaflet/dist/leaflet.css';
+
 html, body {
   margin: 0 !important;
   padding: 0 !important;
@@ -9,7 +11,6 @@ html, body {
   background-color: #070d18;
 }
 
-/* This is the crucial fix: removing Vite's default 1280px limit and 2rem padding */
 #root {
   max-width: none !important;
   width: 100% !important;
@@ -20,4 +21,21 @@ html, body {
 
 *, *::before, *::after {
   box-sizing: border-box !important;
+}
+
+/* Ensure Leaflet panes and pointer events work inside modals */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  background-color: #0d1526 !important;
+  cursor: crosshair !important;
+}
+
+.leaflet-pane {
+  z-index: 400 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 500 !important;
 }

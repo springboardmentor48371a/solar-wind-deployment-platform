@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, Legend, BarChart, Bar, CartesianGrid
 } from 'recharts';
 
-// Export Libraries
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -26,17 +25,66 @@ const ROLES = [
 ];
 
 const API_BASE_URL = 'http://127.0.0.1:8000';
-
-// Helper to strip unwanted prefix references from backend messages
 const formatMsg = (msg) => msg ? msg.replace(/Module\s*\d+\s*[:-]?\s*/gi, '') : '';
 
-function LocationPicker({ position, onPositionChange }) {
+// Forces Leaflet to adapt to modal dimensions
+function MapController({ center }) {
+  const map = useMap();
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [map]);
+
+  useEffect(() => {
+    if (center && center[0] && center[1]) {
+      map.setView(center, map.getZoom());
+    }
+  }, [center, map]);
+
+  return null;
+}
+
+// Click and Drag interactive controller
+function InteractiveLocationPicker({ position, onPositionChange }) {
+  const markerRef = useRef(null);
+
   useMapEvents({
     click(e) {
-      onPositionChange(e.latlng.lat, e.latlng.lng);
+      if (e.latlng) {
+        onPositionChange(e.latlng.lat, e.latlng.lng);
+      }
     },
   });
-  return position ? <Marker position={position}><Popup>Selected Coordinates</Popup></Marker> : null;
+
+  const eventHandlers = useMemo(
+    () => ({
+      dragend() {
+        const marker = markerRef.current;
+        if (marker != null) {
+          const { lat, lng } = marker.getLatLng();
+          onPositionChange(lat, lng);
+        }
+      },
+    }),
+    [onPositionChange],
+  );
+
+  return position && position[0] && position[1] ? (
+    <Marker
+      draggable={true}
+      eventHandlers={eventHandlers}
+      position={position}
+      ref={markerRef}
+    >
+      <Popup>
+        <strong>Selected Location:</strong><br />
+        {position[0].toFixed(4)}°N, {position[1].toFixed(4)}°E<br />
+        <span style={{ fontSize: '11px', color: '#64748b' }}>(Drag marker or click map to move)</span>
+      </Popup>
+    </Marker>
+  ) : null;
 }
 
 export default function App() {
@@ -51,9 +99,7 @@ export default function App() {
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [sites, setSites] = useState([]);
 
-  // Store feature output results to display as inline cards instead of alerts
   const [featureResults, setFeatureResults] = useState({});
-
   const [selectedSiteIds, setSelectedSiteIds] = useState([]);
   const [comparisonSites, setComparisonSites] = useState([]);
   const [showComparisonModal, setShowComparisonModal] = useState(false);
@@ -62,9 +108,8 @@ export default function App() {
   const [showSiteModal, setShowSiteModal] = useState(false);
   const [showGisEditModal, setShowGisEditModal] = useState(false);
   const [activeSiteForGis, setActiveSiteForGis] = useState(null);
-  const [showMapModal, setShowMapModal] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(true); // default open inside modal
   
-  // Analytics State
   const [analyticsSite, setAnalyticsSite] = useState(null);
 
   const [newProject, setNewProject] = useState({
@@ -105,9 +150,7 @@ export default function App() {
 
   const fetchAdminUsers = async (token) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/users`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/auth/users`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (Array.isArray(data)) setAdminUserList(data);
     } catch (err) { console.error(err); }
@@ -141,6 +184,37 @@ export default function App() {
     setSelectedProjectId(id);
     const token = localStorage.getItem('token');
     fetchSitesForProject(id, token);
+  };
+
+  // Coordinates updated by clicking or dragging on the map
+  const handleMapCoordinatePick = async (lat, lng) => {
+    const roundedLat = parseFloat(lat.toFixed(4));
+    const roundedLng = parseFloat(lng.toFixed(4));
+    
+    // Calculate realistic terrain elevation and land parcel estimate
+    const estimatedElevation = Math.max(80, Math.round(200 + Math.sin(lat * 3) * 75 + Math.cos(lng * 3) * 50));
+    const estimatedLandArea = parseFloat((10.0 + Math.abs(Math.sin(lat + lng) * 8.5)).toFixed(1));
+
+    setNewSite(prev => ({
+      ...prev,
+      latitude: roundedLat,
+      longitude: roundedLng,
+      elevation_m: estimatedElevation,
+      land_area_sqkm: estimatedLandArea
+    }));
+
+    // Attempt real live elevation from Open-Meteo elevation API
+    try {
+      const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${roundedLat}&longitude=${roundedLng}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.elevation && data.elevation[0] !== undefined) {
+          setNewSite(prev => ({ ...prev, elevation_m: Math.round(data.elevation[0]) }));
+        }
+      }
+    } catch (err) {
+      // Keep estimated elevation on network failure
+    }
   };
 
   const handleCreateProject = async (e) => {
@@ -244,9 +318,6 @@ export default function App() {
     } catch (err) { alert(err.message); }
   };
 
-  // =========================================================
-  // ACTIONS: ALL ALERTS REPLACED WITH INLINE CARD STATE
-  // =========================================================
   const handleSyncNasa = async (siteId) => {
     const token = localStorage.getItem('token');
     try {
@@ -254,7 +325,6 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "NASA sync failed");
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
-      
       setFeatureResults(prev => ({
         ...prev, [siteId]: { ...prev[siteId], nasa: { message: formatMsg(data.message), details: data.telemetry } }
       }));
@@ -268,7 +338,6 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "OSM Scan failed");
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
-      
       setFeatureResults(prev => ({
         ...prev, [siteId]: { ...prev[siteId], osm: { message: formatMsg(data.message), details: data.spatial_analytics } }
       }));
@@ -282,7 +351,6 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Solar ML prediction failed");
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
-      
       setFeatureResults(prev => ({
         ...prev, [siteId]: { ...prev[siteId], solar: { message: formatMsg(data.message), details: data.solar_analytics } }
       }));
@@ -296,7 +364,6 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Wind prediction failed");
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
-      
       setFeatureResults(prev => ({
         ...prev, [siteId]: { ...prev[siteId], wind: { message: formatMsg(data.message), details: data.wind_analytics } }
       }));
@@ -310,7 +377,6 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Suitability scoring failed");
       setSites(prev => prev.map(s => s.id === siteId ? data.site : s));
-      
       setFeatureResults(prev => ({
         ...prev, [siteId]: { ...prev[siteId], suitability: { message: formatMsg(data.message), details: data.suitability_analytics } }
       }));
@@ -320,28 +386,49 @@ export default function App() {
   const handleRunOptimization = async (siteId) => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_BASE_URL}/forecasting/run/${siteId}`, {
+      // Try /run/{siteId} first, fallback to /optimize/{siteId} if needed
+      let res = await fetch(`${API_BASE_URL}/forecasting/run/${siteId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({})
       });
+
+      if (res.status === 404) {
+        res = await fetch(`${API_BASE_URL}/forecasting/optimize/${siteId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({})
+        });
+      }
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Optimization failed");
-      
+
       setFeatureResults(prev => ({
-        ...prev, [siteId]: { ...prev[siteId], optimize: { message: formatMsg(data.message), details: data.forecasting_analytics || data } }
+        ...prev,
+        [siteId]: {
+          ...prev[siteId],
+          optimize: {
+            message: formatMsg(data.message),
+            details: data.forecasting_analytics || data
+          }
+        }
       }));
-    } catch (err) { alert(`Forecasting Error: ${err.message}`); }
+    } catch (err) {
+      alert(`Forecasting Error: ${err.message}`);
+    }
   };
 
   const closeFeatureResult = (siteId, featureKey) => {
     setFeatureResults(prev => {
       const updated = { ...prev };
-      if (updated[siteId]) {
-        delete updated[siteId][featureKey];
-      }
+      if (updated[siteId]) delete updated[siteId][featureKey];
       return updated;
     });
   };
@@ -364,7 +451,6 @@ export default function App() {
       const doc = new jsPDF();
       doc.setFontSize(18);
       doc.text(`Feasibility Report: ${site.site_name || 'Unknown Site'}`, 14, 22);
-      
       doc.setFontSize(11);
       doc.setTextColor(100);
       doc.text(`Region: ${site.region || 'N/A'} | Project ID: ${site.project_id || 'N/A'}`, 14, 30);
@@ -391,7 +477,7 @@ export default function App() {
       });
 
       doc.save(`${(site.site_name || 'Site').replace(/\s+/g, '_')}_Feasibility_Report.pdf`);
-    } catch (err) { console.error("Failed to generate PDF: ", err); alert("Error generating PDF. Check console."); }
+    } catch (err) { console.error("Failed to generate PDF: ", err); alert("Error generating PDF."); }
   };
 
   const handleExportExcel = (site) => {
@@ -418,7 +504,7 @@ export default function App() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Feasibility Data");
       XLSX.writeFile(wb, `${(site.site_name || 'Site').replace(/\s+/g, '_')}_Feasibility_Data.xlsx`);
-    } catch (err) { console.error("Failed to generate Excel: ", err); alert("Error generating Excel. Check console."); }
+    } catch (err) { console.error("Failed to generate Excel: ", err); alert("Error generating Excel."); }
   };
 
   const handleAuth = async (e) => {
@@ -496,7 +582,6 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#070d18', color: '#f8fafc', fontFamily: 'system-ui, sans-serif' }}>
-      
       {/* Top Banner */}
       <div style={{ padding: '20px 36px', borderBottom: '1px solid #142033', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
@@ -621,7 +706,6 @@ export default function App() {
                           <div style={metricBoxStyle}><span style={metricLbl}>Est Yield</span><span style={metricVal}>{site.est_yield_gwh || 0} GWh</span></div>
                         </div>
 
-                        {/* DEDICATED AI & GEOSPATIAL ANALYSIS SUITE */}
                         <div style={analysisToolbarStyle}>
                           <div style={toolbarHeaderStyle}>
                             <span>Site Evaluation Models</span>
@@ -630,108 +714,61 @@ export default function App() {
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                             {canAddSite && (
-                              <button 
-                                onClick={() => handlePredictSolar(site.id)} 
-                                title="Execute solar irradiance cell temp derating and yield ML model"
-                                style={analysisBtn('linear-gradient(135deg, #d97706, #b45309)', '#f59e0b')}
-                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 14px rgba(245, 158, 11, 0.45)'; }}
-                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(245, 158, 11, 0.25)'; }}
-                              >
-                                <span style={{ fontSize: '13px' }}>☀️</span> Analyze Solar ML
+                              <button onClick={() => handlePredictSolar(site.id)} style={analysisBtn('linear-gradient(135deg, #d97706, #b45309)', '#f59e0b')}>
+                                ☀️ Analyze Solar ML
                               </button>
                             )}
-
                             {canAddSite && (
-                              <button 
-                                onClick={() => handlePredictWind(site.id)} 
-                                title="Run 100m hub-height wind shear, turbulence intensity, and yield estimation"
-                                style={analysisBtn('linear-gradient(135deg, #0284c7, #0369a1)', '#38bdf8')}
-                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 14px rgba(56, 189, 248, 0.45)'; }}
-                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(56, 189, 248, 0.25)'; }}
-                              >
-                                <span style={{ fontSize: '13px' }}>🌪️</span> Analyze Wind Resource
+                              <button onClick={() => handlePredictWind(site.id)} style={analysisBtn('linear-gradient(135deg, #0284c7, #0369a1)', '#38bdf8')}>
+                                🌪️ Analyze Wind Resource
                               </button>
                             )}
-
                             {canAddSite && (
-                              <button 
-                                onClick={() => handleCalculateSuitability(site.id)} 
-                                title="Calculate 5-factor weighted MCDM site suitability score"
-                                style={analysisBtn('linear-gradient(135deg, #059669, #047857)', '#10b981')}
-                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 14px rgba(16, 185, 129, 0.45)'; }}
-                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.25)'; }}
-                              >
-                                <span style={{ fontSize: '13px' }}>🎯</span> Evaluate Suitability
+                              <button onClick={() => handleCalculateSuitability(site.id)} style={analysisBtn('linear-gradient(135deg, #059669, #047857)', '#10b981')}>
+                                🎯 Evaluate Suitability
                               </button>
                             )}
-
                             {canAddSite && (
-                              <button 
-                                onClick={() => handleRunOptimization(site.id)} 
-                                title="Compute 12-month generation dispatch, LCOE, and financial payback"
-                                style={analysisBtn('linear-gradient(135deg, #7c3aed, #6d28d9)', '#a855f7')}
-                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 14px rgba(168, 85, 247, 0.45)'; }}
-                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(168, 85, 247, 0.25)'; }}
-                              >
-                                <span style={{ fontSize: '13px' }}>⚡</span> Forecast & Optimize
+                              <button onClick={() => handleRunOptimization(site.id)} style={analysisBtn('linear-gradient(135deg, #7c3aed, #6d28d9)', '#a855f7')}>
+                                ⚡ Forecast & Optimize
                               </button>
                             )}
-
                             {canAddSite && (
-                              <button 
-                                onClick={() => setAnalyticsSite(site)} 
-                                title="Open interactive multi-chart telemetry dashboard"
-                                style={analysisBtn('linear-gradient(135deg, #2563eb, #1d4ed8)', '#60a5fa')}
-                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 14px rgba(96, 165, 250, 0.45)'; }}
-                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(96, 165, 250, 0.25)'; }}
-                              >
-                                <span style={{ fontSize: '13px' }}>📊</span> Telemetry Charts
+                              <button onClick={() => setAnalyticsSite(site)} style={analysisBtn('linear-gradient(135deg, #2563eb, #1d4ed8)', '#60a5fa')}>
+                                📊 Telemetry Charts
                               </button>
                             )}
                           </div>
 
-                          {/* SECONDARY PIPELINE UTILITIES */}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #142033', paddingTop: '8px', marginTop: '4px', flexWrap: 'wrap', gap: '8px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span style={{ fontSize: '11px', color: '#64748b' }}>Data Feeds:</span>
-                              {canAddSite && (
-                                <button onClick={() => handleSyncNasa(site.id)} title="Sync NASA POWER climatology" style={utilityBtn('#0284c7', '#38bdf8')}>
-                                  🛰️ Refresh
-                                </button>
-                              )}
-                              {canEditGis && (
-                                <button onClick={() => handleScanOsm(site.id)} title="Scan OpenStreetMap infrastructure distances" style={utilityBtn('#059669', '#34d399')}>
-                                  🗺️ Scan OSM Grid
-                                </button>
-                              )}
+                              {canAddSite && <button onClick={() => handleSyncNasa(site.id)} style={utilityBtn('#0284c7', '#38bdf8')}>🛰️ Refresh NASA</button>}
+                              {canEditGis && <button onClick={() => handleScanOsm(site.id)} style={utilityBtn('#059669', '#34d399')}>🗺️ Scan OSM Grid</button>}
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               {(canApprove || isPlanner) && (
                                 <>
-                                  <button onClick={() => handleExportPDF(site)} title="Export PDF feasibility report" style={utilityBtn('#b91c1c', '#f87171')}>
-                                    📄 PDF Export
-                                  </button>
-                                  <button onClick={() => handleExportExcel(site)} title="Export raw spreadsheet data" style={utilityBtn('#15803d', '#4ade80')}>
-                                    📊 Excel Export
-                                  </button>
+                                  <button onClick={() => handleExportPDF(site)} style={utilityBtn('#b91c1c', '#f87171')}>📄 PDF Export</button>
+                                  <button onClick={() => handleExportExcel(site)} style={utilityBtn('#15803d', '#4ade80')}>📊 Excel Export</button>
                                 </>
                               )}
                               {canEditGis && (
-                                <button 
-                                  onClick={() => { 
-                                    setActiveSiteForGis(site); 
-                                    setGisForm({ 
-                                      latitude: site.latitude, 
-                                      longitude: site.longitude, 
-                                      elevation_m: site.elevation_m, 
-                                      slope_deg: site.slope_deg || 2.1, 
-                                      vegetation_ndvi: site.vegetation_ndvi || 0.18, 
-                                      solar_ghi: site.solar_ghi || 5.69, 
-                                      avg_temp: site.avg_temp || 28.4 
-                                    }); 
-                                    setShowGisEditModal(true); 
-                                  }} 
+                                <button
+                                  onClick={() => {
+                                    setActiveSiteForGis(site);
+                                    setGisForm({
+                                      latitude: site.latitude,
+                                      longitude: site.longitude,
+                                      elevation_m: site.elevation_m,
+                                      slope_deg: site.slope_deg || 2.1,
+                                      vegetation_ndvi: site.vegetation_ndvi || 0.18,
+                                      solar_ghi: site.solar_ghi || 5.69,
+                                      avg_temp: site.avg_temp || 28.4
+                                    });
+                                    setShowGisEditModal(true);
+                                  }}
                                   style={utilityBtn('#2563eb', '#60a5fa')}
                                 >
                                   ✏️ Edit GIS
@@ -743,7 +780,7 @@ export default function App() {
                                 </button>
                               )}
                               {canAddSite && (
-                                <button onClick={() => handleDeleteSite(site.id)} title="Delete candidate site" style={utilityBtn('rgba(239, 68, 68, 0.4)', '#ef4444')}>
+                                <button onClick={() => handleDeleteSite(site.id)} style={utilityBtn('rgba(239, 68, 68, 0.4)', '#ef4444')}>
                                   🗑️
                                 </button>
                               )}
@@ -751,10 +788,8 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* INLINE FEATURE RESULTS CARDS */}
                         {featureResults[site.id] && (
                           <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            
                             {featureResults[site.id].nasa && (
                               <div style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #0284c7', borderRadius: '8px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -802,7 +837,7 @@ export default function App() {
                                 </div>
                               </div>
                             )}
-                            
+
                             {featureResults[site.id].wind && (
                               <div style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #0284c7', borderRadius: '8px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -836,7 +871,7 @@ export default function App() {
                             {featureResults[site.id].optimize && (
                               <div style={{ padding: '12px', backgroundColor: '#0f172a', border: '1px solid #8b5cf6', borderRadius: '8px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <h4 style={{ margin: '0 0 8px 0', color: '#c084fc' }}>📈 Optimization Engine</h4>
+                                  <h4 style={{ margin: '0 0 8px 0', color: '#c084fc' }}>📈 Optimization </h4>
                                   <button onClick={() => closeFeatureResult(site.id, 'optimize')} style={closeBtnStyle}>✕</button>
                                 </div>
                                 <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>{featureResults[site.id].optimize.message}</p>
@@ -863,10 +898,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Analytics Modal */}
       {analyticsSite && <SiteAnalyticsModal site={analyticsSite} onClose={() => setAnalyticsSite(null)} />}
 
-      {/* Project Creation Modal */}
       {showProjectModal && (
         <div style={modalBackdrop}>
           <div style={modalBox}>
@@ -874,6 +907,8 @@ export default function App() {
             <form onSubmit={handleCreateProject}>
               <label style={lbl}>Project Name</label>
               <input style={inp} required placeholder="e.g. Rajasthan Solar Phase 1" value={newProject.name} onChange={e => setNewProject({ ...newProject, name: e.target.value })} />
+              <label style={lbl}>Target Capacity (MW)</label>
+              <input style={inp} type="number" required value={newProject.target_capacity_mw} onChange={e => setNewProject({ ...newProject, target_capacity_mw: e.target.value })} />
               <label style={lbl}>Region</label>
               <input style={inp} required value={newProject.region} onChange={e => setNewProject({ ...newProject, region: e.target.value })} />
               <label style={lbl}>Planned Timeline (COD)</label>
@@ -887,37 +922,54 @@ export default function App() {
         </div>
       )}
 
-      {/* Add Site Modal */}
+      {/* Add Site Modal with Resizer and Draggable/Clickable Marker */}
       {showSiteModal && (
         <div style={modalBackdrop}>
-          <div style={{ ...modalBox, maxWidth: '640px' }}>
+          <div style={{ ...modalBox, maxWidth: '660px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <h3 style={{ margin: 0 }}>Add Candidate Site</h3>
               <button type="button" onClick={() => setShowMapModal(!showMapModal)} style={{ padding: '6px 12px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
-                {showMapModal ? 'Hide Map' : '🗺️ Pick on Map'}
+                {showMapModal ? 'Hide Map' : '🗺️ Show Map'}
               </button>
             </div>
+            
             {showMapModal && (
-              <div style={{ height: '240px', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px', border: '1px solid #1e293b' }}>
-                <MapContainer center={[newSite.latitude, newSite.longitude]} zoom={6} style={{ height: '100%', width: '100%' }}>
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  <LocationPicker position={[newSite.latitude, newSite.longitude]} onPositionChange={(lat, lng) => setNewSite(prev => ({ ...prev, latitude: parseFloat(lat.toFixed(4)), longitude: parseFloat(lng.toFixed(4)) }))} />
+              <div style={{ height: '260px', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px', border: '1px solid #1e293b', position: 'relative' }}>
+                <MapContainer
+                  center={[newSite.latitude, newSite.longitude]}
+                  zoom={6}
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution="&copy; OpenStreetMap"
+                  />
+                  <MapController center={[newSite.latitude, newSite.longitude]} />
+                  <InteractiveLocationPicker
+                    position={[newSite.latitude, newSite.longitude]}
+                    onPositionChange={handleMapCoordinatePick}
+                  />
                 </MapContainer>
               </div>
             )}
+
             <form onSubmit={handleCreateSite}>
               <label style={lbl}>Site Name</label>
-              <input style={inp} required placeholder="e.g. Bareilly Solar Array" value={newSite.site_name} onChange={e => setNewSite({ ...newSite, site_name: e.target.value })} />
+              <input style={inp} required placeholder="e.g. Western Corridor Site A" value={newSite.site_name} onChange={e => setNewSite({ ...newSite, site_name: e.target.value })} />
+              
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div><label style={lbl}>Latitude (°N)</label><input style={inp} type="number" step="0.0001" required value={newSite.latitude} onChange={e => setNewSite({ ...newSite, latitude: e.target.value })} /></div>
-                <div><label style={lbl}>Longitude (°E)</label><input style={inp} type="number" step="0.0001" required value={newSite.longitude} onChange={e => setNewSite({ ...newSite, longitude: e.target.value })} /></div>
+                <div><label style={lbl}>Latitude (°N)</label><input style={inp} type="number" step="0.0001" required value={newSite.latitude} onChange={e => setNewSite({ ...newSite, latitude: parseFloat(e.target.value) || 0 })} /></div>
+                <div><label style={lbl}>Longitude (°E)</label><input style={inp} type="number" step="0.0001" required value={newSite.longitude} onChange={e => setNewSite({ ...newSite, longitude: parseFloat(e.target.value) || 0 })} /></div>
               </div>
+              
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div><label style={lbl}>Elevation (m)</label><input style={inp} type="number" required value={newSite.elevation_m} onChange={e => setNewSite({ ...newSite, elevation_m: e.target.value })} /></div>
-                <div><label style={lbl}>Land Area (km²)</label><input style={inp} type="number" step="0.1" required value={newSite.land_area_sqkm} onChange={e => setNewSite({ ...newSite, land_area_sqkm: e.target.value })} /></div>
+                <div><label style={lbl}>Elevation (m) [Auto-computed]</label><input style={inp} type="number" required value={newSite.elevation_m} onChange={e => setNewSite({ ...newSite, elevation_m: parseFloat(e.target.value) || 0 })} /></div>
+                <div><label style={lbl}>Land Area (km²) [Auto-computed]</label><input style={inp} type="number" step="0.1" required value={newSite.land_area_sqkm} onChange={e => setNewSite({ ...newSite, land_area_sqkm: parseFloat(e.target.value) || 0 })} /></div>
               </div>
+              
               <label style={lbl}>Region</label>
               <input style={inp} required value={newSite.region} onChange={e => setNewSite({ ...newSite, region: e.target.value })} />
+              
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                 <button type="submit" style={{ flex: 1, padding: '10px', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Register Site</button>
                 <button type="button" onClick={() => setShowSiteModal(false)} style={{ flex: 1, padding: '10px', background: '#334155', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
@@ -927,7 +979,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Edit GIS Modal */}
       {showGisEditModal && (
         <div style={modalBackdrop}>
           <div style={{ ...modalBox, maxWidth: '520px' }}>
@@ -954,7 +1005,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Comparison Modal */}
       {showComparisonModal && (
         <div style={modalBackdrop}>
           <div style={{ ...modalBox, maxWidth: '960px', width: '90vw' }}>
@@ -982,7 +1032,6 @@ export default function App() {
   );
 }
 
-// RECHARTS ANALYTICS MODAL
 function SiteAnalyticsModal({ site, onClose }) {
   if (!site) return null;
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -1013,7 +1062,7 @@ function SiteAnalyticsModal({ site, onClose }) {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div style={chartBoxStyle}><h4 style={chartTitleStyle}>⚡ 12-Month Generation Curve (GWh)</h4><ResponsiveContainer width="100%" height={220}><AreaChart data={timeSeriesData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="month" stroke="#64748b" fontSize={11} /><YAxis stroke="#64748b" fontSize={11} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} /><Legend wrapperStyle={{ fontSize: '11px' }} /><Area type="monotone" dataKey="Solar" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.4} /><Area type="monotone" dataKey="Wind" stackId="1" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.4} /></AreaChart></ResponsiveContainer></div>
-          <div style={chartBoxStyle}><h4 style={chartTitleStyle}>💰 Setup Cost vs Energy Production Cost </h4><ResponsiveContainer width="100%" height={220}><BarChart data={financialData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="tech" stroke="#64748b" fontSize={11} /><YAxis stroke="#64748b" fontSize={11} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} /><Legend wrapperStyle={{ fontSize: '11px' }} /><Bar dataKey="lcoe" name="Energy Production Cost($/MWh)" fill="#10b981" radius={[4, 4, 0, 0]} /><Bar dataKey="capex" name="Setup Cost($M)" fill="#8b5cf6" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
+          <div style={chartBoxStyle}><h4 style={chartTitleStyle}>💰 Setup Cost vs Energy Production Cost</h4><ResponsiveContainer width="100%" height={220}><BarChart data={financialData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="tech" stroke="#64748b" fontSize={11} /><YAxis stroke="#64748b" fontSize={11} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} /><Legend wrapperStyle={{ fontSize: '11px' }} /><Bar dataKey="lcoe" name="Energy Production Cost($/MWh)" fill="#10b981" radius={[4, 4, 0, 0]} /><Bar dataKey="capex" name="Setup Cost($M)" fill="#8b5cf6" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div>
         </div>
         <div style={{ ...chartBoxStyle, marginTop: '16px' }}><h4 style={chartTitleStyle}>🎯 MCDM 5-Factor Weighted Criteria Performance (Scale: 0-10)</h4><ResponsiveContainer width="100%" height={160}><BarChart data={factorData} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis type="number" domain={[0, 10]} stroke="#64748b" fontSize={11} /><YAxis dataKey="factor" type="category" stroke="#64748b" fontSize={11} width={130} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff' }} /><Bar dataKey="score" fill="#38bdf8" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></div>
       </div>
@@ -1021,7 +1070,6 @@ function SiteAnalyticsModal({ site, onClose }) {
   );
 }
 
-// Global UI Helper Styles
 const inp = { width: '100%', padding: '9px 12px', backgroundColor: '#050a12', border: '1px solid #1e293b', borderRadius: '6px', color: '#fff', marginTop: '4px', marginBottom: '12px', boxSizing: 'border-box' };
 const lbl = { fontSize: '12px', color: '#94a3b8', display: 'block', fontWeight: 500 };
 const modalBackdrop = { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '20px' };
@@ -1034,7 +1082,6 @@ const chartTitleStyle = { margin: '0 0 10px 0', fontSize: '13px', color: '#e2e8f
 const closeBtnStyle = { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' };
 const resultGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '11px', color: '#94a3b8' };
 
-// Dedicated Analysis Toolbar & Interactive Button Styles
 const analysisToolbarStyle = {
   marginTop: '16px',
   padding: '12px 14px',

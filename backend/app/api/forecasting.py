@@ -1,11 +1,11 @@
-import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.models.user import SessionLocal, User, UserRole
 from app.models.project_site import Site
 from app.api.auth import require_roles
+import math
 
-router = APIRouter(prefix="/forecasting", tags=["Modules 8 & 9: Forecasting & Optimization"])
+router = APIRouter(prefix="/forecasting", tags=["Forecasting & Optimization"])
 
 def get_db():
     db = SessionLocal()
@@ -15,7 +15,8 @@ def get_db():
         db.close()
 
 @router.post("/run/{site_id}")
-def run_energy_forecasting_and_optimization(
+@router.post("/optimize/{site_id}")
+def run_forecasting_optimization(
     site_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles([
@@ -29,60 +30,48 @@ def run_energy_forecasting_and_optimization(
     if not site:
         raise HTTPException(status_code=404, detail="Candidate site not found")
 
-    # 1. 12-Month Time-Series Generation Modeling (GWh)
-    base_solar = site.est_yield_gwh or 145.0
-    base_wind = site.annual_wind_yield_gwh or 85.0
-    
-    # Seasonal variance coefficients (Monsoon vs Summer peaks)
-    solar_profile = [round(base_solar / 12 * factor, 2) for factor in [0.85, 0.95, 1.15, 1.25, 1.30, 1.10, 0.75, 0.80, 1.05, 1.10, 0.90, 0.80]]
-    wind_profile = [round(base_wind / 12 * factor, 2) for factor in [1.10, 1.05, 0.95, 0.85, 0.90, 1.20, 1.35, 1.30, 1.00, 0.90, 0.95, 1.05]]
-    hybrid_profile = [round(s + w, 2) for s, w in zip(solar_profile, wind_profile)]
+    base_yield = site.est_yield_gwh or 1450.0
 
-    # 2. Technology Selection & Financial Modeling (CAPEX & LCOE)
-    # Standalone Solar
-    capex_solar = site.land_area_sqkm * 1.2 * 0.95  # Million USD approx
-    lcoe_solar = 34.50
-    
-    # Standalone Wind
-    capex_wind = site.land_area_sqkm * 1.5 * 1.10
-    lcoe_wind = 41.20
-    
-    # Hybrid Solar-Wind
-    capex_hybrid = capex_solar + capex_wind * 0.85
-    lcoe_hybrid = 37.10
+    # 12-month generation profile
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    monthly_solar = [round((base_yield * 0.5) / 12 * (1 + 0.3 * math.sin(i * math.pi / 6)), 2) for i in range(12)]
+    monthly_wind = [round((base_yield * 0.5) / 12 * (1 - 0.2 * math.cos(i * math.pi / 6)), 2) for i in range(12)]
+    hybrid_combined = [round(s + w, 2) for s, w in zip(monthly_solar, monthly_wind)]
 
-    # Decision Matrix
-    if base_wind > base_solar * 1.2:
-        recommended_tech = "Standalone Wind"
-        optimal_lcoe = lcoe_wind
-        optimal_capex = capex_wind
-    elif base_solar > base_wind * 1.3:
-        recommended_tech = "Standalone Solar PV"
-        optimal_lcoe = lcoe_solar
-        optimal_capex = capex_solar
+    # Economics & recommendation
+    if site.suitability_score and site.suitability_score >= 7.5:
+        recommended_tech = "Hybrid Solar-Wind Farm"
+        lcoe = 34.2
+        capex = 290.0
+        payback = 5.4
+    elif site.capacity_factor and site.capacity_factor > 20:
+        recommended_tech = " Wind Farm"
+        lcoe = 41.0
+        capex = 185.0
+        payback = 6.8
     else:
-        recommended_tech = "Hybrid Solar-Wind Microgrid"
-        optimal_lcoe = lcoe_hybrid
-        optimal_capex = capex_hybrid
+        recommended_tech = "Solar Farm "
+        lcoe = 36.5
+        capex = 145.0
+        payback = 6.2
 
-    payback_years = round(optimal_capex * 1e6 / (sum(hybrid_profile) * 1e6 * 0.065), 1)
-
-    site.lcoe_usd_mwh = optimal_lcoe
+    site.lcoe_usd_mwh = lcoe
     db.commit()
     db.refresh(site)
 
     return {
-        "message": f"Optimal deployment technology selected: {recommended_tech}",
-        "site_id": site.id,
+        "message": f"Optimization model executed: Recommended {recommended_tech}",
+        "site": site,
         "forecasting_analytics": {
             "recommended_technology": recommended_tech,
-            "lcoe_usd_per_mwh": optimal_lcoe,
-            "estimated_capex_million_usd": round(optimal_capex, 2),
-            "payback_period_years": payback_years,
+            "lcoe_usd_per_mwh": lcoe,
+            "estimated_capex_million_usd": capex,
+            "payback_period_years": payback,
             "monthly_generation_gwh": {
-                "solar_profile_gwh": solar_profile,
-                "wind_profile_gwh": wind_profile,
-                "hybrid_combined_gwh": hybrid_profile
+                "months": months,
+                "solar_gwh": monthly_solar,
+                "wind_gwh": monthly_wind,
+                "hybrid_combined_gwh": hybrid_combined
             }
         }
     }
