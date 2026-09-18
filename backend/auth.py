@@ -2,7 +2,11 @@
 import base64, hashlib, hmac, os, time
 import jwt
 
+<<<<<<< HEAD
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-solar-wind-jwt-secret-please-change")
+=======
+JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-change-this-secret")
+>>>>>>> origin/vaishnavi-gokarna
 ALGORITHM = "HS256"
 TOKEN_MINUTES = 60 * 8
 

@@ -12,7 +12,10 @@ import re
 
 from database import get_conn, init_db
 from auth import create_access_token, decode_token, hash_password, verify_password
+<<<<<<< HEAD
 from ml_models import predict_site, MODEL_METRICS
+=======
+>>>>>>> origin/vaishnavi-gokarna
 
 ROLES = [
     "Renewable Energy Planner",
@@ -116,7 +119,10 @@ def score_site(s):
         "estimated_solar_mwh_year": round(solar_output, 1),
         "estimated_wind_mwh_year": round(wind_output, 1),
         "estimated_total_mwh_year": round(solar_output + wind_output, 1),
+<<<<<<< HEAD
         **predict_site(s),
+=======
+>>>>>>> origin/vaishnavi-gokarna
     }
 
 @app.get("/health")
@@ -231,6 +237,7 @@ def dashboard(user=Depends(current_user)):
     scored.sort(key=lambda x: x["overall_score"], reverse=True)
     avg = round(sum(x["overall_score"] for x in scored)/len(scored), 1) if scored else 0
     total_mwh = round(sum(x["estimated_total_mwh_year"] for x in scored), 1)
+<<<<<<< HEAD
     ml_total = round(sum(float(x.get("ml_total_mwh_year", 0)) for x in scored), 1)
     return {"projects": projects, "sites": len(scored), "average_score": avg, "annual_energy_mwh": total_mwh, "ml_annual_energy_mwh": ml_total, "recommended_sites": scored[:5]}
 
@@ -270,6 +277,9 @@ def compare_project_sites(project_id: int, user=Depends(current_user)):
     for i, site in enumerate(scored, 1):
         site["rank"] = i
     return {"project": dict(project), "sites": scored, "best_site": scored[0] if scored else None}
+=======
+    return {"projects": projects, "sites": len(scored), "average_score": avg, "annual_energy_mwh": total_mwh, "recommended_sites": scored[:5]}
+>>>>>>> origin/vaishnavi-gokarna
 
 @app.get("/reports/sites.csv")
 def export_sites(user=Depends(current_user)):

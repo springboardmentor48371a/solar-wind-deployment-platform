@@ -4,7 +4,10 @@ frontend/node_modules/
 frontend/dist/
 __pycache__/
 *.pyc
+<<<<<<< HEAD
 
 backend/__pycache__/
 backend/models/*.joblib
 backend/data/*.csv
+=======
+>>>>>>> origin/vaishnavi-gokarna

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 SOLAR AND WIND PREDICTION - RUN INSTRUCTIONS
 
 1. Open the project folder in VS Code.
@@ -23,3 +24,6 @@ SOLAR AND WIND PREDICTION - RUN INSTRUCTIONS
 5. Register an account, log in, create a project and add multiple candidate sites.
 
 6. Use Recommendations to compare and rank sites and ML Prediction to view Random Forest results.
+=======
+1. Open two terminals.\n2. Backend: cd backend && python -m venv .venv && .venv\\Scripts\\activate && pip install -r requirements.txt && uvicorn main:app --reload\n3. Frontend: cd frontend && npm install && npm run dev\n4. Open http://localhost:5173/register\n
+>>>>>>> origin/vaishnavi-gokarna
