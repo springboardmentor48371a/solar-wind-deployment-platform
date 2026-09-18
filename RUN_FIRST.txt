@@ -1,0 +1,25 @@
+SOLAR AND WIND PREDICTION - RUN INSTRUCTIONS
+
+1. Open the project folder in VS Code.
+
+2. BACKEND - open Terminal 1:
+   cd backend
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   python -m pip install -r requirements.txt
+   python -m uvicorn main:app --reload
+
+   Backend: http://127.0.0.1:8000
+   Swagger: http://127.0.0.1:8000/docs
+
+3. FRONTEND - open Terminal 2 and keep Terminal 1 running:
+   cd frontend
+   npm install
+   npm run dev
+
+4. Open:
+   http://localhost:5173
+
+5. Register an account, log in, create a project and add multiple candidate sites.
+
+6. Use Recommendations to compare and rank sites and ML Prediction to view Random Forest results.
