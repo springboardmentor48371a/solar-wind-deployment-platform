@@ -1,4 +1,4 @@
-````markdown
+
 # AI-Driven Solar & Wind Prediction Platform
 
 An AI-powered platform that helps users analyse and compare potential locations for solar and wind energy deployment using environmental, geographic, infrastructure, and machine-learning data.
