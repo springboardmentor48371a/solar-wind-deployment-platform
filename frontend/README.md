@@ -1,8 +1,5 @@
 # Solar & Wind Deployment Intelligence - Frontend
 
-> [!NOTE]
-> **Development Notice**: For now, the frontend is a functional prototype and is not under active aesthetic or structural focus. Once the backend functionality and machine learning services are fully completed and validated, the frontend will be focused on, polished, and fully structured in a professional manner.
-
 ## Key Features
 
 1. **Role-Based Dashboards**: 

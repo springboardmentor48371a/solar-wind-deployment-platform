@@ -4,150 +4,111 @@
 
 Build an AI-powered Solar & Wind Deployment Intelligence Platform that recommends optimal locations for renewable energy projects by analyzing environmental, geographic, climatic, and infrastructure-related factors.
 
-The platform leverages geospatial analytics, satellite imagery, weather forecasting, terrain analysis, machine learning, and optimization algorithms to identify suitable deployment locations, estimate renewable energy generation potential, evaluate project feasibility, and support investment decision-making.
+The platform leverages geospatial analytics, satellite weather data, terrain analysis, machine learning inference, and multi-criteria decision algorithms to evaluate site suitability, estimate renewable generation potential, streamline stakeholder collaboration, and accelerate renewable energy deployment.
 
-**Designed for:** renewable energy companies, government agencies, utility providers, environmental organizations, infrastructure planners, and sustainability consultants.
-
----
-
-## Outcomes
-
-- Developed and deployed an AI-powered renewable energy intelligence platform.
-- Implemented secure authentication and role-based access control.
-- Built geospatial and environmental data analysis workflows.
-- Developed solar and wind potential prediction models.
-- Implemented site suitability and deployment optimization engines.
-- Built energy generation forecasting and investment analytics systems.
-- Developed dashboards for planners, analysts, and decision-makers.
-- Deployed the platform using Docker and cloud deployment platforms such as AWS or Azure.
+**Target Stakeholders:** Renewable energy developers, energy planners, GIS analysts, project managers, utility providers, and infrastructure consultants.
 
 ---
 
-## Platform Layer Summary
+## Implemented Capabilities
 
-| Layer | Contains |
-|---|---|
-| **Users & Roles** | Energy Planner, GIS Analyst, Project Manager, Investor/Developer, Government/Regulator, Administrator |
-| **Access Channels** | Web Browser, Mobile App (Android/iOS), API Access, Third Party Integrations |
-| **User Interfaces** | Web Application, GIS Map Viewer, Analytics Dashboard, Reports & Export, Mobile Application, API Clients |
-| **API Gateway (FastAPI)** | Routing, Authentication & Authorization, Rate Limiting, Request Validation, Load Balancing, CORS, Logging, Throttling |
-| **Microservices Layer** | User & Access Service, Project & Site Service, Environmental Data Service, GIS & Spatial Service, Solar Potential Service, Wind Potential Service, Site Suitability Service, Energy Forecasting Service, Deployment Optimization Service, Scoring & Ranking Service, Reporting Service, Notification Service |
-| **AI/ML & Analytics Layer** | Solar Irradiance Model (XGBoost/LSTM), Wind Speed Model (LSTM/Prophet), Energy Forecasting Model (LSTM/Prophet), Suitability Prediction Model (Random Forest/XGBoost), Risk Assessment Model (XGBoost/Neural Net), Investment Prediction Model (Regression/XGBoost), Optimization Engine (GA/MILP/Heuristics) |
-| **Data Ingestion Layer** | Data Connectors → Raw Data Storage → Data Cleaning → Spatial Processing → Feature Extraction → Data Warehouse → Cache |
-| **Data Layer** | PostgreSQL + PostGIS, MongoDB, TimescaleDB, AWS S3/Azure Blob, Snowflake/BigQuery, FAISS/Pinecone, Redis |
-| **External Sources** | Sentinel/Landsat/MODIS, NASA POWER/NOAA/ECMWF, Global Wind Atlas/NREL, OpenStreetMap/Esri, World Bank, Grid & Infrastructure Data, Environmental Databases |
-| **Integrations** | Financial Modeling, Project Management, SCADA/IoT, Power System Simulation, Third-party Analytics |
-| **Monitoring** | Application Monitoring, Performance Monitoring, Log Aggregation, Error Tracking, Alerts |
-| **Security** | Data Encryption, Role-Based Access Control, Audit Logs, Compliance Management |
-| **Backup & Recovery** | Automated Backups, Cross-Region Replication, Point-in-time Recovery, Disaster Recovery |
+The platform has been designed, implemented, tested, and deployed with the following core systems:
 
----
+### 1. Secure Authentication & Role-Based Access Control (RBAC)
+- **Multi-Factor Session Security**: JWT-based authentication featuring short-lived access tokens (30 minutes) and secure refresh tokens (7 days).
+- **Password Protection**: Industry-standard password hashing using `bcrypt` via Passlib.
+- **Federated Authentication**: Google OAuth2 authentication flow with automatic account provisioning and token exchange.
+- **Granular Roles & Least Privilege**: Four specialized user personas with strictly enforced backend authorization policies:
+  - *Administrator*: System governance, user lifecycle management, role modifications, and account deactivations.
+  - *Energy Planner*: Project portfolio creation, site exploration, scenario planning, and yield analysis.
+  - *GIS Analyst*: Geospatial map intelligence, coordinate inspection, terrain profiling, and site registration.
+  - *Project Manager*: Project governance, resource oversight, multi-site comparison, and exclusive authority to approve or reject site deployment statuses.
 
-## Modules
+### 2. Project Portfolio & Site Asset Management
+- **Project Workspaces**: Centralized containerization of renewable energy initiatives tracking lifecycle milestones (`planning`, `active`, `completed`, `on_hold`).
+- **Asset Registration**: Detailed site profiling capturing coordinates (latitude/longitude), elevation, land area (hectares), energy technology (`solar`, `wind`, `hybrid`), and land ownership categories.
+- **Geographic Auto-Discovery**: Automatic country and regional boundary resolution via Nominatim reverse geocoding on site submission.
+- **Site Comparison Matrix**: Side-by-side benchmarking tool enabling multi-site evaluations across key terrain, resource, and prediction metrics.
+- **Deployment Audit Trail**: Immutable history log (`deployment_history`) tracking every status transition with reviewer ID, previous status, new status, timestamp, and audit notes.
 
-### 1. User Authentication & Role-Based Access ✅
-- User registration and login
-- JWT authentication
-- OAuth2 login (Google)
-- Role-based access control
-- User profile management
+### 3. Automated Environmental & Climate Data Pipeline
+- **Meteorological Ingestion**: Automated data ingestion from NASA POWER API fetching daily solar irradiance ($W/m^2$), peak sun hours, direct normal irradiance (DNI), and ambient temperature ranges.
+- **Atmospheric Climate Ingestion**: Integration with the Open-Meteo API for multi-altitude wind vectors (10m and 50m wind speed in $m/s$), wind direction, precipitation, cloud cover, and relative humidity.
+- **Terrain Elevation Modeling**: Automatic DEM altitude, slope, and aspect retrieval using OpenTopoData / NASA SRTM.
+- **Smart 24-Hour Cache Layer**: Ingestion layer caching that eliminates duplicate external API queries if a site's environmental observations have been refreshed within 24 hours.
 
-**Roles:** Energy Planner · GIS Analyst · Project Manager · Administrator
+### 4. Smart Environmental Visibility Engine
+- **Technology-Tailored Metrics**: Dynamic client-side filtering that presents only domain-relevant environmental parameters:
+  - *Solar Sites*: Displays solar irradiance, peak sun hours, and temperature metrics; automatically suppresses wind metrics.
+  - *Wind Sites*: Displays 10m/50m wind speeds, directional compass, and atmospheric density; automatically suppresses solar irradiance.
+  - *Hybrid Sites*: Displays the unified environmental matrix across both solar and wind dimensions.
 
-### 2. Project & Site Management ✅
-- Project creation
-- Site registration
-- Region management
-- Site comparison
-- Deployment history management
+### 5. AI/ML Site Suitability & Resource Yield Intelligence
+- **Microservice Architecture**: Decoupled FastAPI ML service executing asynchronous model inference and scoring.
+- **Solar Potential Estimation**: Machine learning estimation of solar capacity factor and daily energy yield ($kWh$).
+- **Wind Resource Modeling**: Wind power output prediction ($kW$) integrated with Betz-limit aerodynamic fallbacks for low-wind regimes.
+- **Geographic & Land Cover Analysis**: Land classification, vegetation indexing (NDVI), and slope suitability indexing.
+- **Multi-Factor Suitability Scoring Engine**:
+  $$\text{Composite Score} = 35\% \times \text{Resource} + 25\% \times \text{Geographic} + 15\% \times \text{Infrastructure} + 15\% \times \text{Environmental} + 10\% \times \text{Economic}$$
+- **Standardized Categorization**: Automatic qualitative rating classification into *Excellent*, *Highly Suitable*, *Moderately Suitable*, *Low Suitability*, or *Unsuitable*.
 
-### 3. Environmental Data Collection Engine ✅
-- Weather data collection (NASA POWER)
-- Terrain analysis (OpenTopoData)
-- Climate data integration (Open-Meteo)
+### 6. Interactive Geospatial GIS & Role Dashboards
+- **Interactive Mapping**: Leaflet.js-powered GIS map with OpenStreetMap basemaps, custom color-coded technology markers, and site radius coverage circles.
+- **Real-Time Coordinate Preview**: Live reverse-geocoding preview tool displaying elevation, municipality, state, and country before site commitment.
+- **Customized Role Dashboards**: Specialized UI layouts designed specifically around each role's primary mission:
+  - *Planner*: Portfolio view, suitability rankings, and site comparisons.
+  - *GIS Analyst*: Map-first spatial intelligence, site registration, and coordinate profiling.
+  - *Project Manager*: Project health, site approval/rejection controls, and audit logs.
+  - *Admin*: User management, access rights, and security oversight.
 
-### 4. Geographic Intelligence Engine ✅
-- GIS data processing (Leaflet maps integration)
-- Terrain mapping (Elevation and slope indices)
-- Land suitability assessment (distilled EuroSAT bridge model)
-
-### 5. Solar Potential Prediction Engine ✅
-- Solar energy estimation (capacity factor prediction)
-- Panel efficiency/yield tracking
-- Solar resource mapping
-
-### 6. Wind Potential Prediction Engine ✅
-- Wind resource assessment (Betz fallback & SCADA power predictions)
-- Turbine suitability analysis
-- Wind power estimation
-
-### 7. Site Suitability Intelligence Engine ✅
-- Site ranking
-- Multi-factor suitability analysis
-- Environmental impact evaluation
-
-### 8. Energy Forecasting Engine ⏸ (model rewrite needed)
-- Energy production forecasting
-- Seasonal generation prediction
-- Long-term energy estimation
-- Revenue prediction
-
-### 9. Deployment Optimization Engine 🔜
-- Optimal location recommendation
-- Technology selection
-- Capacity planning
-- Hybrid solar-wind recommendations
-
-### 10. Site Scoring Engine ✅
-
-```
-Deployment Suitability Score =
-    Renewable Resource Availability   × 35%
-  + Geographic Suitability            × 25%
-  + Infrastructure Accessibility      × 15%
-  + Environmental Impact              × 15%
-  + Economic Feasibility              × 10%
-```
-
-**Suitability Categories:** Excellent · Highly Suitable · Moderately Suitable · Low Suitability · Unsuitable
-
-### 11. Dashboard & Analytics ✅
-| Dashboard | Shows |
-|---|---|
-| **Energy Planner** | Recommended sites, suitability scores, analytics rankings |
-| **GIS Analyst** | Leaflet Map GIS visualization, terrain metrics, site comparisons |
-| **Project Manager** | Project progress, site list, comparisons, status updates |
-| **Admin** | User management, role changes, deactivations |
-
-### 12. Notification & Alert System 🔜
-### 13. Reports & Export System 🔜
-### 14. Final Integration, Testing & Deployment 🔜
+### 7. Production DevOps & Cloud Deployment
+- **Docker Compose Orchestration**: Containerized multi-container environment encompassing PostgreSQL 16, FastAPI Backend Gateway, FastAPI ML Microservice, and an Nginx Alpine SPA.
+- **Nginx Reverse Proxying**: Built-in production routing with SPA HTML5 fallback and upstream API gateway proxying.
+- **Live Render Deployment**: Fully operational production release on Render across managed static sites, web services, and PostgreSQL databases.
 
 ---
 
-## Tech Stack
+## Future Implementation
 
-| Layer | Technology |
-|---|---|
-| Backend | Python, FastAPI |
-| Frontend | JavaScript, React.js, Vite |
-| Primary DB | PostgreSQL + PostGIS |
-| Secondary DB | MongoDB |
-| ML Models | XGBoost, Random Forest, LightGBM, TensorFlow, PyTorch |
-| Data Analytics | Scikit-learn, Pandas, NumPy |
-| GIS | GDAL, Rasterio, GeoPandas, Shapely |
-| Visualization | Leaflet.js, Plotly, Chart.js |
-| DevOps | Docker, Docker Compose, GitHub Actions |
-| Cloud | AWS / Azure |
+The following modules represent the strategic development roadmap for upcoming releases of the platform:
+
+### 1. Advanced Energy Forecasting
+Provide reliable 30-day and seasonal solar/wind generation forecasts leveraging time-series machine learning models to predict output variability and grid export capacity.
+
+### 2. Deployment Optimization Engine
+Recommend the best technology, capacity, and site combination for each project using multi-objective genetic algorithms and spatial optimization to maximize return on investment.
+
+### 3. Financial Feasibility Analysis
+Add comprehensive financial intelligence including CAPEX, OPEX, ROI, payback period, levelized cost of energy (LCOE), revenue projections, and energy-cost estimates.
+
+### 4. Automated Feasibility Reports
+Generate downloadable, executive-ready PDF and spreadsheet reports incorporating spatial maps, environmental metrics, suitability rankings, ML predictions, and strategic recommendations.
+
+### 5. Notification and Alert System
+Notify users about automated data updates, site-status transitions, prediction completions, critical weather anomalies, and system operational issues through in-app and email alerts.
 
 ---
 
-## Recommended Datasets
+## Current Technology Stack
 
-| Dataset | Purpose |
-|---|---|
-| NASA POWER | Solar irradiance, climate data |
-| Global Wind Atlas | Wind resource assessment |
-| NASA SRTM | Terrain analysis, elevation mapping |
-| OpenStreetMap | Road networks, infrastructure mapping |
-| Copernicus Sentinel | Land cover analysis, environmental monitoring |
+| Layer | Technologies | Purpose |
+|---|---|---|
+| **Frontend** | React 19, Vite, React Router 7, Axios | Single-Page Web Application |
+| **Mapping & GIS** | Leaflet.js, React-Leaflet, OpenStreetMap | Interactive spatial analysis |
+| **Backend API** | Python 3.11, FastAPI, Pydantic v2, SQLAlchemy 2.0 | High-performance API Gateway |
+| **ML Microservice** | FastAPI, Scikit-Learn, XGBoost, Joblib, NumPy, Pandas | Climate inference & suitability scoring |
+| **Database** | PostgreSQL 16 | Relational data persistence & spatial indices |
+| **Authentication**| JWT (Python-Jose), Passlib (Bcrypt), Google OAuth2 | Secure identity & role management |
+| **Web Server** | Nginx (Alpine) | Production SPA hosting & reverse proxy |
+| **DevOps & Cloud** | Docker, Docker Compose, Render | Container orchestration & cloud deployment |
+
+---
+
+## External Data Integrations
+
+| Data Source | Integration Type | Parameter Scope |
+|---|---|---|
+| **NASA POWER API** | REST API | Solar GHI, DNI, peak sun hours, daily ambient temperatures |
+| **Open-Meteo API** | REST API | Wind speed at 10m/50m, wind direction, precipitation, cloud cover, humidity |
+| **OpenTopoData / NASA SRTM** | REST API | Digital elevation models (DEM), terrain slope, aspect |
+| **Nominatim (OpenStreetMap)** | REST API | Reverse geocoding of coordinates to country, state, and administrative region |

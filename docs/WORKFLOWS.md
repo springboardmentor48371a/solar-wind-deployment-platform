@@ -1,360 +1,276 @@
-# Workflows
+# Platform Workflows & Access Control
 
-Key workflows and processes implemented in the Solar & Wind Deployment Intelligence Platform.
+This document outlines the operational workflows, authentication sequences, RESTful API specifications, and role-based permissions governing the Solar & Wind Deployment Intelligence Platform.
 
 ---
 
 ## Table of Contents
 
-1. [User Registration & Login](#1-user-registration--login)
-2. [Google OAuth Login](#2-google-oauth-login)
-3. [Token Refresh](#3-token-refresh)
-4. [Project & Site Creation](#4-project--site-creation)
-5. [Site Status Update & Audit Trail](#5-site-status-update--audit-trail)
-6. [Environmental Data Collection](#6-environmental-data-collection)
-7. [ML Prediction Pipeline](#7-ml-prediction-pipeline)
-8. [API Endpoints Reference](#api-endpoints-reference)
-9. [Role-Based Access Control](#role-based-access-control)
+1. [Authentication & Session Lifecycle](#1-authentication--session-lifecycle)
+2. [Project & Site Lifecycle](#2-project--site-lifecycle)
+3. [Site Status Transition & Audit Trail](#3-site-status-transition--audit-trail)
+4. [Environmental Data Ingestion Pipeline](#4-environmental-data-ingestion-pipeline)
+5. [Machine Learning Prediction Workflow](#5-machine-learning-prediction-workflow)
+6. [API Endpoints Reference](#6-api-endpoints-reference)
+7. [Role-Based Access Control (RBAC) Specification](#7-role-based-access-control-rbac-specification)
 
 ---
 
-## 1. User Registration & Login
+## 1. Authentication & Session Lifecycle
 
+### Standard Email & Password Authentication
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Frontend as React SPA (Client)
+    participant API as FastAPI Gateway
+    participant DB as PostgreSQL DB
+
+    User->>Frontend: Submit email, password, full name, role
+    Frontend->>API: POST /auth/register or /auth/login
+    API->>DB: Query user by email
+    Note over API: Verify password using passlib bcrypt
+    API->>Frontend: Return access_token (30m) & refresh_token (7d)
+    Frontend->>Frontend: Store tokens in localStorage
+    Frontend->>API: GET /users/me (Bearer Token)
+    API->>DB: Fetch user profile & active role
+    API->>Frontend: Return User Profile
+    Frontend->>Frontend: Redirect to role-specific dashboard
 ```
-User submits email + password + role
-        ↓
-Backend checks email is not already registered
-        ↓
-Password is hashed with bcrypt
-        ↓
-User record saved to `users` table
-        ↓
-access_token (30 min) + refresh_token (7 days) returned
-        ↓
-Frontend stores tokens in localStorage
-        ↓
-Frontend fetches GET /users/me to get profile
-        ↓
-User redirected to their role-specific dashboard
-```
+
+### Google OAuth2 Authentication
+
+1. **Initiation**: User clicks *"Continue with Google"*. Frontend requests redirect URI via `GET /auth/google/login`.
+2. **Consent**: User completes Google authentication; Google redirects to backend callback with authorization code: `GET /auth/google/callback?code=...`.
+3. **Account Provisioning**: Backend exchanges authorization code with Google for profile data (name, email, Google user ID). If user does not exist, an account is automatically provisioned; if exists, Google credentials are linked.
+4. **Token Delivery**: Backend issues JWT session tokens and redirects browser back to frontend with query parameters: `http://localhost:5173/?access_token=...&refresh_token=...`.
+5. **Client Mount**: React reads tokens from URL search parameters, persists them in `localStorage`, cleans the browser history URL via `history.replaceState()`, and navigates to the role dashboard.
+
+### Session Token Lifetimes
+- **Access Token**: Valid for **30 minutes** (used in `Authorization: Bearer <token>` header).
+- **Refresh Token**: Valid for **7 days** (used with `POST /auth/refresh` to rotate access tokens without forcing re-login).
 
 ---
 
-## 2. Google OAuth Login
+## 2. Project & Site Lifecycle
 
+```mermaid
+flowchart TD
+    Start([User Initiates Site Addition]) --> RoleCheck{Role Check}
+    RoleCheck -->|GIS Analyst / Energy Planner / Project Manager| Preview[GET /sites/preview?lat=&lon=]
+    RoleCheck -->|Unauthorized / Admin| Deny[HTTP 403 Forbidden]
+    
+    Preview --> Validate[Validate Coordinates & Fetch OpenTopoData Elevation]
+    Validate --> Submit[POST /sites/ with Coordinates, Energy Type, Ownership]
+    Submit --> ReverseGeo[Reverse Geocoding: Auto-detect Country & State via Nominatim]
+    ReverseGeo --> RegionAssign[Auto-create or Link Region to Project]
+    RegionAssign --> Persist[Insert Site Record in DB]
+    
+    Persist --> AsyncEnv[Async Ingestion: 30-day NASA POWER & Open-Meteo Climate Data]
+    Persist --> AsyncML[Trigger ML Suitability & Resource Yield Predictions]
+    AsyncEnv --> Complete([Site Ready for Spatial & Analytics Evaluation])
+    AsyncML --> Complete
 ```
-User clicks "Continue with Google"
-        ↓
-Frontend calls GET /auth/google/login
-        ↓
-Backend returns Google OAuth URL
-        ↓
-Browser redirects to Google login page
-        ↓
-User approves → Google redirects to GET /auth/google/callback?code=...
-        ↓
-Backend exchanges code for Google access token
-        ↓
-Backend fetches user info from Google (name, email, picture)
-        ↓
-If user exists → link Google account
-If user doesn't exist → create new account
-        ↓
-Backend redirects to http://localhost:5173?access_token=...&refresh_token=...
-        ↓
-Frontend reads tokens from URL, stores in localStorage, clears URL
-        ↓
-User is logged in
-```
+
+1. **Project Initiation**: Created by an **Energy Planner** or **Project Manager** (name and description).
+2. **Coordinate Preview**: GIS Analyst or Planner clicks on the map or inputs coordinates. `GET /sites/preview` validates latitude (-90 to 90) and longitude (-180 to 180), fetches terrain elevation, and resolves geographic boundaries.
+3. **Site Registration**: `POST /sites/` saves the site under the project, auto-assigns region, and triggers background climate and ML pipelines.
 
 ---
 
-## 3. Token Refresh
+## 3. Site Status Transition & Audit Trail
 
+Site approval governance is strictly restricted to **Project Managers** to guarantee formal review before project commitment.
+
+```mermaid
+stateDiagram-v2
+    [*] --> under_review: Site Created (Default)
+    under_review --> approved: Project Manager Approves
+    under_review --> rejected: Project Manager Rejects
+    approved --> under_review: Reopened for Re-assessment
+    rejected --> under_review: Re-submitted with Adjustments
+    
+    note right of approved
+        Every transition records:
+        - Previous Status
+        - New Status
+        - Reviewer ID (changed_by)
+        - Timestamp (changed_at)
+        - Rationale / Notes
+    end note
 ```
-access_token expires after 30 minutes
-        ↓
-Frontend sends POST /auth/refresh with refresh_token
-        ↓
-Backend validates refresh_token signature and type
-        ↓
-New access_token issued (refresh_token unchanged)
-        ↓
-Frontend updates localStorage with new access_token
-```
 
-**Token lifetimes:**
-- `access_token` → 30 minutes
-- `refresh_token` → 7 days
-
-After 7 days the refresh token expires and the user must log in again.
+- **Endpoint**: `PATCH /sites/{site_id}/status`
+- **Audit Table**: `deployment_history` (persists chronological status changes, reviewer ID, and reviewer notes).
+- **Audit Retrieval**: `GET /sites/{site_id}/history` (accessible to all authenticated team members).
 
 ---
 
-## 4. Project & Site Creation
+## 4. Environmental Data Ingestion Pipeline
 
-### Project Creation
-```
-Energy Planner / Project Manager / Admin creates a Project
-  → only name + description required
-  → region is NOT set at this point
-  → project saved with status = "planning", region_id = null
-```
+When a site is registered or refreshed:
 
-### Site Creation (2-step)
-
-**Step 1 — Location Preview**
-```
-User enters site name, coordinates, energy type, land ownership
-        ↓
-Frontend calls GET /sites/preview?lat=&lon=
-        ↓
-Backend calls Nominatim reverse geocoding API
-        ↓
-Backend calls OpenTopoData for elevation
-        ↓
-Returns detected country, state, city, display_name, elevation
-        ↓
-Frontend shows preview card — "Is this the correct location?"
-User can go back to edit coordinates or confirm
-```
-
-**Step 2 — Site Creation**
-```
-User confirms location
-        ↓
-POST /sites/ called
-        ↓
-Backend reverse geocodes coordinates → gets region info
-        ↓
-Region looked up in DB by country + state
-  → if not found: new region auto-created
-        ↓
-If project has no region_id → auto-assigned from this site's region
-        ↓
-Elevation fetched from OpenTopoData
-        ↓
-Site saved with status = "under_review" (default)
-        ↓
-30 days of environmental data auto-fetched in background
-  (NASA POWER + Open-Meteo + OpenTopoData)
-        ↓
-Site appears on map and in project's site list
-```
+1. **24-Hour Cache Check**: `POST /environmental/{site_id}/collect?days=30` inspects the maximum `fetched_at` timestamp. If data was refreshed within the last 24 hours, ingestion is skipped to conserve bandwidth and prevent redundant API queries.
+2. **Multi-Source Fetch**:
+   - **NASA POWER API**: Daily solar irradiance ($W/m^2$), peak sun hours, direct normal irradiance (DNI), and ambient temperatures.
+   - **Open-Meteo API**: Wind speed at 10m and 50m ($m/s$), wind direction, precipitation, cloud cover percentage, and relative humidity.
+   - **OpenTopoData / NASA SRTM**: Digital elevation model (DEM) metrics, terrain slope, and aspect degree.
+3. **Storage & Aggregation**: Raw daily observations are stored in `environmental_data`. `GET /environmental/{site_id}/summary` returns consolidated statistical means for analytical dashboards.
 
 ---
 
-## 5. Site Status Update & Audit Trail
+## 5. Machine Learning Prediction Workflow
 
-```
-Authorized user changes site status via dropdown
-        ↓
-PATCH /sites/{id}/status called with new status
-        ↓
-Backend reads current status as previous_status
-        ↓
-New DeploymentHistory record written:
-  - site_id
-  - changed_by (current user)
-  - previous_status
-  - new_status
-  - changed_at (timestamp)
-        ↓
-Site status updated in `sites` table
-        ↓
-Full history retrievable via GET /sites/{id}/history
-```
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as User / Dashboard
+    participant API as FastAPI Backend (:8000)
+    participant DB as PostgreSQL DB
+    participant ML as ML Service (:8001)
 
-**Site status progression:**
-```
-under_review → approved
-             ↘ rejected
-```
+    Client->>API: POST /predictions/{site_id}/run
+    API->>DB: Query site coordinates, elevation, energy type & infrastructure
+    API->>ML: POST /predict/all (Site Metadata + Ingested Climate Averages)
+    
+    activate ML
+    Note over ML: Solar Model (Capacity Factor & Yield kWh)
+    Note over ML: Wind Model (Power kW via Betz / SCADA)
+    Note over ML: Land Cover Model (Vegetation Index & Slope)
+    Note over ML: Suitability Scoring Engine (Weighted Composite)
+    ML->>DB: Upsert site_predictions & land_cover records
+    ML-->>API: Return Predictions & Suitability Category
+    deactivate ML
 
-Sites enter as `under_review` by default. Our platform's role is to evaluate and approve or reject sites — deployment tracking is out of scope.
-
----
-
-## 6. Environmental Data Collection
-
-```
-Site is created → auto-triggers data collection for last 30 days
-        ↓
-POST /environmental/{site_id}/collect?days=30 called internally
-        ↓
-Backend checks if data was already fetched within 24 hours
-  → if yes: returns "Data already up to date" (no API calls made)
-  → if no: proceeds with collection
-        ↓
-3 API calls made:
-  1. NASA POWER API  → solar irradiance, wind speed (10m & 50m),
-                       wind direction, temperature, rainfall, cloud cover
-  2. Open-Meteo API  → relative humidity
-  3. OpenTopoData    → elevation (fetched once, static per location)
-        ↓
-Data parsed into daily records (one record per day)
-        ↓
-Old records for this site deleted from `environmental_data`
-New records inserted (30 rows per site)
-        ↓
-GET /environmental/{site_id}/summary returns:
-  - avg solar irradiance
-  - avg peak sun hours
-  - avg wind speed (10m and 50m)
-  - avg temperature
-  - total rainfall
-  - avg cloud cover
-  - avg humidity
-  - elevation
-  - total days of data
-```
-
-**Refresh behaviour:**
-- Clicking Refresh in the UI calls `POST /environmental/{site_id}/collect`
-- If data was fetched within the last 24 hours, the cache check skips re-fetching and re-reads from DB
-- After 24 hours, old rows are deleted and fresh 30-day data is inserted
-
----
-
-## 7. ML Prediction Pipeline
-
-```
-User triggers ML predictions (manually or on site creation)
-        ↓
-POST /predictions/{site_id}/run proxy endpoint called
-        ↓
-Backend queries database for site details (coordinates, elevation, type)
-        ↓
-Backend forwards request to the ml-service: POST /predict/all
-        ↓
-ml-service averages 30 days of site's environmental_data
-        ↓
-ml-service executes 3 prediction modules:
-  - Solar Model: predicts capacity factor & daily solar yield (10 features)
-  - Wind Model: predicts power output with Betz-limit low speed fallback (10 features)
-  - Land Cover Model: predicts dominant cover class & vegetation index (3 features)
-        ↓
-ml-service calculates final deployment suitability score & rating category
-        ↓
-ml-service writes/updates record in `site_predictions` table
-        ↓
-Frontend displays scores, sub-scores, and recommendations in real-time
+    API-->>Client: Return Comprehensive ML Assessment
 ```
 
 ---
 
-## API Endpoints Reference
+## 6. API Endpoints Reference
 
 ### Authentication — `/auth`
 
-| Method | Endpoint | Auth | Description |
+| Method | Endpoint | Authorization | Description |
 |---|---|---|---|
-| POST | `/auth/register` | Public | Register new user, returns tokens |
-| POST | `/auth/login` | Public | Login with email/password, returns tokens |
-| POST | `/auth/refresh` | Public | Exchange refresh token for new access token |
-| GET | `/auth/google/login` | Public | Get Google OAuth redirect URL |
-| GET | `/auth/google/callback` | Public | Google OAuth callback, redirects to frontend with tokens |
+| `POST` | `/auth/register` | Public | Register new user account with default role |
+| `POST` | `/auth/login` | Public | OAuth2 password form login; returns JWT tokens |
+| `POST` | `/auth/refresh` | Public | Exchange refresh token for a fresh access token |
+| `GET` | `/auth/google/login` | Public | Generate Google OAuth authorization URL |
+| `GET` | `/auth/google/callback`| Public | Google OAuth callback handler; redirects with tokens |
 
-### Users — `/users`
+### User Management — `/users`
 
-| Method | Endpoint | Auth | Description |
+| Method | Endpoint | Authorization | Description |
 |---|---|---|---|
-| GET | `/users/me` | Any | Get own profile |
-| PATCH | `/users/me` | Any | Update own profile |
-| GET | `/users/` | Admin | List all users |
-| PATCH | `/users/{id}/role` | Admin | Change a user's role |
-| PATCH | `/users/{id}/deactivate` | Admin | Deactivate a user account |
+| `GET` | `/users/me` | Authenticated (Any) | Retrieve logged-in user profile |
+| `PATCH` | `/users/me` | Authenticated (Any) | Update own user profile details |
+| `GET` | `/users/` | **Administrator** | List all platform user accounts |
+| `PATCH` | `/users/{id}/role` | **Administrator** | Update a user's assigned role |
+| `PATCH` | `/users/{id}/deactivate`| **Administrator** | Deactivate an active user account |
 
-### Regions — `/regions`
+### Geographic Regions — `/regions`
 
-| Method | Endpoint | Auth | Description |
+| Method | Endpoint | Authorization | Description |
 |---|---|---|---|
-| POST | `/regions/` | Admin | Create a new region manually |
-| GET | `/regions/` | Any | List all regions |
-| DELETE | `/regions/{id}` | Admin | Delete a region |
-
-> Regions are normally auto-created from site coordinates. Manual creation is admin-only.
+| `GET` | `/regions/` | Authenticated (Any) | List all registered geographic regions |
+| `POST` | `/regions/` | **Energy Planner**, **Project Manager** | Explicitly register a new region |
+| `DELETE`| `/regions/{id}` | **Energy Planner**, **Project Manager** | Remove an existing region |
 
 ### Projects — `/projects`
 
-| Method | Endpoint | Auth | Description |
+| Method | Endpoint | Authorization | Description |
 |---|---|---|---|
-| POST | `/projects/` | Planner, Manager, Admin | Create a new project (name + description only) |
-| GET | `/projects/` | Any | List all projects |
-| GET | `/projects/{id}` | Any | Get a specific project |
-| PATCH | `/projects/{id}` | Creator or Admin | Update project details or status |
-| DELETE | `/projects/{id}` | Admin | Delete a project |
+| `POST` | `/projects/` | **Energy Planner**, **Project Manager** | Create a new renewable project container |
+| `GET` | `/projects/` | Authenticated (Any) | List all accessible projects |
+| `GET` | `/projects/{id}` | Authenticated (Any) | Retrieve specific project details |
+| `PATCH` | `/projects/{id}` | **Project Manager** or **Project Creator** | Modify project name, description, or status |
+| `DELETE`| `/projects/{id}` | **Project Manager** or **Project Creator** | Delete project and cascade dependencies |
 
 ### Sites — `/sites`
 
-| Method | Endpoint | Auth | Description |
+| Method | Endpoint | Authorization | Description |
 |---|---|---|---|
-| GET | `/sites/preview?lat=&lon=` | Any | Preview detected location + elevation before creating site |
-| POST | `/sites/` | Any | Register a new site — auto-detects region, elevation, fetches env data |
-| GET | `/sites/` | Any | List sites, filter by `?project_id=` |
-| GET | `/sites/compare?ids=1,2,3` | Any | Compare multiple sites side by side |
-| GET | `/sites/{id}` | Any | Get a specific site |
-| PATCH | `/sites/{id}` | Creator or Admin | Update site details |
-| PATCH | `/sites/{id}/status` | Planner, Manager, Admin | Update site status (writes history) |
-| GET | `/sites/{id}/history` | Any | Get full deployment history for a site |
-| DELETE | `/sites/{id}` | Creator or Admin | Delete a site |
-
-### Predictions — `/predictions`
-
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| GET | `/predictions/{site_id}` | Any | Retrieve calculated ML predictions & suitability scores |
-| POST | `/predictions/{site_id}/run` | Any | Manually trigger/re-run all ML models for a site |
+| `GET` | `/sites/preview?lat=&lon=` | Authenticated (Any) | Reverse geocode and fetch elevation for coordinates |
+| `POST` | `/sites/` | **GIS Analyst**, **Energy Planner**, **Project Manager** | Register a site under an existing project |
+| `GET` | `/sites/` | Authenticated (Any) | Query sites (filterable by `?project_id=`) |
+| `GET` | `/sites/compare?ids=1,2`| Authenticated (Any) | Multi-site side-by-side comparison matrix |
+| `GET` | `/sites/{id}` | Authenticated (Any) | Retrieve single site metadata |
+| `PATCH` | `/sites/{id}` | **Project Manager** or **Site Creator** | Update site coordinates, land area, notes |
+| `PATCH` | `/sites/{id}/status` | **Project Manager ONLY** | Transition site status (`under_review`, `approved`, `rejected`) |
+| `GET` | `/sites/{id}/history`| Authenticated (Any) | Retrieve chronological deployment audit history |
+| `DELETE`| `/sites/{id}` | **Project Manager** or **Site Creator** | Delete site and cascade all associated ML/climate records |
 
 ### Environmental Data — `/environmental`
 
-| Method | Endpoint | Auth | Description |
+| Method | Endpoint | Authorization | Description |
 |---|---|---|---|
-| POST | `/environmental/{site_id}/collect?days=30` | Any | Fetch and store environmental data from external APIs |
-| GET | `/environmental/{site_id}` | Any | Get all daily records for a site |
-| GET | `/environmental/{site_id}?start_date=&end_date=` | Any | Get records filtered by date range |
-| GET | `/environmental/{site_id}/summary` | Any | Get aggregated averages and totals |
+| `POST` | `/environmental/{site_id}/collect?days=30` | Authenticated (Any) | Fetch and cache 30-day meteorological data |
+| `GET` | `/environmental/{site_id}` | Authenticated (Any) | Retrieve daily historical environmental rows |
+| `GET` | `/environmental/{site_id}/summary` | Authenticated (Any) | Retrieve aggregated climate averages & totals |
+
+### Predictions & Suitability — `/predictions`
+
+| Method | Endpoint | Authorization | Description |
+|---|---|---|---|
+| `GET` | `/predictions/{site_id}` | Authenticated (Any) | Get precomputed ML scores and suitability rank |
+| `POST` | `/predictions/{site_id}/run` | Authenticated (Any) | Trigger ML inference pipeline on the ML microservice |
 
 ---
 
-## Role-Based Access Control
+## 7. Role-Based Access Control (RBAC) Specification
 
-### Backend permissions
+The platform implements a precise operational hierarchy reflecting real-world organizational governance.
 
-| Action | Energy Planner | GIS Analyst | Project Manager | Administrator |
-|---|---|---|---|---|
-| Register / Login | ✅ | ✅ | ✅ | ✅ |
-| View own profile | ✅ | ✅ | ✅ | ✅ |
-| Update own profile | ✅ | ✅ | ✅ | ✅ |
-| List all users | ❌ | ❌ | ❌ | ✅ |
-| Change user role | ❌ | ❌ | ❌ | ✅ |
-| Deactivate user | ❌ | ❌ | ❌ | ✅ |
-| Create region (manual) | ❌ | ❌ | ❌ | ✅ |
-| Delete region | ❌ | ❌ | ❌ | ✅ |
-| View regions | ✅ | ✅ | ✅ | ✅ |
-| Create project | ✅ | ❌ | ✅ | ✅ |
-| Edit own project | ✅ | ❌ | ✅ | ✅ |
-| Edit any project | ❌ | ❌ | ❌ | ✅ |
-| Delete project | ❌ | ❌ | ❌ | ✅ |
-| View projects | ✅ | ✅ | ✅ | ✅ |
-| Create site | ✅ | ✅ | ✅ | ✅ |
-| Edit own site | ✅ | ✅ | ✅ | ✅ |
-| Edit any site | ❌ | ❌ | ❌ | ✅ |
-| Update site status | ✅ | ❌ | ✅ | ✅ |
-| Delete own site | ✅ | ✅ | ✅ | ✅ |
-| Delete any site | ❌ | ❌ | ❌ | ✅ |
-| View sites | ✅ | ✅ | ✅ | ✅ |
-| Collect environmental data | ✅ | ✅ | ✅ | ✅ |
-| View environmental data | ✅ | ✅ | ✅ | ✅ |
-| Run ML predictions | ✅ | ❌ | ✅ | ✅ |
-| View ML predictions | ✅ | ✅ | ✅ | ✅ |
+### Backend API Permissions Matrix
 
-### Frontend UI visibility by role
+| Platform Action | Energy Planner | GIS Analyst | Project Manager | Administrator |
+|---|:---:|:---:|:---:|:---:|
+| **Authentication & Profile** |
+| Register & Login | ✅ | ✅ | ✅ | ✅ |
+| View & Update Own Profile | ✅ | ✅ | ✅ | ✅ |
+| **System Governance (Users)** |
+| List All Users | ❌ | ❌ | ❌ | ✅ |
+| Change User Roles | ❌ | ❌ | ❌ | ✅ |
+| Deactivate User Accounts | ❌ | ❌ | ❌ | ✅ |
+| **Project Management** |
+| Create Projects | ✅ | ❌ | ✅ | ❌ |
+| Edit Projects | ✅ *(Own)* | ❌ | ✅ *(Any)* | ❌ |
+| Delete Projects | ✅ *(Own)* | ❌ | ✅ *(Any)* | ❌ |
+| View Projects & Regions | ✅ | ✅ | ✅ | ✅ |
+| Create / Delete Regions | ✅ | ❌ | ✅ | ❌ |
+| **Site Operations** |
+| Preview Coordinates & Elevation | ✅ | ✅ | ✅ | ✅ |
+| Create Sites | ✅ | ✅ | ✅ | ❌ |
+| Edit Sites | ✅ *(Own)* | ✅ *(Own)* | ✅ *(Any)* | ❌ |
+| Delete Sites | ✅ *(Own)* | ❌ | ✅ *(Any)* | ❌ |
+| View Sites & Compare | ✅ | ✅ | ✅ | ✅ |
+| **Approval Governance** |
+| Update Site Status (`approved`/`rejected`) | ❌ | ❌ | **✅ (Exclusive)** | ❌ |
+| View Site Deployment History | ✅ | ✅ | ✅ | ✅ |
+| **Analytics & Climate** |
+| Collect Environmental Data | ✅ | ✅ | ✅ | ✅ |
+| View Environmental Summaries | ✅ | ✅ | ✅ | ✅ |
+| Run ML Predictions | ✅ | ✅ | ✅ | ✅ |
+| View ML Predictions & Suitability | ✅ | ✅ | ✅ | ✅ |
 
-| UI Element | Energy Planner | GIS Analyst | Project Manager | Administrator |
-|---|---|---|---|---|
-| Create Project button | ✅ | ❌ | ✅ | ✅ |
-| Delete Project button | ❌ | ❌ | ❌ | ✅ |
-| Site status dropdown | ✅ | ❌ | ✅ | ✅ |
-| User Management tab | ❌ | ❌ | ❌ | ✅ |
-| Default landing page | Projects | Map | Projects | Projects |
+> **Design Rationale for Administrator Role:** Administrators are dedicated to security governance, user compliance, and identity lifecycle management. Domain-level renewable project modeling, site engineering, and site approvals are partitioned to energy professionals (Planners, GIS Analysts, Project Managers) to maintain principle of least privilege (PoLP) and clean separation of duties.
+
+---
+
+### Frontend UI Navigation & Capabilities by Role
+
+| Feature / UI Component | Energy Planner | GIS Analyst | Project Manager | Administrator |
+|---|:---:|:---:|:---:|:---:|
+| **Default Landing Page** | Projects & Sites | Map View | Projects & Sites | User Management |
+| **Navigation Tabs Available** | Projects, Map, Analytics | Map, Sites, Analytics | Projects, Map, Analytics | User Management |
+| **"Create Project" Action** | ✅ Visible | ❌ Hidden | ✅ Visible | ❌ Hidden |
+| **"Create Site" Action** | ✅ Visible | ✅ Visible | ✅ Visible | ❌ Hidden |
+| **"Delete Project" Action** | ✅ (Own projects) | ❌ Hidden | ✅ (All projects) | ❌ Hidden |
+| **"Delete Site" Action** | ✅ (Own sites) | ❌ Hidden | ✅ (All sites) | ❌ Hidden |
+| **Status Approval Dropdown** | ❌ Read-Only Pill | ❌ Read-Only Pill | **✅ Interactive Dropdown** | ❌ Read-Only Pill |
+| **User Administration Console**| ❌ Hidden | ❌ Hidden | ❌ Hidden | **✅ Active** |
+| **Interactive Map & Layers** | ✅ Interactive | ✅ Interactive | ✅ Interactive | ❌ (Access via direct URL) |
+| **Run ML Prediction Button** | ✅ Active | ✅ Active | ✅ Active | ❌ |
