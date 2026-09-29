@@ -1,3 +1,21 @@
+<<<<<<< HEAD
+__pycache__/
+*.py[cod]
+*$py.class
+*.joblib
+.venv/
+venv/
+ENV/
+*.sqlite
+*.db
+.env
+node_modules/
+dist/
+build/
+.DS_Store
+*.log
+coverage/
+=======
 # Python
 __pycache__/
 *.pyc
@@ -18,3 +36,4 @@ dist/
 # IDE
 .vscode/
 .idea/
+>>>>>>> 37662da0e8869e0bbc1ff09955f5860bf55aedba
